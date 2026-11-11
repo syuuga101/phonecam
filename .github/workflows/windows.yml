@@ -11,6 +11,9 @@ env:
   # softcam (MIT, https://github.com/tshino/softcam) の固定バージョン
   SOFTCAM_TAG: v1.8.1
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -133,3 +136,16 @@ jobs:
           name: PhoneCamReceiver
           path: package/PhoneCamReceiver
           if-no-files-found: error
+
+      - name: Zip package
+        shell: pwsh
+        run: Compress-Archive -Path package/PhoneCamReceiver -DestinationPath package/PhoneCamReceiver.zip -Force
+
+      - name: Publish to release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: PhoneCam 最新版
+          body: mainブランチの最新ビルドです。PhoneCam.ipa をAltStoreで、PhoneCamReceiver.zip をWindowsで使います。
+          files: package/PhoneCamReceiver.zip
