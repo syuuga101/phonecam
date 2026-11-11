@@ -1,0 +1,39 @@
+name: Build Windows receiver
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r windows/requirements.txt pyinstaller
+
+      - name: Build exe
+        shell: pwsh
+        working-directory: windows
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name PhoneCamReceiver --collect-all av --collect-all pyvirtualcam phonecam_receiver.py
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhoneCamReceiver-exe
+          path: windows/dist/PhoneCamReceiver.exe
+          if-no-files-found: error
