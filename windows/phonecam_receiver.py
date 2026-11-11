@@ -12,6 +12,10 @@ import plistlib
 import socket
 import struct
 import sys
+try:
+    from phonecam_version import VERSION as APP_VERSION  # ビルド時に生成される
+except Exception:
+    APP_VERSION = "dev"
 import threading
 import time
 
@@ -192,6 +196,8 @@ DEFAULT_SETTINGS = {
     "mirror": False,
     "rotate180": False,
     "orientation": "auto",
+    "canvas": "follow",
+    "fit": "pad",
     "backend": "phonecam" if os.path.isfile(softcam_path()) else "obs",
     "codec": "h264",
     "bg_mode": "off",
@@ -220,6 +226,8 @@ BACKENDS = ("phonecam", "obs", "unitycapture")
 CODECS = ("h264", "hevc")
 BG_MODES = ("off", "blur", "green")
 BG_QUALITIES = ("fast", "balanced")
+CANVAS_MODES = ("follow", "landscape", "portrait", "native")
+FIT_MODES = ("pad", "crop")
 # (キー, 最小, 最大) — 範囲外の値は丸める
 NUMERIC_RANGES = {
     "bg_strength": (0.0, 1.0),
@@ -234,7 +242,8 @@ COLOR_DEFAULTS = {"brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "sharpn
 def sanitize_settings(s):
     """読み込んだ設定の新規項目を検証し、不正値は既定値へ戻す (古い設定ファイルとの互換用)。"""
     for key, allowed in (("backend", BACKENDS), ("codec", CODECS),
-                         ("bg_mode", BG_MODES), ("bg_quality", BG_QUALITIES)):
+                         ("bg_mode", BG_MODES), ("bg_quality", BG_QUALITIES),
+                         ("canvas", CANVAS_MODES), ("fit", FIT_MODES)):
         if s.get(key) not in allowed:
             s[key] = DEFAULT_SETTINGS[key]
     for key, (lo, hi) in NUMERIC_RANGES.items():
@@ -322,6 +331,71 @@ def build_control(settings, group):
 
 
 # ---------------------------------------------------------------------------
+# 出力サイズの固定 (向きが変わっても仮想カメラを作り直さない)
+# ---------------------------------------------------------------------------
+
+def canvas_size(settings):
+    """仮想カメラの出力サイズ (幅, 高さ)。native のときは None (= フレームのサイズそのまま)。"""
+    mode = settings.get("canvas", "follow")
+    if mode == "native":
+        return None
+    long_side, short_side = RESOLUTIONS.get(settings.get("resolution"), (1920, 1080))
+    if mode == "follow":
+        mode = "portrait" if settings.get("orientation", "auto") == "portrait" else "landscape"
+    if mode == "portrait":
+        return (short_side, long_side)
+    return (long_side, short_side)
+
+
+def _even(x):
+    return max(2, int(round(x / 2.0)) * 2)
+
+
+def fit_geometry(fw, fh, cw, ch, fit):
+    """(fw x fh) のフレームを (cw x ch) に合わせるときの (拡縮後の幅, 高さ, x, y)。
+    pad: 全体が収まる最大サイズで中央に置く位置 (x, y >= 0)。
+    crop: 全体を覆う最小サイズで、中央を切り出す開始位置 (x, y >= 0)。"""
+    if fit == "crop":
+        scale = max(cw / float(fw), ch / float(fh))
+        sw, sh = max(_even(fw * scale), cw), max(_even(fh * scale), ch)
+        return sw, sh, (sw - cw) // 2, (sh - ch) // 2
+    scale = min(cw / float(fw), ch / float(fh))
+    sw, sh = min(_even(fw * scale), cw), min(_even(fh * scale), ch)
+    return sw, sh, (cw - sw) // 2, (ch - sh) // 2
+
+
+class CanvasFitter:
+    """フレームを固定サイズのキャンバスに収める。PyAV の reformat で拡縮するので numpy では拡縮しない。"""
+
+    def __init__(self):
+        self._buf = None
+        self._key = None
+
+    def process(self, frame, fmt, canvas, fit, pad_color):
+        """frame: av.VideoFrame, canvas: (幅, 高さ), pad_color: (v0, v1, v2) ※0/255のみ使うので RGB/BGR 共通。
+        戻り値: (ch, cw, 3) の uint8 配列。"""
+        cw, ch = canvas
+        sw, sh, ox, oy = fit_geometry(frame.width, frame.height, cw, ch, fit)
+        arr = frame.reformat(width=sw, height=sh, format=fmt).to_ndarray()
+        if fit == "crop":
+            return arr[oy:oy + ch, ox:ox + cw]
+        key = (cw, ch, tuple(pad_color), sw, sh)
+        if self._buf is None or self._key != key:
+            # 余白の色・キャンバス・貼り付け範囲が変わったときだけ塗り直す
+            if self._buf is None or self._buf.shape != (ch, cw, 3):
+                self._buf = np.empty((ch, cw, 3), dtype=np.uint8)
+            self._buf[:, :] = pad_color
+            self._key = key
+        self._buf[oy:oy + sh, ox:ox + sw] = arr
+        return self._buf
+
+
+def pad_color_for(settings):
+    """余白の色。背景の切り抜き(緑)中は、クロマキーが効くよう純緑 (RGBでもBGRでも同じ並び)。"""
+    return (0, 255, 0) if settings.get("bg_mode") == "green" else (0, 0, 0)
+
+
+# ---------------------------------------------------------------------------
 # 共有状態 (スレッド間)
 # ---------------------------------------------------------------------------
 
@@ -401,6 +475,9 @@ class SoftcamSender:
             self._lib.scDeleteCamera(h)  # 同一プロセスでは1台のみ。作り直す前に必ず削除
 
 
+SIZE_CHANGED_NOTICE = "出力サイズが変わりました。OBSでソースを一度非表示→表示にすると映像が戻ります"
+
+
 class VirtualCamOutput:
     def __init__(self, settings, state):
         self.settings = settings
@@ -411,6 +488,7 @@ class VirtualCamOutput:
         self.reset_requested = False
         self._softcam = None
         self._cam_kind = None  # 現在開いているバックエンド
+        self._notice_until = 0.0  # 出力サイズ変更の案内を消す時刻
 
     # -- 補助 -----------------------------------------------------------
     def backend(self):
@@ -475,7 +553,9 @@ class VirtualCamOutput:
             if not SOFTCAM_TOP_DOWN:
                 img = np.ascontiguousarray(img[::-1])
         h, w = img.shape[0], img.shape[1]
+        size_changed = False
         if self.cam is not None and (self.size != (w, h) or self._cam_kind != backend):
+            size_changed = self._cam_kind == backend and self.size != (w, h)
             self.close()
         if self.cam is None:
             now = time.time()
@@ -519,6 +599,13 @@ class VirtualCamOutput:
                                "インストールしてください。詳細: %s" % e)
                     self.state.update(error_text=msg)
                     return
+            if size_changed:
+                self._notice_until = time.time() + 10.0
+                self.state.update(error_text=SIZE_CHANGED_NOTICE)
+        if self._notice_until and time.time() >= self._notice_until:
+            self._notice_until = 0.0
+            if self.state.snapshot()["error_text"] == SIZE_CHANGED_NOTICE:
+                self.state.update(error_text="")
         try:
             self.cam.send(img)
         except Exception as e:
@@ -698,6 +785,7 @@ class Link:
         frame_count = 0
         fps_t0 = time.time()
         decode_avg = 0.0
+        fitter = CanvasFitter()
 
         while not stop.is_set():
             msg_type, payload = read_msg(sock, stop)
@@ -722,7 +810,13 @@ class Link:
                     continue
                 frame = frames[-1]
                 self.vcam.apply_pending_reset()
-                img = frame.to_ndarray(format=self.vcam.frame_format())
+                fmt = self.vcam.frame_format()
+                canvas = canvas_size(self.settings)
+                if canvas is None or canvas == (frame.width, frame.height):
+                    img = frame.to_ndarray(format=fmt)
+                else:
+                    img = fitter.process(frame, fmt, canvas, self.settings.get("fit", "pad"),
+                                         pad_color_for(self.settings))
                 if self.settings.get("mirror"):
                     img = img[:, ::-1]
                 if self.settings.get("rotate180"):
@@ -761,6 +855,9 @@ SHUTTER_VALUES = [30, 50, 60, 100, 120, 250, 500, 1000]
 ORIENT_LABELS = [("auto", "自動"), ("landscape", "横"), ("portrait", "縦")]
 BACKEND_LABELS = [("phonecam", "PhoneCam（専用カメラ）"), ("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Capture")]
 CODEC_LABELS = [("h264", "H.264"), ("hevc", "HEVC(H.265)")]
+CANVAS_LABELS = [("follow", "向きの設定に合わせる"), ("landscape", "横長で固定"), ("portrait", "縦長で固定"),
+                 ("native", "映像のサイズそのまま（向きが変わるとOBSで再読み込みが必要）")]
+FIT_LABELS = [("pad", "余白を付けて全体を表示"), ("crop", "はみ出す部分を切り取って埋める")]
 BG_MODE_LABELS = [("off", "オフ"), ("blur", "ぼかし"), ("green", "切り抜き(緑)")]
 BG_QUALITY_LABELS = [("fast", "速度優先"), ("balanced", "バランス")]
 THERMAL_LABELS = {"nominal": "正常", "fair": "やや高い", "serious": "高い", "critical": "危険"}
@@ -799,7 +896,7 @@ class App:
         self.manual_widgets = {}
         self._range_cache = {}
 
-        root.title("PhoneCam 受信")
+        root.title("PhoneCam 受信 v%s" % APP_VERSION)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         root.minsize(560, 560)
         root.geometry("620x700")
@@ -1013,13 +1110,25 @@ class App:
         cb.grid(row=7, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("orientation", self._label_to_value(ORIENT_LABELS, self.orient_var.get()), "video"))
 
-        ttk.Label(f, text="コーデック").grid(row=8, column=0, sticky="w", pady=2)
+        ttk.Label(f, text="出力の形").grid(row=8, column=0, sticky="w", pady=2)
+        self.canvas_var = tk.StringVar(value=self._value_to_label(CANVAS_LABELS, self.settings["canvas"]))
+        cb = ttk.Combobox(f, textvariable=self.canvas_var, values=[l for _, l in CANVAS_LABELS], state="readonly", width=24)
+        cb.grid(row=8, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("canvas", self._label_to_value(CANVAS_LABELS, self.canvas_var.get()), None))
+        ttk.Label(f, text="合わせ方").grid(row=9, column=0, sticky="w", pady=2)
+        self.fit_var = tk.StringVar(value=self._value_to_label(FIT_LABELS, self.settings["fit"]))
+        cb = ttk.Combobox(f, textvariable=self.fit_var, values=[l for _, l in FIT_LABELS], state="readonly", width=24)
+        cb.grid(row=9, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("fit", self._label_to_value(FIT_LABELS, self.fit_var.get()), None))
+        self._hint(f, 10, "向きが変わってもOBSの映像が止まらないよう、出力サイズを固定します")
+
+        ttk.Label(f, text="コーデック").grid(row=11, column=0, sticky="w", pady=2)
         self.codec_var = tk.StringVar(value=self._value_to_label(CODEC_LABELS, self.settings["codec"]))
         cb = ttk.Combobox(f, textvariable=self.codec_var, values=[l for _, l in CODEC_LABELS], state="readonly", width=14)
-        cb.grid(row=8, column=1, sticky="w", padx=6)
+        cb.grid(row=11, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("codec", self._label_to_value(CODEC_LABELS, self.codec_var.get()), "codec"))
-        self._hint(f, 9, "HEVC は同じ画質をより低いビットレートで送れます（Wi-Fi向き）")
-        self._hint(f, 10, "出力先「PhoneCam（専用カメラ）」は OBS や Discord のカメラ一覧に「PhoneCam」と表示されます。"
+        self._hint(f, 12, "HEVC は同じ画質をより低いビットレートで送れます（Wi-Fi向き）")
+        self._hint(f, 13, "出力先「PhoneCam（専用カメラ）」は OBS や Discord のカメラ一覧に「PhoneCam」と表示されます。"
                           "OBSの仮想カメラと同時に使えます（初回は register.bat が必要）")
 
     def _on_backend(self):
