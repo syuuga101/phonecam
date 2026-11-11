@@ -29,6 +29,7 @@ final class AppModel: ObservableObject {
     @Published var previewEnabled = false
     @Published var dimScreen = false
     @Published var errorText: String?
+    @Published var rotationAngle = 0
 
     let camera = CameraController()
     private let encoder = H264Encoder()
@@ -74,6 +75,11 @@ final class AppModel: ObservableObject {
                     self.formatText = "\(width)×\(height) \(fps)fps"
                 }
                 self.bitrateText = "\(bitrate) Mbps"
+            }
+        }
+        camera.onRotation = { [weak self] angle in
+            DispatchQueue.main.async {
+                self?.rotationAngle = angle
             }
         }
         camera.onError = { [weak self] message in
@@ -224,10 +230,15 @@ final class PreviewUIView: UIView {
         return layer as! AVCaptureVideoPreviewLayer
     }
 
+    /// 出力と同じ回転角 (0/90/180/270)。プレビューも出力映像と同じ向きで表示する。
+    var angle: CGFloat = 0 {
+        didSet { applyRotation() }
+    }
+
     func applyRotation() {
         if #available(iOS 17.0, *) {
-            if let conn = previewLayer.connection, conn.isVideoRotationAngleSupported(0) {
-                conn.videoRotationAngle = 0
+            if let conn = previewLayer.connection, conn.isVideoRotationAngleSupported(angle) {
+                conn.videoRotationAngle = angle
             }
         }
     }
@@ -240,18 +251,19 @@ final class PreviewUIView: UIView {
 
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
+    let angle: Int
 
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.backgroundColor = .black
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspect
-        view.applyRotation()
+        view.angle = CGFloat(angle)
         return view
     }
 
     func updateUIView(_ uiView: PreviewUIView, context: Context) {
-        uiView.applyRotation()
+        uiView.angle = CGFloat(angle)
     }
 }
 
@@ -312,8 +324,10 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                     if model.previewEnabled {
-                        CameraPreview(session: model.camera.session)
-                            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                        let isPortraitOutput = (model.rotationAngle == 90 || model.rotationAngle == 270)
+                        CameraPreview(session: model.camera.session, angle: model.rotationAngle)
+                            .aspectRatio(isPortraitOutput ? 9.0 / 16.0 : 16.0 / 9.0, contentMode: .fit)
+                            .frame(maxHeight: isPortraitOutput ? 420 : nil)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
 

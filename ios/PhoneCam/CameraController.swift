@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreMedia
 import CoreVideo
+import UIKit
 
 /// AVFoundation を使ったカメラ制御。設定変更は sessionQueue で直列に処理する。
 final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -15,6 +16,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     var onStreamSettings: ((Int, Int, Int, Int) -> Void)?
     /// ユーザー向けエラーメッセージ
     var onError: ((String) -> Void)?
+    /// 出力の回転角 (0/90/180/270) が変わったとき (sessionQueue 上で呼ばれる)
+    var onRotation: ((Int) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "phonecam.session")
     private let videoQueue = DispatchQueue(label: "phonecam.video", qos: .userInteractive)
@@ -45,6 +48,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var zoom: Double = 1.0
     private var torch = false
 
+    // 向き (auto / landscape / portrait)
+    private var reqOrientation = "auto"
+    private var autoAngle = 0          // auto のときの角度 (RotationCoordinator 由来)
+    private var activeRotation = 0     // 実際に接続へ適用した角度
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservation: NSKeyValueObservation?
+    private weak var rotationDevice: AVCaptureDevice?
+
     private static let allParts: Set<String> = ["exposure", "wb", "focus", "zoom", "torch"]
 
     override init() {
@@ -62,12 +73,18 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     }
 
     deinit {
+        rotationObservation?.invalidate()
+        rotationObservation = nil
         NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - 開始
 
     func start() {
+        // UI は縦固定なので、向きの変化を RotationCoordinator に伝えるため明示的に有効化する
+        DispatchQueue.main.async {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        }
         AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
             guard let self = self else { return }
             self.sessionQueue.async {
@@ -108,6 +125,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         s["height"] = activeHeight
         s["fps"] = activeFps
         s["bitrate"] = bitrate
+        s["orientation"] = reqOrientation
+        s["rotationAngle"] = activeRotation
         s["exposureMode"] = (exposure["mode"] as? String) ?? "auto"
         s["wbMode"] = (wb["mode"] as? String) ?? "auto"
         s["focusMode"] = (focus["mode"] as? String) ?? "auto"
@@ -185,6 +204,12 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             reqFps = f
             needReconfigure = true
         }
+        var orientationChanged = false
+        if let o = json["orientation"] as? String,
+           (o == "auto" || o == "landscape" || o == "portrait"), o != reqOrientation {
+            reqOrientation = o
+            orientationChanged = true
+        }
         if let b = intValue(json["bitrate"]), b > 0 {
             bitrate = min(max(b, 1), 100)
         }
@@ -212,8 +237,13 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         if started {
             if needReconfigure {
                 reconfigure()   // 内部で全設定を再適用する
-            } else if !parts.isEmpty {
-                applyDeviceSettings(parts)
+            } else {
+                if orientationChanged {
+                    applyRotationOnQueue()
+                }
+                if !parts.isEmpty {
+                    applyDeviceSettings(parts)
+                }
             }
         }
         publishState()
@@ -333,12 +363,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             if conn.isVideoStabilizationSupported {
                 conn.preferredVideoStabilizationMode = .off
             }
-            if #available(iOS 17.0, *) {
-                if conn.isVideoRotationAngleSupported(0) {
-                    conn.videoRotationAngle = 0
-                }
-            }
         }
+        setupRotationCoordinator(for: dev)
+        applyRotationOnQueue()
 
         session.commitConfiguration()
 
@@ -349,6 +376,63 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         activeLens = (dev.deviceType == .builtInUltraWideCamera) ? "ultrawide" : "wide"
 
         applyDeviceSettings(CameraController.allParts)
+    }
+
+    // MARK: - 向き
+
+    /// 角度を 0/90/180/270 のいちばん近い値にそろえる
+    private func snapAngle(_ a: Double) -> Int {
+        guard a.isFinite else { return 0 }
+        let q = Int((a / 90.0).rounded())
+        return ((q % 4) + 4) % 4 * 90
+    }
+
+    /// デバイスが変わったとき RotationCoordinator と KVO を作り直す (sessionQueue 上)
+    private func setupRotationCoordinator(for dev: AVCaptureDevice) {
+        if rotationCoordinator != nil && rotationDevice === dev {
+            return
+        }
+        rotationObservation?.invalidate()
+        rotationObservation = nil
+        rotationDevice = dev
+
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
+        rotationCoordinator = coordinator
+        autoAngle = snapAngle(Double(coordinator.videoRotationAngleForHorizonLevelCapture))
+        rotationObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture,
+            options: [.initial, .new]
+        ) { [weak self] coord, _ in
+            let angle = Double(coord.videoRotationAngleForHorizonLevelCapture)
+            self?.sessionQueue.async {
+                guard let self = self else { return }
+                self.autoAngle = self.snapAngle(angle)
+                if self.started && self.reqOrientation == "auto" {
+                    self.applyRotationOnQueue()
+                }
+            }
+        }
+    }
+
+    /// 要求された向きを出力接続へ適用する (sessionQueue 上)
+    private func applyRotationOnQueue() {
+        let target: Int
+        switch reqOrientation {
+        case "landscape": target = 0
+        case "portrait": target = 90
+        default: target = autoAngle
+        }
+        guard let conn = output.connection(with: .video) else { return }
+        let angle = CGFloat(target)
+        if conn.isVideoRotationAngleSupported(angle) && conn.videoRotationAngle != angle {
+            conn.videoRotationAngle = angle
+        }
+        let applied = snapAngle(Double(conn.videoRotationAngle))
+        if applied != activeRotation {
+            activeRotation = applied
+            onRotation?(applied)
+            onApplied?(buildStatus())
+        }
     }
 
     // MARK: - 露出 / WB / フォーカス / ズーム / ライト

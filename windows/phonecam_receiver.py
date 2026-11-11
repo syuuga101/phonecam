@@ -43,7 +43,14 @@ MSG_VIDEO = 1
 MSG_STATUS = 3
 MSG_CONTROL = 10
 
-SETTINGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phonecam_settings.json")
+def _app_dir():
+    """設定ファイルを置くフォルダ。exe 化されているときは exe と同じ場所。"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+SETTINGS_PATH = os.path.join(_app_dir(), "phonecam_settings.json")
 
 
 class PhoneCamError(Exception):
@@ -172,6 +179,7 @@ DEFAULT_SETTINGS = {
     "bitrate": 20,
     "mirror": False,
     "rotate180": False,
+    "orientation": "auto",
     "backend": "obs",
     "exp_mode": "auto",
     "exp_bias": 0.0,
@@ -222,6 +230,7 @@ def build_control(settings, group):
         c["width"] = w
         c["height"] = h
         c["fps"] = int(settings["fps"])
+        c["orientation"] = settings.get("orientation", "auto")
     if group in ("all", "bitrate"):
         c["bitrate"] = int(settings["bitrate"])
     if group in ("all", "exposure"):
@@ -543,6 +552,7 @@ RES_LABELS = ["720p", "1080p", "4K"]
 FPS_LABELS = [30, 60]
 MODE3_LABELS = [("auto", "自動"), ("locked", "固定"), ("manual", "マニュアル")]
 SHUTTER_VALUES = [30, 50, 60, 100, 120, 250, 500, 1000]
+ORIENT_LABELS = [("auto", "自動"), ("landscape", "横"), ("portrait", "縦")]
 BACKEND_LABELS = [("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Video Capture")]
 THROTTLE_MS = 50  # 1コントロールあたり最大 20 msg/s
 
@@ -733,6 +743,12 @@ class App:
         cb.grid(row=6, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._on_backend())
 
+        ttk.Label(f, text="向き").grid(row=7, column=0, sticky="w", pady=2)
+        self.orient_var = tk.StringVar(value=self._value_to_label(ORIENT_LABELS, self.settings.get("orientation", "auto")))
+        cb = ttk.Combobox(f, textvariable=self.orient_var, values=[l for _, l in ORIENT_LABELS], state="readonly", width=14)
+        cb.grid(row=7, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("orientation", self._label_to_value(ORIENT_LABELS, self.orient_var.get()), "video"))
+
     def _on_backend(self):
         self._changed("backend", self._label_to_value(BACKEND_LABELS, self.backend_var.get()), None)
         self.link.vcam.request_reset()
@@ -902,5 +918,29 @@ def main():
     return 0
 
 
+def _show_fatal(exc):
+    """windowed の exe ではコンソールが無いので、起動時エラーをダイアログで表示する。"""
+    import traceback
+    detail = traceback.format_exc()
+    try:
+        r = tk.Tk() if tk is not None else None
+        if r is not None:
+            r.withdraw()
+            messagebox.showerror("PhoneCam", "起動中にエラーが発生しました。\n\n%s" % detail[-1500:])
+            r.destroy()
+            return
+    except Exception:
+        pass
+    try:
+        sys.stderr.write(detail)
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    except Exception as e:
+        _show_fatal(e)
+        code = 1
+    sys.exit(code)

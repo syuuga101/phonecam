@@ -1,7 +1,7 @@
 # PhoneCam
 
 iPhone 13 を、Windows の OBS で使える低遅延ワイヤレス／USB カメラにするプロジェクトです。
-Mac は不要です。iPhone アプリは GitHub Actions で自動ビルドし、Sideloadly で iPhone に入れます。
+Mac は不要です。iPhone アプリと Windows 受信アプリ(exe)は GitHub Actions で自動ビルドし、AltStore で iPhone に入れます。
 
 ## 概要と仕組み
 
@@ -21,10 +21,10 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 - GitHub アカウント（無料）
 - Windows PC
-- Python 3.12
+- Python 3.12（exe 版を使うなら不要）
 - OBS Studio 30 以上
-- Apple Devices アプリ（Microsoft Store）または iTunes
-- Sideloadly（https://sideloadly.io/）
+- iTunes と iCloud（Apple 公式サイト版。AltStore 用。USB 接続の通信にも使います）
+- AltServer（https://altstore.io/）
 - Lightning ケーブル（USB 接続で使う場合。Wi-Fi のみなら不要ですが、充電のためにもおすすめです）
 - Apple ID（無料のものでOK）
 
@@ -45,17 +45,31 @@ iPhone (PhoneCam アプリ)                         Windows PC
 5. 数分で完了します。実行結果のページ下部「Artifacts」から **PhoneCam-ipa** をダウンロードします。
 6. ダウンロードした zip を展開すると `PhoneCam.ipa` が入っています。
 
-## iPhoneへのインストール
+## iPhoneへのインストール（AltStore Classic 推奨）
 
-1. PC で Sideloadly を起動し、iPhone を USB で接続します。
-2. `PhoneCam.ipa` を Sideloadly にドラッグし、自分の Apple ID を入力して **Start** を押します。
-3. iPhone の **設定 > プライバシーとセキュリティ > デベロッパモード** を ON にして、再起動します。
-4. iPhone の **設定 > 一般 > VPNとデバイス管理** で自分の Apple ID のアプリを開き、「信頼」します。
-5. PhoneCam を起動し、カメラとローカルネットワークの許可を「許可」にします。
+1. Apple の公式サイトから **iTunes** と **iCloud** をインストールします。**Microsoft Store 版は不可**です（AltServer が動きません）。
+2. **AltServer** をインストールして起動します（タスクトレイに常駐します）。
+3. iPhone を USB で接続して「このコンピュータを信頼」し、iTunes で iPhone を開いて **「Wi-Fi経由でこのiPhoneと同期」** を ON にします。
+4. タスクトレイの AltServer アイコン > **Install AltStore** > 自分の iPhone を選び、Apple ID を入力します。
+5. iPhone の **設定 > プライバシーとセキュリティ > デベロッパモード** を ON にして再起動します。
+6. iPhone の **設定 > 一般 > VPNとデバイス管理** で自分の Apple ID のアプリを開き、「信頼」します。
+7. iPhone で **AltStore** を開き、**My Apps** > 左上の **＋** > `PhoneCam.ipa`（iPhone に保存しておく）を選びます。
+8. PhoneCam を起動し、カメラとローカルネットワークの許可を「許可」にします。
 
-> 無料の Apple ID でインストールしたアプリは **7日ごとに再インストール**（Sideloadly でもう一度 Start）が必要です。
+- 7日の期限は、PC で AltServer が動いていて同じ Wi-Fi につながっている間、AltStore が自動で更新します。
+- 無料の Apple ID では、AltStore を含めて同時に有効にできるサイドロードアプリは **3つまで**です。
 
-## Windows側
+> 代わりに Sideloadly（https://sideloadly.io/）でも入れられます。PC で `PhoneCam.ipa` をドラッグして Apple ID を入力し Start するだけですが、7日ごとに自分で再インストールが必要です。
+
+## Windows側（exe 版・おすすめ）
+
+1. GitHub の **Actions** タブ > **Build Windows receiver** > 最新の実行 > 下部の **Artifacts** から **PhoneCamReceiver-exe** をダウンロードし、zip を展開します。
+2. `PhoneCamReceiver.exe` をダブルクリックします。Windows SmartScreen の警告が出たら **詳細情報 → 実行** を選びます。
+3. 設定は exe と同じフォルダの `phonecam_settings.json` に保存されます。
+
+Python は不要です。OBS Studio 30 以上と、USB 接続なら iTunes が必要です。
+
+## Windows側（ソースから実行）
 
 1. `windows` フォルダの **install.bat** をダブルクリックします（初回のみ。av / numpy / pyvirtualcam をインストールします）。
 2. iPhone で PhoneCam を起動し、画面を表示したままにします。
@@ -80,6 +94,7 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 - 接続: **USB**（Wi-Fi より安定し、遅延も小さい）
 - 映像: **1080p / 60fps / ビットレート 20Mbps**
+- 向き（映像 > 向き）: **自動**（iPhone を縦に持てば縦映像、横に持てば横映像）／**横**（常に 1920×1080）／**縦**（常に 1080×1920）。向きが変わると映像サイズも変わるため、仮想カメラは自動で作り直されます（OBS 側で一瞬途切れることがあります）。OBS のキャンバスを縦にするなら「縦」固定がおすすめです。
 - 露出・ホワイトバランス・フォーカス: **マニュアル／固定**（配信中に明るさや色が勝手に変わらなくなります）
 - シャッター速度（照明のちらつき防止）:
   - 東日本（50Hz）: **1/50** か **1/100**
@@ -91,14 +106,14 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 | 症状 | 対処 |
 |---|---|
-| 「Apple Mobile Device Service に接続できません」 | Microsoft Store の「Apple Devices」アプリ（またはiTunes）をインストールし、PCを再起動してください。 |
+| 「Apple Mobile Device Service に接続できません」 | iTunes（または Microsoft Store の「Apple Devices」アプリ）をインストールし、PCを再起動してください。 |
 | 「iPhoneがUSBで見つかりません」 | ケーブルを確認し、iPhone のロックを解除して「このコンピュータを信頼」してください。 |
 | 「iPhoneのPhoneCamアプリに接続できません」 | iPhone で PhoneCam を起動し、前面に表示したままにしてください。 |
 | Wi-Fi で接続できない | iPhone と PC が同じネットワークか確認してください。初回はローカルネットワークの許可が必要です。 |
 | 仮想カメラを開始できない | OBS Studio 30以上をインストールしてください。OBS の「仮想カメラ開始」が ON なら停止してください。 |
 | 映像が固まる／乱れる | 受信アプリが自動でキーフレームを再要求します。改善しない場合はビットレートを下げるか USB を使ってください。 |
 | 映像が暗い／ちらつく | 露出をマニュアルにし、シャッター速度を地域に合わせてください（上記参照）。 |
-| 数日後にアプリが開かなくなった | 無料 Apple ID は7日で期限切れです。Sideloadly で再インストールしてください。 |
+| 数日後にアプリが開かなくなった | 無料 Apple ID は7日で期限切れです。AltStore なら PC の AltServer を起動して同じ Wi-Fi につなぎ、My Apps で更新してください（Sideloadly の場合は再インストール）。 |
 | 画面が消えて止まる | iPhone をロックするとカメラが止まります。アプリを前面に表示したままにしてください。 |
 | `py` コマンドが見つからない | Python 3.12 を公式サイトからインストールし、「Add python.exe to PATH」と「py launcher」にチェックを入れてください。 |
 
