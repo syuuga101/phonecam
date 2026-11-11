@@ -19,6 +19,14 @@ final class H264Encoder {
     private let flagLock = NSLock()
     private var keyframeRequested = false
 
+    // 以下は flagLock で保護 (出力コールバックのスレッドからも触るため)
+    private var consecutiveFailures = 0
+    private var usingLowLatency = false
+    private var needsRecreate = false
+    private var lowLatencyBlockedKey: Int64 = -1
+    private var sessionWidthSnapshot: Int32 = 0
+    private var sessionHeightSnapshot: Int32 = 0
+
     private let startCode: [UInt8] = [0, 0, 0, 1]
 
     deinit {
@@ -95,7 +103,11 @@ final class H264Encoder {
         sessionLock.lock()
         defer { sessionLock.unlock() }
 
-        if session != nil && (w != sessionWidth || h != sessionHeight) {
+        flagLock.lock()
+        let recreate = needsRecreate
+        needsRecreate = false
+        flagLock.unlock()
+        if session != nil && (recreate || w != sessionWidth || h != sessionHeight) {
             destroySessionLocked()
         }
         if session == nil {
@@ -135,9 +147,26 @@ final class H264Encoder {
         )
         if status != noErr {
             // セッションが無効になった場合などは作り直す
+            noteFailure()
             if force { requestKeyframe() }
             destroySessionLocked()
         }
+    }
+
+    /// エンコード失敗を数える。低遅延モードで失敗が続いたら、このサイズでは低遅延モードを使わない。
+    private func noteFailure() {
+        flagLock.lock()
+        consecutiveFailures += 1
+        if usingLowLatency && consecutiveFailures >= 3 {
+            lowLatencyBlockedKey = sizeKey(sessionWidthSnapshot, sessionHeightSnapshot)
+            needsRecreate = true
+            consecutiveFailures = 0
+        }
+        flagLock.unlock()
+    }
+
+    private func sizeKey(_ w: Int32, _ h: Int32) -> Int64 {
+        return (Int64(w) << 32) | Int64(UInt32(bitPattern: h))
     }
 
     // MARK: - セッション管理 (sessionLock を保持して呼ぶ)
@@ -145,20 +174,29 @@ final class H264Encoder {
     private func createSessionLocked(width: Int32, height: Int32) -> Bool {
         var newSession: VTCompressionSession?
         let codecType: CMVideoCodecType = useHevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264
-        let lowLatencySpec = [kVTVideoEncoderSpecification_EnableLowLatencyRateControl: true] as CFDictionary
-        var status = VTCompressionSessionCreate(
-            allocator: nil,
-            width: width,
-            height: height,
-            codecType: codecType,
-            encoderSpecification: lowLatencySpec,
-            imageBufferAttributes: nil,
-            compressedDataAllocator: nil,
-            outputCallback: nil,
-            refcon: nil,
-            compressionSessionOut: &newSession
-        )
+        // 低遅延レート制御は 4K などの大きい解像度で動かないことがあるため、1080p 以下のときだけ使う
+        flagLock.lock()
+        let blocked = lowLatencyBlockedKey == sizeKey(width, height)
+        flagLock.unlock()
+        var lowLatency = !blocked && Int(width) * Int(height) <= 1920 * 1088
+        var status: OSStatus = -1
+        if lowLatency {
+            let lowLatencySpec = [kVTVideoEncoderSpecification_EnableLowLatencyRateControl: true] as CFDictionary
+            status = VTCompressionSessionCreate(
+                allocator: nil,
+                width: width,
+                height: height,
+                codecType: codecType,
+                encoderSpecification: lowLatencySpec,
+                imageBufferAttributes: nil,
+                compressedDataAllocator: nil,
+                outputCallback: nil,
+                refcon: nil,
+                compressionSessionOut: &newSession
+            )
+        }
         if status != noErr || newSession == nil {
+            lowLatency = false
             newSession = nil
             status = VTCompressionSessionCreate(
                 allocator: nil,
@@ -211,6 +249,12 @@ final class H264Encoder {
         session = s
         sessionWidth = width
         sessionHeight = height
+        flagLock.lock()
+        usingLowLatency = lowLatency
+        sessionWidthSnapshot = width
+        sessionHeightSnapshot = height
+        consecutiveFailures = 0
+        flagLock.unlock()
         return true
     }
 
@@ -234,7 +278,14 @@ final class H264Encoder {
     // MARK: - 出力処理
 
     private func handleOutput(status: OSStatus, sampleBuffer: CMSampleBuffer?) {
-        guard status == noErr, let sb = sampleBuffer, CMSampleBufferDataIsReady(sb) else { return }
+        guard status == noErr, let sb = sampleBuffer, CMSampleBufferDataIsReady(sb) else {
+            // status が成功でバッファが無いのはフレームが間引かれただけなので数えない
+            if status != noErr { noteFailure() }
+            return
+        }
+        flagLock.lock()
+        consecutiveFailures = 0
+        flagLock.unlock()
 
         // キーフレーム判定: NotSync が無い or false ならキーフレーム
         var isKey = true
