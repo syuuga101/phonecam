@@ -1,0 +1,51 @@
+   name: Build iOS (unsigned IPA)
+
+   on:
+     push:
+       paths:
+         - "ios/**"
+         - ".github/workflows/ios.yml"
+     workflow_dispatch:
+
+   jobs:
+     build:
+       runs-on: macos-latest
+       steps:
+         - name: Checkout
+           uses: actions/checkout@v4
+
+         - name: Install XcodeGen
+           run: brew install xcodegen
+
+         - name: Generate Xcode project
+           working-directory: ios
+           run: xcodegen generate
+
+         - name: Build (unsigned)
+           working-directory: ios
+           run: |
+             xcodebuild \
+               -project PhoneCam.xcodeproj \
+               -scheme PhoneCam \
+               -configuration Release \
+               -sdk iphoneos \
+               -destination 'generic/platform=iOS' \
+               -derivedDataPath build \
+               CODE_SIGNING_ALLOWED=NO \
+               CODE_SIGNING_REQUIRED=NO \
+               CODE_SIGN_IDENTITY="" \
+               build
+
+         - name: Package IPA
+           working-directory: ios
+           run: |
+             rm -rf Payload PhoneCam.ipa
+             mkdir Payload
+             cp -R build/Build/Products/Release-iphoneos/PhoneCam.app Payload/PhoneCam.app
+             zip -qry PhoneCam.ipa Payload
+
+         - name: Upload IPA
+           uses: actions/upload-artifact@v4
+           with:
+             name: PhoneCam-ipa
+             path: ios/PhoneCam.ipa
