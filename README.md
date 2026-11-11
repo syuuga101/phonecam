@@ -7,15 +7,15 @@ Mac は不要です。iPhone アプリと Windows 受信アプリ(exe)は GitHub
 
 ```
 iPhone (PhoneCam アプリ)                         Windows PC
- カメラ → H.264 ハードウェアエンコード  ── USB (usbmux) / Wi-Fi ──→  受信アプリ → デコード → 仮想カメラ → OBS / Discord
+ カメラ → 背景・色調整 → H.264/HEVC エンコード ── USB (usbmux) / Wi-Fi ──→  受信アプリ → デコード → 仮想カメラ → OBS / Discord
                                     ←──────  露出・WB・フォーカス等の制御 ──────
 ```
 
 - iPhone 側は TCP サーバ（ポート 5555）として待ち受けます。
 - USB 接続では、Apple Devices アプリ（または iTunes）が入れる「Apple Mobile Device Service」を経由して接続します（専用ドライバー不要）。
 - Wi-Fi 接続では、iPhone の画面に表示される IP アドレスへ直接接続します。
-- 映像は H.264 のまま送られ、PC 側でデコードして仮想カメラに流します。
-- 露出・ホワイトバランス・フォーカス・ズーム・ライトは PC の画面から操作できます。
+- 映像は H.264 または HEVC(H.265) のまま送られ、PC 側でデコードして仮想カメラに流します。
+- 露出・ホワイトバランス・フォーカス・ズーム・ライト・背景エフェクト・色調整は PC の画面から操作できます。
 
 ## 必要なもの
 
@@ -63,11 +63,14 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 ## Windows側（exe 版・おすすめ）
 
-1. GitHub の **Actions** タブ > **Build Windows receiver** > 最新の実行 > 下部の **Artifacts** から **PhoneCamReceiver-exe** をダウンロードし、zip を展開します。
-2. `PhoneCamReceiver.exe` をダブルクリックします。Windows SmartScreen の警告が出たら **詳細情報 → 実行** を選びます。
-3. 設定は exe と同じフォルダの `phonecam_settings.json` に保存されます。
+1. GitHub の **Actions** タブ > **Build Windows receiver** > 最新の実行 > 下部の **Artifacts** から **PhoneCamReceiver** をダウンロードします。
+2. zip を **ずっと置いておくフォルダ**（例: `C:\Tools\PhoneCam`）に展開します。
+3. 展開したフォルダの **register.bat** をダブルクリックします（管理者権限の確認が出ます。初回のみ）。専用カメラ「PhoneCam」が登録されます。
+4. `PhoneCamReceiver.exe` をダブルクリックします。Windows SmartScreen の警告が出たら **詳細情報 → 実行** を選びます。
+5. 設定は exe と同じフォルダの `phonecam_settings.json` に保存されます。
 
-Python は不要です。OBS Studio 30 以上と、USB 接続なら iTunes が必要です。
+- フォルダを移動したら、**register.bat をもう一度**実行してください（登録はフォルダの場所に紐づきます）。不要になったら **unregister.bat** で解除できます。
+- Python は不要です。USB 接続なら iTunes（または Apple Devices）が必要です。
 
 ## Windows側（ソースから実行）
 
@@ -83,12 +86,25 @@ Python は不要です。OBS Studio 30 以上と、USB 接続なら iTunes が�
 
 1. 受信アプリで接続し、映像が流れていることを確認します（受信fps が表示されます）。
 2. OBS で **ソース追加 > 映像キャプチャデバイス** を作成します。
-3. デバイスに **OBS Virtual Camera** を選びます。
+3. デバイスに **PhoneCam** を選びます（exe 版で register.bat を実行済みの場合）。
 
-注意:
-- OBS の「**仮想カメラ開始**」ボタンとは同時に使えません。OBS 側の仮想カメラは開始しないでください。
-- Discord などでも、カメラに **OBS Virtual Camera** を選べば PhoneCam の映像を使えます。
-- 出力先は受信アプリの「映像 > 出力先」で、OBS Virtual Camera か Unity Video Capture を選べます。
+- 専用カメラ「PhoneCam」は OBS の仮想カメラとは別物なので、**OBS の「仮想カメラ開始」と同時に使えます**。Discord などでもカメラに **PhoneCam** を選びます。
+- 出力先は受信アプリの「接続・映像 > 出力先」で選べます。`softcam.dll` が exe と同じフォルダにあれば「PhoneCam（専用カメラ）」が既定です。
+- 「OBS Virtual Camera」または「Unity Capture」を選ぶと従来どおりの仮想カメラで出力します（OBS の「仮想カメラ開始」とは同時に使えません）。
+- ソースから実行する場合は `softcam.dll` が無いため、OBS Virtual Camera を使います。
+
+## 新機能
+
+画面は **接続・映像 / 画質調整 / エフェクト / 状態** のタブに分かれています。
+
+- **コーデック**（接続・映像）: H.264 と HEVC(H.265) を選べます。HEVC は同じ画質をより低いビットレートで送れるので、Wi-Fi 向きです。切り替えると自動でキーフレームを要求します。
+- **背景**（エフェクト）: オフ / ぼかし / 切り抜き(緑)。強さと品質（速度優先 / バランス）を調整できます。処理は iPhone 側で行います。
+  - 切り抜き(緑)は、OBS のソースに **クロマキー** フィルタ（キーの色: 緑）を追加すると背景が透明になります。
+- **色調整**（エフェクト）: 明るさ・コントラスト・彩度・シャープネス。「リセット」で初期値に戻ります。
+- **iPhoneの状態**（状態）: 温度・バッテリー・低電力モード・エフェクト処理時間を表示します。温度が「高い」「危険」になると、画面下に警告が出ます。その場合は fps を 30 に下げるか、エフェクトをオフにしてください。
+- **専用カメラ（PhoneCam）**: 上の「Windows側」の手順で登録すると、OBS・Discord・Zoom などのカメラ一覧に「PhoneCam」が出ます。
+
+古い設定ファイルもそのまま使えます（新しい項目は既定値になります）。
 
 ## おすすめ設定
 
@@ -110,7 +126,9 @@ Python は不要です。OBS Studio 30 以上と、USB 接続なら iTunes が�
 | 「iPhoneがUSBで見つかりません」 | ケーブルを確認し、iPhone のロックを解除して「このコンピュータを信頼」してください。 |
 | 「iPhoneのPhoneCamアプリに接続できません」 | iPhone で PhoneCam を起動し、前面に表示したままにしてください。 |
 | Wi-Fi で接続できない | iPhone と PC が同じネットワークか確認してください。初回はローカルネットワークの許可が必要です。 |
-| 仮想カメラを開始できない | OBS Studio 30以上をインストールしてください。OBS の「仮想カメラ開始」が ON なら停止してください。 |
+| 仮想カメラを開始できない | OBS Virtual Camera の場合: OBS Studio 30以上をインストールし、OBS の「仮想カメラ開始」が ON なら停止してください。 |
+| 「PhoneCam」がカメラ一覧に出ない／「未登録」と出る | 展開したフォルダの register.bat を実行してください。フォルダを移動した場合ももう一度実行が必要です。 |
+| PhoneCam に切り替えたのに OBS で映像が出ない | 受信アプリで接続して映像が流れている必要があります。OBS のソースを開き直してください。 |
 | 映像が固まる／乱れる | 受信アプリが自動でキーフレームを再要求します。改善しない場合はビットレートを下げるか USB を使ってください。 |
 | 映像が暗い／ちらつく | 露出をマニュアルにし、シャッター速度を地域に合わせてください（上記参照）。 |
 | 数日後にアプリが開かなくなった | 無料 Apple ID は7日で期限切れです。AltStore なら PC の AltServer を起動して同じ Wi-Fi につなぎ、My Apps で更新してください（Sideloadly の場合は再インストール）。 |
@@ -128,3 +146,25 @@ Python は不要です。OBS Studio 30 以上と、USB 接続なら iTunes が�
 
 さらに小さくしたいときは、USB 接続にし、ビットレートを上げすぎず、PC の負荷を下げてください。
 OBS 側でもソースのバッファリングを無効にすると改善する場合があります。
+
+## 通信プロトコル（開発者向け）
+
+TCP 上のメッセージは `[種別 1byte][長さ 4byte ビッグエンディアン][本体]` です。
+
+| 種別 | 方向 | 内容 |
+|---|---|---|
+| 1 | iPhone → PC | H.264 アクセスユニット |
+| 2 | iPhone → PC | HEVC アクセスユニット（Annex B。キーフレームには VPS/SPS/PPS を付加） |
+| 3 | iPhone → PC | 状態 JSON |
+| 10 | PC → iPhone | 制御 JSON |
+
+- PC 側はデコーダーを1つだけ保持し、受信した種別のコーデックが現在と違えばデコーダーを作り直し、キーフレームを要求します。
+- 制御 JSON の追加キー:
+  - `"codec"`: `"h264"` / `"hevc"`
+  - `"background"`: `{"mode": "off"|"blur"|"green", "strength": 0〜1（既定0.6）, "quality": "fast"|"balanced"}`
+  - `"color"`: `{"brightness": -0.5〜0.5（0）, "contrast": 0.5〜1.5（1）, "saturation": 0〜2（1）, "sharpness": 0〜1（0）}`
+- 状態 JSON の追加キー: `codec`, `background`, `color`, `thermalState`（`nominal`/`fair`/`serious`/`critical`）, `batteryLevel`（0〜1、不明は -1）, `batteryState`（`charging`/`full`/`unplugged`/`unknown`）, `lowPowerMode`（bool）, `processingMs`（float）
+
+## 専用カメラのしくみ（開発者向け）
+
+[softcam](https://github.com/tshino/softcam)（MIT）v1.8.1 を、GitHub Actions で表示名「PhoneCam」・独自の CLSID・独自の共有メモリ名に書き換えてビルドしています（他の softcam 利用アプリと衝突しません）。受信アプリは `softcam.dll` を ctypes で読み込み、BGR24 のフレームを渡します。CLSID は `windows/phonecam_receiver.py` の `PHONECAM_CLSID` と `.github/workflows/windows.yml` で一致させてください。

@@ -3,16 +3,17 @@ import VideoToolbox
 import CoreMedia
 import CoreVideo
 
-/// VideoToolbox を使った低遅延 H.264 エンコーダ。出力は Annex B 形式。
+/// VideoToolbox を使った低遅延 H.264 / HEVC エンコーダ。出力は Annex B 形式。
 final class H264Encoder {
-    /// エンコード済みアクセスユニット (Annex B) とキーフレームかどうか
-    var onEncoded: ((Data, Bool) -> Void)?
+    /// エンコード済みアクセスユニット (Annex B)、キーフレームかどうか、HEVC かどうか
+    var onEncoded: ((Data, Bool, Bool) -> Void)?
 
     private var session: VTCompressionSession?
     private var sessionWidth: Int32 = 0
     private var sessionHeight: Int32 = 0
     private var fps: Int = 60
     private var bitrateBps: Int = 20_000_000
+    private var useHevc = false
 
     private let sessionLock = NSLock()
     private let flagLock = NSLock()
@@ -46,6 +47,17 @@ final class H264Encoder {
         }
     }
 
+    /// コーデックを切り替える。変更時はセッションを作り直し、キーフレームを強制する。
+    func setCodec(hevc: Bool) {
+        sessionLock.lock()
+        defer { sessionLock.unlock() }
+        if hevc != useHevc {
+            useHevc = hevc
+            destroySessionLocked()
+            requestKeyframe()
+        }
+    }
+
     /// ビットレートを動的に変更する (Mbps)
     func setBitrate(mbps: Int) {
         sessionLock.lock()
@@ -71,6 +83,10 @@ final class H264Encoder {
     }
 
     // MARK: - エンコード
+
+    func encode(pixelBuffer: CVPixelBuffer, pts: CMTime) {
+        encode(pixelBuffer: pixelBuffer, pts: pts, duration: CMTime.invalid)
+    }
 
     func encode(pixelBuffer: CVPixelBuffer, pts: CMTime, duration: CMTime) {
         let w = Int32(CVPixelBufferGetWidth(pixelBuffer))
@@ -128,12 +144,13 @@ final class H264Encoder {
 
     private func createSessionLocked(width: Int32, height: Int32) -> Bool {
         var newSession: VTCompressionSession?
+        let codecType: CMVideoCodecType = useHevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264
         let lowLatencySpec = [kVTVideoEncoderSpecification_EnableLowLatencyRateControl: true] as CFDictionary
         var status = VTCompressionSessionCreate(
             allocator: nil,
             width: width,
             height: height,
-            codecType: kCMVideoCodecType_H264,
+            codecType: codecType,
             encoderSpecification: lowLatencySpec,
             imageBufferAttributes: nil,
             compressedDataAllocator: nil,
@@ -147,7 +164,7 @@ final class H264Encoder {
                 allocator: nil,
                 width: width,
                 height: height,
-                codecType: kCMVideoCodecType_H264,
+                codecType: codecType,
                 encoderSpecification: nil,
                 imageBufferAttributes: nil,
                 compressedDataAllocator: nil,
@@ -163,17 +180,25 @@ final class H264Encoder {
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_AllowFrameReordering, value: kCFBooleanFalse)
 
-        let profileStatus = VTSessionSetProperty(
-            s,
-            key: kVTCompressionPropertyKey_ProfileLevel,
-            value: kVTProfileLevel_H264_ConstrainedHigh_AutoLevel
-        )
-        if profileStatus != noErr {
+        if useHevc {
             VTSessionSetProperty(
                 s,
                 key: kVTCompressionPropertyKey_ProfileLevel,
-                value: kVTProfileLevel_H264_High_AutoLevel
+                value: kVTProfileLevel_HEVC_Main_AutoLevel
             )
+        } else {
+            let profileStatus = VTSessionSetProperty(
+                s,
+                key: kVTCompressionPropertyKey_ProfileLevel,
+                value: kVTProfileLevel_H264_ConstrainedHigh_AutoLevel
+            )
+            if profileStatus != noErr {
+                VTSessionSetProperty(
+                    s,
+                    key: kVTCompressionPropertyKey_ProfileLevel,
+                    value: kVTProfileLevel_H264_High_AutoLevel
+                )
+            }
         }
 
         applyBitrateLocked(s)
@@ -223,27 +248,30 @@ final class H264Encoder {
         var out = Data()
         var nalHeaderLength: Int32 = 4
 
+        var isHevc = false
+        if let fd0 = CMSampleBufferGetFormatDescription(sb) {
+            isHevc = (CMFormatDescriptionGetMediaSubType(fd0) == kCMVideoCodecType_HEVC)
+        }
+
         if isKey, let fd = CMSampleBufferGetFormatDescription(sb) {
             var count: Int = 0
-            let st0 = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                fd,
-                parameterSetIndex: 0,
-                parameterSetPointerOut: nil,
-                parameterSetSizeOut: nil,
-                parameterSetCountOut: &count,
-                nalUnitHeaderLengthOut: &nalHeaderLength
+            let st0 = parameterSet(fd, hevc: isHevc,
+                index: 0,
+                pointerOut: nil,
+                sizeOut: nil,
+                countOut: &count,
+                headerOut: &nalHeaderLength
             )
             if st0 == noErr {
                 for i in 0..<count {
                     var ptr: UnsafePointer<UInt8>?
                     var size: Int = 0
-                    let st = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                        fd,
-                        parameterSetIndex: i,
-                        parameterSetPointerOut: &ptr,
-                        parameterSetSizeOut: &size,
-                        parameterSetCountOut: nil,
-                        nalUnitHeaderLengthOut: nil
+                    let st = parameterSet(fd, hevc: isHevc,
+                        index: i,
+                        pointerOut: &ptr,
+                        sizeOut: &size,
+                        countOut: nil,
+                        headerOut: nil
                     )
                     if st == noErr, let p = ptr, size > 0 {
                         out.append(contentsOf: startCode)
@@ -279,6 +307,36 @@ final class H264Encoder {
         }
 
         if out.isEmpty { return }
-        onEncoded?(out, isKey)
+        onEncoded?(out, isKey, isHevc)
+    }
+
+    /// H.264 / HEVC のパラメータセット取得を 1 つにまとめた薄いラッパ
+    private func parameterSet(
+        _ fd: CMFormatDescription,
+        hevc: Bool,
+        index: Int,
+        pointerOut: UnsafeMutablePointer<UnsafePointer<UInt8>?>?,
+        sizeOut: UnsafeMutablePointer<Int>?,
+        countOut: UnsafeMutablePointer<Int>?,
+        headerOut: UnsafeMutablePointer<Int32>?
+    ) -> OSStatus {
+        if hevc {
+            return CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
+                fd,
+                parameterSetIndex: index,
+                parameterSetPointerOut: pointerOut,
+                parameterSetSizeOut: sizeOut,
+                parameterSetCountOut: countOut,
+                nalUnitHeaderLengthOut: headerOut
+            )
+        }
+        return CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+            fd,
+            parameterSetIndex: index,
+            parameterSetPointerOut: pointerOut,
+            parameterSetSizeOut: sizeOut,
+            parameterSetCountOut: countOut,
+            nalUnitHeaderLengthOut: headerOut
+        )
     }
 }

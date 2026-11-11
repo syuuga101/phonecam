@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """PhoneCam Windows 受信アプリ
 
-iPhone (PhoneCam アプリ) から H.264 映像を受信してデコードし、
-仮想カメラ (OBS Virtual Camera / Unity Capture) へ出力します。
+iPhone (PhoneCam アプリ) から H.264 / HEVC 映像を受信してデコードし、
+仮想カメラ (PhoneCam 専用カメラ / OBS Virtual Camera / Unity Capture) へ出力します。
 """
 
+import ctypes
 import json
 import os
 import plistlib
@@ -39,7 +40,8 @@ PHONE_PORT = 5555
 USBMUX_ADDR = ("127.0.0.1", 27015)
 RECONNECT_SEC = 2.0
 
-MSG_VIDEO = 1
+MSG_VIDEO = 1        # H.264 アクセスユニット
+MSG_VIDEO_HEVC = 2   # HEVC アクセスユニット (Annex B)
 MSG_STATUS = 3
 MSG_CONTROL = 10
 
@@ -51,6 +53,16 @@ def _app_dir():
 
 
 SETTINGS_PATH = os.path.join(_app_dir(), "phonecam_settings.json")
+
+# 専用仮想カメラ (softcam)。CLSID は .github/workflows/windows.yml でパッチして埋め込むものと同一
+SOFTCAM_DLL = "softcam.dll"
+PHONECAM_CLSID = "{BD7AEDAC-501F-4685-9B20-BC10F70BD144}"
+# softcam へ渡す画像の行順。True = 上から下 (softcam 側が DIB 用に反転する)。逆さまに映るなら False にする
+SOFTCAM_TOP_DOWN = True
+
+
+def softcam_path():
+    return os.path.join(_app_dir(), SOFTCAM_DLL)
 
 
 class PhoneCamError(Exception):
@@ -180,7 +192,15 @@ DEFAULT_SETTINGS = {
     "mirror": False,
     "rotate180": False,
     "orientation": "auto",
-    "backend": "obs",
+    "backend": "phonecam" if os.path.isfile(softcam_path()) else "obs",
+    "codec": "h264",
+    "bg_mode": "off",
+    "bg_strength": 0.6,
+    "bg_quality": "balanced",
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "saturation": 1.0,
+    "sharpness": 0.0,
     "exp_mode": "auto",
     "exp_bias": 0.0,
     "iso": 200,
@@ -196,6 +216,35 @@ DEFAULT_SETTINGS = {
 
 RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
 
+BACKENDS = ("phonecam", "obs", "unitycapture")
+CODECS = ("h264", "hevc")
+BG_MODES = ("off", "blur", "green")
+BG_QUALITIES = ("fast", "balanced")
+# (キー, 最小, 最大) — 範囲外の値は丸める
+NUMERIC_RANGES = {
+    "bg_strength": (0.0, 1.0),
+    "brightness": (-0.5, 0.5),
+    "contrast": (0.5, 1.5),
+    "saturation": (0.0, 2.0),
+    "sharpness": (0.0, 1.0),
+}
+COLOR_DEFAULTS = {"brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "sharpness": 0.0}
+
+
+def sanitize_settings(s):
+    """読み込んだ設定の新規項目を検証し、不正値は既定値へ戻す (古い設定ファイルとの互換用)。"""
+    for key, allowed in (("backend", BACKENDS), ("codec", CODECS),
+                         ("bg_mode", BG_MODES), ("bg_quality", BG_QUALITIES)):
+        if s.get(key) not in allowed:
+            s[key] = DEFAULT_SETTINGS[key]
+    for key, (lo, hi) in NUMERIC_RANGES.items():
+        try:
+            v = float(s[key])
+        except Exception:
+            v = DEFAULT_SETTINGS[key]
+        s[key] = min(hi, max(lo, v))
+    return s
+
 
 def load_settings(path=SETTINGS_PATH):
     s = dict(DEFAULT_SETTINGS)
@@ -208,7 +257,7 @@ def load_settings(path=SETTINGS_PATH):
                     s[k] = data[k]
     except Exception:
         pass
-    return s
+    return sanitize_settings(s)
 
 
 def save_settings(settings, path=SETTINGS_PATH):
@@ -231,6 +280,23 @@ def build_control(settings, group):
         c["height"] = h
         c["fps"] = int(settings["fps"])
         c["orientation"] = settings.get("orientation", "auto")
+    if group in ("all", "codec"):
+        c["codec"] = settings.get("codec", "h264")
+        if group == "codec":
+            c["keyframe"] = True
+    if group in ("all", "background"):
+        c["background"] = {
+            "mode": settings["bg_mode"],
+            "strength": float(settings["bg_strength"]),
+            "quality": settings["bg_quality"],
+        }
+    if group in ("all", "color"):
+        c["color"] = {
+            "brightness": float(settings["brightness"]),
+            "contrast": float(settings["contrast"]),
+            "saturation": float(settings["saturation"]),
+            "sharpness": float(settings["sharpness"]),
+        }
     if group in ("all", "bitrate"):
         c["bitrate"] = int(settings["bitrate"])
     if group in ("all", "exposure"):
@@ -292,6 +358,49 @@ class SharedState:
 # 仮想カメラ出力
 # ---------------------------------------------------------------------------
 
+def softcam_registered_path():
+    """レジストリに登録されている PhoneCam カメラの DLL パス。未登録なら None。"""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "CLSID\\%s\\InprocServer32" % PHONECAM_CLSID) as k:
+            return winreg.QueryValueEx(k, "")[0]
+    except Exception:
+        return None
+
+
+class SoftcamSender:
+    """softcam.dll (専用仮想カメラ) への ctypes ラッパー。BGR24 のフレームを送る。"""
+
+    def __init__(self, dll_path):
+        lib = ctypes.CDLL(dll_path)  # softcam は __cdecl
+        lib.scCreateCamera.restype = ctypes.c_void_p
+        lib.scCreateCamera.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_float]
+        lib.scDeleteCamera.restype = None
+        lib.scDeleteCamera.argtypes = [ctypes.c_void_p]
+        lib.scSendFrame.restype = None
+        lib.scSendFrame.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        lib.scIsConnected.restype = ctypes.c_bool
+        lib.scIsConnected.argtypes = [ctypes.c_void_p]
+        self._lib = lib
+        self._handle = None
+
+    def create(self, width, height):
+        # framerate=0: 受け取ったフレームを待たずに即送る (低遅延)
+        h = self._lib.scCreateCamera(int(width), int(height), 0.0)
+        if not h:
+            raise RuntimeError("scCreateCamera が失敗しました（別のアプリがPhoneCamカメラを使用中の可能性があります）")
+        self._handle = h
+
+    def send(self, img):
+        """img: C 連続な uint8 (H, W, 3) BGR 配列"""
+        self._lib.scSendFrame(self._handle, img.ctypes.data_as(ctypes.c_void_p))
+
+    def close(self):
+        h, self._handle = self._handle, None
+        if h:
+            self._lib.scDeleteCamera(h)  # 同一プロセスでは1台のみ。作り直す前に必ず削除
+
+
 class VirtualCamOutput:
     def __init__(self, settings, state):
         self.settings = settings
@@ -300,6 +409,23 @@ class VirtualCamOutput:
         self.size = None
         self.fail_until = 0.0
         self.reset_requested = False
+        self._softcam = None
+        self._cam_kind = None  # 現在開いているバックエンド
+
+    # -- 補助 -----------------------------------------------------------
+    def backend(self):
+        b = self.settings.get("backend")
+        return b if b in BACKENDS else "obs"
+
+    def frame_format(self):
+        """デコード結果をどの画素形式で渡すか。"""
+        return "bgr24" if self.backend() == "phonecam" else "rgb24"
+
+    def apply_pending_reset(self):
+        if self.reset_requested:
+            self.reset_requested = False
+            self.close()
+            self.fail_until = 0.0
 
     def close(self):
         if self.cam is not None:
@@ -309,43 +435,90 @@ class VirtualCamOutput:
                 pass
         self.cam = None
         self.size = None
+        self._cam_kind = None
 
     def request_reset(self):
         self.reset_requested = True
 
+    # -- 出力 -----------------------------------------------------------
+    def _open_softcam(self, w, h):
+        path = softcam_path()
+        if not os.path.isfile(path):
+            raise PhoneCamError(
+                "softcam.dll が見つかりません。配布版(PhoneCamReceiverフォルダ)を使い、"
+                "register.bat を実行してください。OBS Virtual Camera など他の出力先も選べます")
+        if self._softcam is None:
+            try:
+                self._softcam = SoftcamSender(path)
+            except OSError as e:
+                raise PhoneCamError("softcam.dll を読み込めません: %s" % e)
+        sender = self._softcam
+        sender.close()
+        sender.create(w, h)
+        reg = softcam_registered_path()
+        if reg is None:
+            self.state.update(error_text="PhoneCamカメラが未登録です。register.bat を実行してください（管理者権限が必要です）")
+        elif os.path.normcase(os.path.abspath(reg)) != os.path.normcase(os.path.abspath(path)):
+            self.state.update(error_text="PhoneCamカメラの登録先が別のフォルダです。フォルダを移動した場合は register.bat をもう一度実行してください")
+        else:
+            self.state.update(error_text="")
+        return sender
+
     def send(self, img, fps):
-        if self.reset_requested:
-            self.reset_requested = False
-            self.close()
-            self.fail_until = 0.0
+        self.apply_pending_reset()
+        backend = self.backend()
+        if backend == "phonecam":
+            # softcam は幅・高さが4の倍数である必要がある
+            h4, w4 = img.shape[0] // 4 * 4, img.shape[1] // 4 * 4
+            if (h4, w4) != (img.shape[0], img.shape[1]):
+                img = np.ascontiguousarray(img[:h4, :w4])
+            if not SOFTCAM_TOP_DOWN:
+                img = np.ascontiguousarray(img[::-1])
         h, w = img.shape[0], img.shape[1]
-        if self.cam is not None and self.size != (w, h):
+        if self.cam is not None and (self.size != (w, h) or self._cam_kind != backend):
             self.close()
         if self.cam is None:
-            if pyvirtualcam is None:
-                self.state.update(error_text="pyvirtualcam がインストールされていません。install.bat を実行してください")
-                return
             now = time.time()
             if now < self.fail_until:
                 return
-            backend = "unitycapture" if self.settings.get("backend") == "unitycapture" else "obs"
-            try:
-                self.cam = pyvirtualcam.Camera(
-                    w, h, max(1, int(fps)), fmt=pyvirtualcam.PixelFormat.RGB, backend=backend
-                )
-                self.size = (w, h)
-                self.state.update(error_text="")
-            except Exception as e:
-                self.cam = None
-                self.fail_until = now + 3.0
-                if backend == "obs":
-                    msg = ("仮想カメラ(OBS Virtual Camera)を開始できません。OBS Studio 30以上をインストールし、"
-                           "OBSの「仮想カメラ開始」を使用中の場合は停止してください。詳細: %s" % e)
-                else:
-                    msg = ("仮想カメラ(Unity Capture)を開始できません。Unity Captureドライバーを"
-                           "インストールしてください。詳細: %s" % e)
-                self.state.update(error_text=msg)
-                return
+            if backend == "phonecam":
+                try:
+                    self.cam = self._open_softcam(w, h)
+                    self.size = (w, h)
+                    self._cam_kind = backend
+                except PhoneCamError as e:
+                    self.cam = None
+                    self.fail_until = now + 3.0
+                    self.state.update(error_text=str(e))
+                    return
+                except Exception as e:
+                    self.cam = None
+                    self.fail_until = now + 3.0
+                    self.state.update(error_text="PhoneCamカメラを開始できません。register.bat を実行済みか確認してください。詳細: %s" % e)
+                    return
+            else:
+                if pyvirtualcam is None:
+                    self.state.update(error_text="pyvirtualcam がインストールされていません。install.bat を実行してください")
+                    return
+                pv_backend = "unitycapture" if backend == "unitycapture" else "obs"
+                try:
+                    self.cam = pyvirtualcam.Camera(
+                        w, h, max(1, int(fps)), fmt=pyvirtualcam.PixelFormat.RGB, backend=pv_backend
+                    )
+                    self.size = (w, h)
+                    self._cam_kind = backend
+                    self.state.update(error_text="")
+                except Exception as e:
+                    self.cam = None
+                    self.fail_until = now + 3.0
+                    if pv_backend == "obs":
+                        msg = ("仮想カメラ(OBS Virtual Camera)を開始できません。OBS Studio 30以上をインストールし、"
+                               "OBSの「仮想カメラ開始」を使用中の場合は停止してください。詳細: %s" % e)
+                    else:
+                        msg = ("仮想カメラ(Unity Capture)を開始できません。Unity Captureドライバーを"
+                               "インストールしてください。詳細: %s" % e)
+                    self.state.update(error_text=msg)
+                    return
         try:
             self.cam.send(img)
         except Exception as e:
@@ -357,8 +530,35 @@ class VirtualCamOutput:
 # 接続 + デコード スレッド
 # ---------------------------------------------------------------------------
 
-def make_decoder():
-    ctx = av.CodecContext.create("h264", "r")
+def codec_for_msg(msg_type):
+    """映像パケット種別 → コーデック名。映像以外は None。"""
+    if msg_type == MSG_VIDEO:
+        return "h264"
+    if msg_type == MSG_VIDEO_HEVC:
+        return "hevc"
+    return None
+
+
+class DecoderManager:
+    """デコーダー (CodecContext) を1つだけ保持し、パケットのコーデックが変わったら作り直す。"""
+
+    def __init__(self, factory):
+        self._factory = factory
+        self.codec = None
+        self.decoder = None
+
+    def get(self, codec):
+        """(decoder, switched)。switched は既存デコーダーから別コーデックへ切り替えたとき True。"""
+        switched = False
+        if self.decoder is None or codec != self.codec:
+            switched = self.decoder is not None
+            self.decoder = self._factory(codec)
+            self.codec = codec
+        return self.decoder, switched
+
+
+def make_decoder(codec="h264"):
+    ctx = av.CodecContext.create(codec, "r")
     try:
         ctx.thread_type = "SLICE"
     except Exception:
@@ -485,7 +685,7 @@ class Link:
     def _session(self, sock, stop):
         if av is None or np is None:
             raise PhoneCamError("av / numpy がインストールされていません。install.bat を実行してください")
-        decoder = make_decoder()
+        decoders = DecoderManager(make_decoder)
         self.state.update(status_text="接続済み", connected=True, error_text="")
 
         # 保存済み設定を全部送る + キーフレーム要求
@@ -501,9 +701,14 @@ class Link:
 
         while not stop.is_set():
             msg_type, payload = read_msg(sock, stop)
-            if msg_type == MSG_VIDEO:
+            codec_name = codec_for_msg(msg_type)
+            if codec_name is not None:
                 t0 = time.perf_counter()
                 try:
+                    decoder, switched = decoders.get(codec_name)
+                    if switched:
+                        last_kf = time.time()
+                        self.send_control({"keyframe": True})
                     frames = decoder.decode(av.Packet(payload))
                 except Exception:
                     now = time.time()
@@ -516,7 +721,8 @@ class Link:
                 if not frames:
                     continue
                 frame = frames[-1]
-                img = frame.to_ndarray(format="rgb24")
+                self.vcam.apply_pending_reset()
+                img = frame.to_ndarray(format=self.vcam.frame_format())
                 if self.settings.get("mirror"):
                     img = img[:, ::-1]
                 if self.settings.get("rotate180"):
@@ -553,8 +759,31 @@ FPS_LABELS = [30, 60]
 MODE3_LABELS = [("auto", "自動"), ("locked", "固定"), ("manual", "マニュアル")]
 SHUTTER_VALUES = [30, 50, 60, 100, 120, 250, 500, 1000]
 ORIENT_LABELS = [("auto", "自動"), ("landscape", "横"), ("portrait", "縦")]
-BACKEND_LABELS = [("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Video Capture")]
+BACKEND_LABELS = [("phonecam", "PhoneCam（専用カメラ）"), ("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Capture")]
+CODEC_LABELS = [("h264", "H.264"), ("hevc", "HEVC(H.265)")]
+BG_MODE_LABELS = [("off", "オフ"), ("blur", "ぼかし"), ("green", "切り抜き(緑)")]
+BG_QUALITY_LABELS = [("fast", "速度優先"), ("balanced", "バランス")]
+THERMAL_LABELS = {"nominal": "正常", "fair": "やや高い", "serious": "高い", "critical": "危険"}
+BATTERY_STATE_LABELS = {"charging": "充電中", "full": "満充電", "unplugged": "放電中", "unknown": "不明"}
+THERMAL_WARNING = "iPhoneが熱くなっています。fpsを30に下げるか、エフェクトをオフにしてください"
+HINT_FG = "#666666"
 THROTTLE_MS = 50  # 1コントロールあたり最大 20 msg/s
+
+
+def format_battery(level, state):
+    """バッテリー表示文字列。level は 0-1 または -1 (不明)。"""
+    st = BATTERY_STATE_LABELS.get(state, "不明")
+    try:
+        lv = float(level)
+    except Exception:
+        lv = -1.0
+    if lv < 0:
+        return "不明" if st == "不明" else st
+    return "%d%%（%s）" % (round(lv * 100), st)
+
+
+def is_thermal_warning(thermal):
+    return thermal in ("serious", "critical")
 
 
 class App:
@@ -572,7 +801,8 @@ class App:
 
         root.title("PhoneCam 受信")
         root.protocol("WM_DELETE_WINDOW", self.on_close)
-        root.minsize(560, 600)
+        root.minsize(560, 560)
+        root.geometry("620x700")
         self._build_ui()
         self._update_enabled()
         self._poll()
@@ -629,8 +859,36 @@ class App:
     def _build_ui(self):
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
-        canvas = tk.Canvas(outer, highlightthickness=0)
-        vsb = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+
+        # 熱警告バナー (どのタブを開いていても見えるよう下部に表示)
+        self.warn_var = tk.StringVar(value="")
+        self.warn_label = ttk.Label(outer, textvariable=self.warn_var, foreground="#c0392b",
+                                    font=("", 9, "bold"), wraplength=560, justify="left", padding=(14, 6))
+        self.nb = ttk.Notebook(outer)
+        self.nb.pack(fill="both", expand=True, padx=4, pady=(6, 4))
+        self._canvases = []
+        self.root.bind_all("<MouseWheel>", self._on_wheel)
+
+        p1 = self._page("接続・映像")
+        self._build_connection(p1)
+        self._build_video(p1)
+        p2 = self._page("画質調整")
+        self._build_exposure(p2)
+        self._build_wb(p2)
+        self._build_focus(p2)
+        self._build_zoom(p2)
+        p3 = self._page("エフェクト")
+        self._build_background(p3)
+        self._build_color(p3)
+        p4 = self._page("状態")
+        self._build_phone_status(p4)
+
+    def _page(self, title):
+        """スクロール可能なタブページを作り、中身を載せるフレームを返す。"""
+        page = ttk.Frame(self.nb)
+        self.nb.add(page, text=title)
+        canvas = tk.Canvas(page, highlightthickness=0, borderwidth=0)
+        vsb = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=vsb.set)
         vsb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
@@ -638,14 +896,20 @@ class App:
         win = canvas.create_window((0, 0), window=body, anchor="nw")
         body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
+        self._canvases.append(canvas)
+        return body
 
-        self._build_connection(body)
-        self._build_video(body)
-        self._build_exposure(body)
-        self._build_wb(body)
-        self._build_focus(body)
-        self._build_zoom(body)
+    def _on_wheel(self, e):
+        try:
+            canvas = self._canvases[self.nb.index("current")]
+            canvas.yview_scroll(int(-e.delta / 120), "units")
+        except Exception:
+            pass
+
+    def _hint(self, parent, row, text, **grid):
+        lbl = ttk.Label(parent, text=text, foreground=HINT_FG, wraplength=480, justify="left")
+        lbl.grid(row=row, column=0, columnspan=3, sticky="w", **grid)
+        return lbl
 
     def _slider(self, parent, row, label, key, lo, hi, group, fmt, round_to, as_int=False, var_init=None):
         """ラベル + スライダー + 値表示。戻り値: (scale, value_label)。"""
@@ -749,6 +1013,15 @@ class App:
         cb.grid(row=7, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("orientation", self._label_to_value(ORIENT_LABELS, self.orient_var.get()), "video"))
 
+        ttk.Label(f, text="コーデック").grid(row=8, column=0, sticky="w", pady=2)
+        self.codec_var = tk.StringVar(value=self._value_to_label(CODEC_LABELS, self.settings["codec"]))
+        cb = ttk.Combobox(f, textvariable=self.codec_var, values=[l for _, l in CODEC_LABELS], state="readonly", width=14)
+        cb.grid(row=8, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("codec", self._label_to_value(CODEC_LABELS, self.codec_var.get()), "codec"))
+        self._hint(f, 9, "HEVC は同じ画質をより低いビットレートで送れます（Wi-Fi向き）")
+        self._hint(f, 10, "出力先「PhoneCam（専用カメラ）」は OBS や Discord のカメラ一覧に「PhoneCam」と表示されます。"
+                          "OBSの仮想カメラと同時に使えます（初回は register.bat が必要）")
+
     def _on_backend(self):
         self._changed("backend", self._label_to_value(BACKEND_LABELS, self.backend_var.get()), None)
         self.link.vcam.request_reset()
@@ -814,6 +1087,62 @@ class App:
                                         command=lambda: self._changed("torch", bool(self.torch_var.get()), "torch"))
         self.torch_cb.grid(row=1, column=0, columnspan=2, sticky="w")
 
+    def _build_background(self, parent):
+        f = self._section(parent, "背景")
+        ttk.Label(f, text="モード").grid(row=0, column=0, sticky="w", pady=2)
+        self.bg_mode_var = tk.StringVar(value=self._value_to_label(BG_MODE_LABELS, self.settings["bg_mode"]))
+        cb = ttk.Combobox(f, textvariable=self.bg_mode_var, values=[l for _, l in BG_MODE_LABELS], state="readonly", width=14)
+        cb.grid(row=0, column=1, sticky="w", padx=6)
+
+        def on_mode(_e=None):
+            self._changed("bg_mode", self._label_to_value(BG_MODE_LABELS, self.bg_mode_var.get()), "background")
+            self._update_enabled()
+
+        cb.bind("<<ComboboxSelected>>", on_mode)
+        self.bg_strength_scale, _, _ = self._slider(
+            f, 1, "強さ", "bg_strength", 0.0, 1.0, "background", lambda v: "%d%%" % round(v * 100), 0.05)
+
+        ttk.Label(f, text="品質").grid(row=2, column=0, sticky="w", pady=2)
+        self.bg_quality_var = tk.StringVar(value=self._value_to_label(BG_QUALITY_LABELS, self.settings["bg_quality"]))
+        self.bg_quality_cb = ttk.Combobox(f, textvariable=self.bg_quality_var, values=[l for _, l in BG_QUALITY_LABELS],
+                                          state="readonly", width=14)
+        self.bg_quality_cb.grid(row=2, column=1, sticky="w", padx=6)
+        self.bg_quality_cb.bind("<<ComboboxSelected>>", lambda e: self._changed(
+            "bg_quality", self._label_to_value(BG_QUALITY_LABELS, self.bg_quality_var.get()), "background"))
+        self.bg_hint = self._hint(f, 3, "OBSのソースに「クロマキー」フィルタ(緑)を追加すると背景が透明になります", pady=(4, 0))
+        self.bg_hint_visible = True
+
+    def _build_color(self, parent):
+        f = self._section(parent, "色調整")
+        self._color_vars = {}
+        specs = [("明るさ", "brightness", -0.5, 0.5, lambda v: "%+.2f" % v, 0.01),
+                 ("コントラスト", "contrast", 0.5, 1.5, lambda v: "%.2f" % v, 0.01),
+                 ("彩度", "saturation", 0.0, 2.0, lambda v: "%.2f" % v, 0.01),
+                 ("シャープネス", "sharpness", 0.0, 1.0, lambda v: "%.2f" % v, 0.01)]
+        for row, (label, key, lo, hi, fmt, step) in enumerate(specs):
+            _, _, var = self._slider(f, row, label, key, lo, hi, "color", fmt, step)
+            self._color_vars[key] = var
+        ttk.Button(f, text="リセット", command=self._reset_color).grid(row=len(specs), column=2, sticky="e", pady=(6, 0))
+
+    def _reset_color(self):
+        for key, var in self._color_vars.items():
+            var.set(COLOR_DEFAULTS[key])
+
+    def _build_phone_status(self, parent):
+        f = self._section(parent, "iPhoneの状態")
+        self._default_fg = ttk.Style().lookup("TLabel", "foreground") or "#1d1d1f"
+        self.st_vars = {}
+        self.st_labels = {}
+        for row, (key, name) in enumerate([("thermal", "温度"), ("battery", "バッテリー"),
+                                           ("lowpower", "低電力モード"), ("processing", "エフェクト処理時間")]):
+            ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=3)
+            var = tk.StringVar(value="-")
+            lbl = ttk.Label(f, textvariable=var)
+            lbl.grid(row=row, column=1, sticky="w", padx=6)
+            self.st_vars[key] = var
+            self.st_labels[key] = lbl
+        self._hint(f, 4, "接続中のiPhoneから約1秒ごとに更新されます", pady=(6, 0))
+
     # -- 有効/無効 -----------------------------------------------------------
     @staticmethod
     def _set_enabled(widget, enabled):
@@ -839,6 +1168,16 @@ class App:
         self._set_enabled(self.focus_mode_cb, focus_ok)
         self._set_enabled(self.focus_scale, focus_ok and s["focus_mode"] == "manual")
         self._set_enabled(self.torch_cb, status.get("torchAvailable", True))
+        bg_on = s["bg_mode"] != "off"
+        self._set_enabled(self.bg_strength_scale, bg_on)
+        self._set_enabled(self.bg_quality_cb, bg_on)
+        show_hint = s["bg_mode"] == "green"
+        if show_hint != self.bg_hint_visible:
+            self.bg_hint_visible = show_hint
+            if show_hint:
+                self.bg_hint.grid()
+            else:
+                self.bg_hint.grid_remove()
 
     # -- 接続 ---------------------------------------------------------------
     def toggle_connect(self):
@@ -846,7 +1185,8 @@ class App:
             if self.settings["mode"] == "wifi" and not self.settings["ip"].strip():
                 messagebox.showerror("PhoneCam", "iPhoneのIPアドレスを入力してください（iPhoneのアプリ画面に表示されています）")
                 return
-            if av is None or np is None or pyvirtualcam is None:
+            need_pv = self.settings.get("backend") != "phonecam"
+            if av is None or np is None or (need_pv and pyvirtualcam is None):
                 messagebox.showerror("PhoneCam", "必要なライブラリ(av, numpy, pyvirtualcam)が見つかりません。install.bat を実行してください")
                 return
             self.wanted = True
@@ -879,7 +1219,34 @@ class App:
                 self.cur_wb_var.set("現在の色温度 %dK / 色かぶり %d" % (round(st["temperature"]), round(st.get("tint", 0))))
             if "lensPosition" in st:
                 self.cur_focus_var.set("現在の位置 %.2f" % st["lensPosition"])
+        self._update_phone_status(st if snap["connected"] else {})
         self.root.after(100, self._poll)
+
+    def _update_phone_status(self, st):
+        thermal = st.get("thermalState")
+        self.st_vars["thermal"].set(THERMAL_LABELS.get(thermal, "-") if thermal else "-")
+        color = {"fair": "#b7791f", "serious": "#d9730d", "critical": "#c0392b"}.get(thermal, self._default_fg)
+        try:
+            self.st_labels["thermal"].config(
+                foreground=color, font=("", 9, "bold") if thermal == "critical" else "TkDefaultFont")
+        except Exception:
+            pass
+        if "batteryLevel" in st or "batteryState" in st:
+            self.st_vars["battery"].set(format_battery(st.get("batteryLevel", -1), st.get("batteryState", "unknown")))
+        else:
+            self.st_vars["battery"].set("-")
+        lp = st.get("lowPowerMode")
+        self.st_vars["lowpower"].set("-" if lp is None else ("オン" if lp else "オフ"))
+        pm = st.get("processingMs")
+        self.st_vars["processing"].set("%.1f ms" % pm if isinstance(pm, (int, float)) else "-")
+
+        warn = is_thermal_warning(thermal)
+        if warn and not self.warn_var.get():
+            self.warn_var.set(THERMAL_WARNING)
+            self.warn_label.pack(side="bottom", fill="x", before=self.nb)
+        elif not warn and self.warn_var.get():
+            self.warn_var.set("")
+            self.warn_label.pack_forget()
 
     def _apply_ranges(self, st):
         key = (st.get("isoMin"), st.get("isoMax"), st.get("zoomMax"), st.get("focusSupported"), st.get("torchAvailable"))

@@ -190,7 +190,7 @@ final class StreamServer {
 
     /// 映像フレームを送信する。破棄した場合は false。
     /// キーフレーム以外は、未送信フレームが2つ以上溜まっていると破棄する。
-    func sendVideo(_ data: Data, isKey: Bool) -> Bool {
+    func sendVideo(_ data: Data, isKey: Bool, hevc: Bool = false) -> Bool {
         lock.lock()
         guard let conn = client, clientReady else {
             lock.unlock()
@@ -204,7 +204,7 @@ final class StreamServer {
         let gen = generation
         lock.unlock()
 
-        let packet = Packet.encode(type: PacketType.video, payload: data)
+        let packet = Packet.encode(type: hevc ? PacketType.videoHevc : PacketType.video, payload: data)
         conn.send(content: packet, completion: .contentProcessed({ [weak self] _ in
             guard let self = self else { return }
             self.lock.lock()

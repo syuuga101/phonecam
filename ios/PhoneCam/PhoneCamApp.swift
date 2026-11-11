@@ -30,10 +30,13 @@ final class AppModel: ObservableObject {
     @Published var dimScreen = false
     @Published var errorText: String?
     @Published var rotationAngle = 0
+    @Published var thermalText = "正常"
+    @Published var batteryText = "-"
 
     let camera = CameraController()
     private let encoder = H264Encoder()
     private let server = StreamServer()
+    private let effects = EffectsProcessor()
 
     // encoder のコールバックは任意のスレッドから来るため lock で保護する
     private let stateLock = NSLock()
@@ -46,11 +49,25 @@ final class AppModel: ObservableObject {
     private let timerQueue = DispatchQueue(label: "phonecam.timer", qos: .utility)
     private var lastSentCount = 0
     private var savedBrightness: CGFloat = 0.5
+    private var batteryLevel: Double = -1
+    private var batteryStateText = "unknown"
+    private var codecName = "h264"
 
     func start() {
         guard !started else { return }
         started = true
         UIApplication.shared.isIdleTimerDisabled = true
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        refreshDeviceInfo()
+        NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async { self.refreshDeviceInfo() }
+            self.sendFullStatus()
+        }
 
         // カメラ
         camera.onFrame = { [weak self] pixelBuffer, pts, duration in
@@ -59,11 +76,13 @@ final class AppModel: ObservableObject {
             let isActive = self.active
             self.stateLock.unlock()
             if isActive {
-                self.encoder.encode(pixelBuffer: pixelBuffer, pts: pts, duration: duration)
+                let toEncode = self.effects.process(pixelBuffer)
+                self.encoder.encode(pixelBuffer: toEncode, pts: pts, duration: duration)
             }
         }
         camera.onApplied = { [weak self] status in
-            self?.server.sendStatus(status)
+            guard let self = self else { return }
+            self.server.sendStatus(self.withExtras(status))
         }
         camera.onStreamSettings = { [weak self] width, height, fps, bitrate in
             guard let self = self else { return }
@@ -89,8 +108,8 @@ final class AppModel: ObservableObject {
         }
 
         // エンコーダ
-        encoder.onEncoded = { [weak self] data, isKey in
-            self?.handleEncoded(data, isKey: isKey)
+        encoder.onEncoded = { [weak self] data, isKey, isHevc in
+            self?.handleEncoded(data, isKey: isKey, hevc: isHevc)
         }
 
         // サーバ
@@ -103,7 +122,7 @@ final class AppModel: ObservableObject {
             self.lastSentCount = 0
             self.stateLock.unlock()
             self.encoder.requestKeyframe()
-            self.server.sendStatus(self.camera.status())
+            self.sendFullStatus()
             DispatchQueue.main.async {
                 self.isConnected = true
                 self.connectionKind = kind
@@ -126,6 +145,13 @@ final class AppModel: ObservableObject {
             if let key = json["keyframe"] as? NSNumber, key.boolValue {
                 self.encoder.requestKeyframe()
             }
+            self.effects.apply(json)
+            if let c = json["codec"] as? String, (c == "h264" || c == "hevc") {
+                self.stateLock.lock()
+                self.codecName = c
+                self.stateLock.unlock()
+                self.encoder.setCodec(hevc: c == "hevc")
+            }
             // 適用後に camera.onApplied 経由でステータスが返る
             self.camera.apply(json)
         }
@@ -135,13 +161,13 @@ final class AppModel: ObservableObject {
         startTimer()
     }
 
-    private func handleEncoded(_ data: Data, isKey: Bool) {
+    private func handleEncoded(_ data: Data, isKey: Bool, hevc: Bool) {
         stateLock.lock()
         let waiting = waitingForKeyframe
         stateLock.unlock()
         if waiting && !isKey { return }
 
-        let sent = server.sendVideo(data, isKey: isKey)
+        let sent = server.sendVideo(data, isKey: isKey, hevc: hevc)
 
         stateLock.lock()
         if sent {
@@ -170,8 +196,9 @@ final class AppModel: ObservableObject {
             self.stateLock.unlock()
 
             if isActive {
-                self.server.sendStatus(self.camera.status())
+                self.sendFullStatus()
             }
+            DispatchQueue.main.async { self.refreshDeviceInfo() }
             let ip = AppModel.wifiIPv4()
             DispatchQueue.main.async {
                 self.sentFps = max(0, delta)
@@ -180,6 +207,69 @@ final class AppModel: ObservableObject {
         }
         t.resume()
         timer = t
+    }
+
+    // MARK: 端末状態 / ステータス拡張
+
+    private static func thermalName(_ s: ProcessInfo.ThermalState) -> String {
+        switch s {
+        case .nominal: return "nominal"
+        case .fair: return "fair"
+        case .serious: return "serious"
+        case .critical: return "critical"
+        @unknown default: return "nominal"
+        }
+    }
+
+    private static func thermalLabel(_ s: ProcessInfo.ThermalState) -> String {
+        switch s {
+        case .nominal: return "正常"
+        case .fair: return "やや高い"
+        case .serious: return "高い"
+        case .critical: return "危険"
+        @unknown default: return "正常"
+        }
+    }
+
+    /// メインスレッドで呼ぶ。バッテリー情報を読み、UI とステータス用の値を更新する。
+    private func refreshDeviceInfo() {
+        let dev = UIDevice.current
+        let level = Double(dev.batteryLevel)
+        let stateText: String
+        switch dev.batteryState {
+        case .charging: stateText = "charging"
+        case .full: stateText = "full"
+        case .unplugged: stateText = "unplugged"
+        default: stateText = "unknown"
+        }
+        let lvl = (level >= 0 && level.isFinite) ? level : -1
+        stateLock.lock()
+        batteryLevel = lvl
+        batteryStateText = stateText
+        stateLock.unlock()
+
+        thermalText = AppModel.thermalLabel(ProcessInfo.processInfo.thermalState)
+        batteryText = lvl >= 0 ? "\(Int((lvl * 100).rounded()))%" : "-"
+    }
+
+    private func withExtras(_ base: [String: Any]) -> [String: Any] {
+        var s = base
+        stateLock.lock()
+        let lvl = batteryLevel
+        let bst = batteryStateText
+        let codec = codecName
+        stateLock.unlock()
+        s["codec"] = codec
+        s["thermalState"] = AppModel.thermalName(ProcessInfo.processInfo.thermalState)
+        s["batteryLevel"] = lvl
+        s["batteryState"] = bst
+        s["lowPowerMode"] = ProcessInfo.processInfo.isLowPowerModeEnabled
+        for (k, v) in effects.statusFields() { s[k] = v }
+        return s
+    }
+
+    private func sendFullStatus() {
+        server.sendStatus(withExtras(camera.status()))
     }
 
     // MARK: 画面を暗くする
@@ -301,6 +391,10 @@ struct ContentView: View {
                         InfoRow(title: "ビットレート", value: model.bitrateText)
                         Divider().background(Color(white: 0.2))
                         InfoRow(title: "送信fps", value: "\(model.sentFps)")
+                        Divider().background(Color(white: 0.2))
+                        InfoRow(title: "温度状態", value: model.thermalText)
+                        Divider().background(Color(white: 0.2))
+                        InfoRow(title: "バッテリー", value: model.batteryText)
                     }
                     .background(cardColor)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

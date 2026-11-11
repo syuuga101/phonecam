@@ -3,6 +3,7 @@ import Foundation
 /// 通信プロトコルのメッセージ種別
 enum PacketType {
     static let video: UInt8 = 1
+    static let videoHevc: UInt8 = 2
     static let status: UInt8 = 3
     static let control: UInt8 = 10
 }
