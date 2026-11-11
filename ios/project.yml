@@ -1,0 +1,36 @@
+name: PhoneCam
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  PhoneCam:
+    type: application
+    platform: iOS
+    sources:
+      - path: PhoneCam
+        excludes: [Info.plist]
+    scheme: {}
+    info:
+      path: PhoneCam/Info.plist
+      properties:
+        CFBundleDisplayName: PhoneCam
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSCameraUsageDescription: 配信用カメラとして使用します
+        NSLocalNetworkUsageDescription: Wi-Fi経由でPCと接続するために使用します
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIUserInterfaceStyle: Dark
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.phonecam
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
