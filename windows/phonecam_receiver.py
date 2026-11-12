@@ -573,7 +573,9 @@ DEFAULT_SETTINGS = {
     "mode": "usb",
     "ip": "",
     "lens": "wide",
-    "resolution": "1080p",
+    "resolution": "1080p",       # iPhoneから送る解像度 (仮想カメラのサイズとは無関係)
+    "output_size": "1080p",      # 仮想カメラの出力サイズ (長辺×短辺)。iPhoneの解像度が変わっても変えない
+    "hw_decode": True,           # ハードウェアデコード (d3d11va) を試す。使えなければ自動でソフトウェア
     "fps": 60,
     "bitrate": 20,
     "mirror": False,
@@ -656,7 +658,7 @@ INT_RANGES = {
     "mic_volume": (0, 200),
     "mic_delay_ms": (0, 500),
 }
-BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "mic_enabled", "mic_mute", "setup_done")
+BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "mic_enabled", "mic_mute", "setup_done", "hw_decode")
 AUDIO_AVAILABLE = sd is not None and np is not None
 
 
@@ -710,6 +712,9 @@ def sanitize_settings(s):
     except Exception:
         idle = None
     s["idle_stop_sec"] = idle if idle in IDLE_STOP_VALUES else DEFAULT_SETTINGS["idle_stop_sec"]
+    # v1.4 追加: 出力サイズ (古い設定では持っていない → 解像度に関係なく 1080p。仮想カメラのサイズは固定)
+    if s.get("output_size") not in RESOLUTIONS:
+        s["output_size"] = DEFAULT_SETTINGS["output_size"]
     # 音声デバイスの控え
     try:
         pend = int(s.get("vbcable_restore_pending"))
@@ -835,7 +840,8 @@ def canvas_size(settings):
     mode = settings.get("canvas", "follow")
     if mode == "native":
         return None
-    long_side, short_side = RESOLUTIONS.get(settings.get("resolution"), (1920, 1080))
+    # 仮想カメラのサイズは「iPhoneから送る解像度」とは独立。解像度を変えてもカメラは作り直さない
+    long_side, short_side = RESOLUTIONS.get(settings.get("output_size"), (1920, 1080))
     if mode == "follow":
         mode = "portrait" if settings.get("orientation", "auto") == "portrait" else "landscape"
     if mode == "portrait":
@@ -872,7 +878,10 @@ class CanvasFitter:
         戻り値: (ch, cw, 3) の uint8 配列。"""
         cw, ch = canvas
         sw, sh, ox, oy = fit_geometry(frame.width, frame.height, cw, ch, fit)
+        # 縮小・形式変換は reformat の1回で済ませる (4K → 1080 でも余計なコピーをしない)
         arr = frame.reformat(width=sw, height=sh, format=fmt).to_ndarray()
+        if (sw, sh) == (cw, ch):
+            return arr
         if fit == "crop":
             return arr[oy:oy + ch, ox:ox + cw]
         key = (cw, ch, tuple(pad_color), sw, sh)
@@ -1035,6 +1044,50 @@ def format_mmss(seconds):
     if t >= 3600:
         return "%d:%02d:%02d" % (t // 3600, t % 3600 // 60, t % 60)
     return "%02d:%02d" % (t // 60, t % 60)
+
+
+GRAPH_RANGES = (5, 15, 30)  # 履歴グラフの表示範囲 (分)
+GRAPH_FPS_MAX = 60.0
+THERMAL_BLOCK_COLORS = {"nominal": "#8fd6a1", "fair": "#f5c542", "serious": "#f2994a", "critical": "#e5484d"}
+THERMAL_NO_DATA_COLOR = "#e8e8ed"
+
+
+def graph_window(samples, seconds):
+    """直近 seconds 個のサンプル (1秒=1個)。足りない分は先頭を「データなし」で埋めて、常に seconds 個にそろえる。"""
+    data = list(samples)[-seconds:] if seconds > 0 else []
+    return [(None, 0.0)] * (seconds - len(data)) + data
+
+
+def level_runs(window):
+    """温度の帯用。同じレベルが続く区間にまとめる → [(開始位置, 長さ(秒), レベル 0-3 または None)]"""
+    runs = []
+    for i, (lv, _fps) in enumerate(window):
+        if runs and runs[-1][2] == lv:
+            runs[-1][1] += 1
+        else:
+            runs.append([i, 1, lv])
+    return [tuple(r) for r in runs]
+
+
+def fps_runs(window, min_fps=0.5):
+    """fps折れ線用。未接続・受信なし(0 fps) の秒で線を切り、つながった区間ごとに [(位置, fps), ...] を返す。"""
+    runs, cur = [], []
+    for i, (lv, fps) in enumerate(window):
+        if lv is None or fps < min_fps:
+            if cur:
+                runs.append(cur)
+                cur = []
+        else:
+            cur.append((i, float(fps)))
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def range_label(minutes, fraction=1.0):
+    """時間軸の「◯分前」。fraction=0.5 なら半分の位置。"""
+    m = minutes * fraction
+    return "%d分前" % m if abs(m - round(m)) < 1e-9 else "%.1f分前" % m
 
 
 def format_bytes(n):
@@ -1408,6 +1461,9 @@ class SharedState:
         self.resolution = "-"
         self.phone_status = {}
         self.connected = False
+        self.codec_in_use = "-"      # 実際に受信している映像のコーデック ("h264" / "hevc")
+        self.decoder = "-"           # "hw" / "sw"
+        self.decoder_note = ""       # ハードウェアが使えなかった理由など
 
     def update(self, **kw):
         with self._lock:
@@ -1424,6 +1480,9 @@ class SharedState:
                 "resolution": self.resolution,
                 "phone_status": dict(self.phone_status),
                 "connected": self.connected,
+                "codec_in_use": self.codec_in_use,
+                "decoder": self.decoder,
+                "decoder_note": self.decoder_note,
             }
 
 
@@ -1451,6 +1510,14 @@ def parse_receiver_heartbeat(raw):
     if raw is None or len(raw) < SHMEM_HEADER_BYTES:
         return None
     return raw[RECEIVER_HEARTBEAT_OFFSET]
+
+
+def parse_softcam_header(raw):
+    """共有メモリ先頭 16 byte → {"width","height","active","ver","hb"}。不正なら None。"""
+    if raw is None or len(raw) < SHMEM_HEADER_BYTES:
+        return None
+    _off, w, h, _fr, active, ver, _sender_hb, hb = struct.unpack("<IHHfBBBB", bytes(raw[:SHMEM_HEADER_BYTES]))
+    return {"width": w, "height": h, "active": bool(active), "ver": ver, "hb": hb}
 
 
 class Win32Mapping:
@@ -1490,27 +1557,38 @@ class Win32Mapping:
 
 
 class SoftcamMemoryReader:
-    """softcam の共有メモリから receiver_heartbeat を読む。カメラが無いときは None。"""
+    """softcam の共有メモリから receiver_heartbeat などを読む。カメラが無いときは None。
+    UI スレッドが読み、受信スレッドが (カメラの作り直しで) 閉じることがあるので、ロックで守る。"""
 
     def __init__(self, opener=Win32Mapping, name=SOFTCAM_SHMEM_NAME):
         self._opener = opener
         self._name = name
         self._m = None
+        self._lock = threading.Lock()
+        self._hold_until = 0.0
+
+    def read_info(self):
+        """ヘッダの内容 (parse_softcam_header) か、共有メモリが無い/読めないときは None。"""
+        with self._lock:
+            if self._m is None:
+                if time.monotonic() < self._hold_until:
+                    return None  # カメラの作り直し中: 古い共有メモリを掴み直さない
+                try:
+                    self._m = self._opener(self._name)
+                except Exception:
+                    self._m = None
+                    return None
+            try:
+                return parse_softcam_header(self._m.read())
+            except Exception:
+                self._close_locked()
+                return None
 
     def read(self):
-        if self._m is None:
-            try:
-                self._m = self._opener(self._name)
-            except Exception:
-                self._m = None
-                return None
-        try:
-            return parse_receiver_heartbeat(self._m.read())
-        except Exception:
-            self.close()
-            return None
+        info = self.read_info()
+        return None if info is None else info["hb"]
 
-    def close(self):
+    def _close_locked(self):
         m, self._m = self._m, None
         if m is not None:
             try:
@@ -1518,34 +1596,79 @@ class SoftcamMemoryReader:
             except Exception:
                 pass
 
+    def close(self, hold=0.0):
+        """閉じる。hold 秒のあいだは開き直さない。
+        (こちらが古い共有メモリを開いたままだと、softcam が同じ名前で新しいカメラを作れないため)"""
+        with self._lock:
+            self._close_locked()
+            if hold > 0:
+                self._hold_until = time.monotonic() + hold
+
+
+WATCH_STATE_LABELS = {"in_use": "使用中", "idle": "未使用", "nomem": "共有メモリなし"}
+
 
 class ConsumerWatcher:
-    """receiver_heartbeat が最近変化したか = 仮想カメラを開いているアプリがあるか。
-    ハートビートは 8bit で一周するので、前回値との不一致だけを見る。"""
+    """仮想カメラを開いているアプリがあるか。
+    主: receiver_heartbeat が最近変化した (8bit で一周するので、前回値との不一致だけを見る)。
+    補助: connected_min_version が 0 → 0以外 になった (アプリが新しく開いた) ことも「使われた」とみなす。"""
 
     def __init__(self, reader, window=CONSUMER_WINDOW_SEC):
         self.reader = reader
         self.window = window
+        self.info = None
         self._last = None
+        self._last_ver = None
         self._changed_t = None
 
     def reset(self):
         """カメラを作り直したときに呼ぶ (古い共有メモリを掴み続けないため)。"""
         self.reader.close()
+        self.info = None
         self._last = None
+        self._last_ver = None
         self._changed_t = None
 
+    def _read_info(self):
+        fn = getattr(self.reader, "read_info", None)
+        if fn is not None:
+            return fn()
+        hb = self.reader.read()  # read() だけを持つ読み取り側 (テスト用など)
+        return None if hb is None else {"hb": hb, "ver": None, "width": 0, "height": 0, "active": True}
+
     def poll(self, now):
-        hb = self.reader.read()
-        if hb is None:
+        info = self._read_info()
+        self.info = info
+        if info is None:
             self._last = None
-        else:
-            if self._last is not None and hb != self._last:
-                self._changed_t = now
-            self._last = hb
+            self._last_ver = None
+            return
+        hb, ver = info["hb"], info.get("ver")
+        if self._last is not None and hb != self._last:
+            self._changed_t = now
+        elif self._last_ver == 0 and ver:
+            self._changed_t = now
+        self._last = hb
+        self._last_ver = ver
 
     def in_use(self, now):
         return self._changed_t is not None and (now - self._changed_t) <= self.window
+
+    def state(self, now):
+        """"in_use" / "idle" / "nomem" (診断表示用)。"""
+        if self.info is None:
+            return "nomem"
+        return "in_use" if self.in_use(now) else "idle"
+
+    def detail(self):
+        """診断表示の補足 (共有メモリのサイズと、アプリが一度でも開いたか)。"""
+        i = self.info
+        if not i:
+            return ""
+        parts = ["共有メモリ %dx%d" % (i.get("width", 0), i.get("height", 0))]
+        if i.get("ver") is not None:
+            parts.append("アプリの接続履歴あり" if i["ver"] else "アプリの接続履歴なし")
+        return "、".join(parts)
 
 
 class StreamController:
@@ -1717,7 +1840,8 @@ class SoftcamSender:
             self._lib.scDeleteCamera(h)  # 同一プロセスでは1台のみ。作り直す前に必ず削除
 
 
-SIZE_CHANGED_NOTICE = "出力サイズが変わりました。OBSでソースを一度非表示→表示にすると映像が戻ります"
+SIZE_CHANGED_NOTICE = "出力サイズが変わりました。OBSはソースを非表示→表示、Discordはカメラを一度オフ→オンにしてください"
+CAM_RELEASE_HOLD_SEC = 1.5  # カメラを作り直す間、共有メモリの監視を止める時間
 
 
 class VirtualCamOutput:
@@ -1737,6 +1861,7 @@ class VirtualCamOutput:
         self.last_frame_t = 0.0   # 最後に映像を渡した時刻 (monotonic)
         self._last_standby_t = 0.0
         self._black = None
+        self.release_hooks = []   # カメラを閉じる/作り直す直前に呼ぶ (共有メモリの監視を手放すため)
 
     # -- 補助 -----------------------------------------------------------
     def backend(self):
@@ -1753,9 +1878,17 @@ class VirtualCamOutput:
             self.close()
             self.fail_until = 0.0
 
+    def _release_watchers(self):
+        for fn in list(self.release_hooks):
+            try:
+                fn()
+            except Exception:
+                pass
+
     def close(self):
         with self._lock:
             if self.cam is not None:
+                self._release_watchers()
                 try:
                     self.cam.close()
                 except Exception:
@@ -1783,7 +1916,7 @@ class VirtualCamOutput:
             if now - self.last_frame_t < STANDBY_INTERVAL_SEC or now - self._last_standby_t < STANDBY_INTERVAL_SEC:
                 return
             self._last_standby_t = now
-            w, h = canvas or self.size or RESOLUTIONS.get(self.settings.get("resolution"), (1920, 1080))
+            w, h = canvas or self.size or RESOLUTIONS.get(self.settings.get("output_size"), (1920, 1080))
             w, h = w // 4 * 4, h // 4 * 4
             if self._black is None or self._black.shape[:2] != (h, w):
                 self._black = np.zeros((h, w, 3), dtype=np.uint8)
@@ -1814,6 +1947,7 @@ class VirtualCamOutput:
             except OSError as e:
                 raise PhoneCamError("softcam.dll を読み込めません: %s" % e)
         sender = self._softcam
+        self._release_watchers()
         sender.close()
         sender.create(w, h)
         if _is_frozen():
@@ -1866,12 +2000,12 @@ class VirtualCamOutput:
                     self.generation += 1
                 except PhoneCamError as e:
                     self.cam = None
-                    self.fail_until = now + 3.0
+                    self.fail_until = now + 1.5
                     self.state.update(error_text=str(e))
                     return
                 except Exception as e:
                     self.cam = None
-                    self.fail_until = now + 3.0
+                    self.fail_until = now + 1.5
                     self.state.update(error_text="PhoneCamカメラを開始できません。登録済みか確認してください（%s）。詳細: %s" % (register_hint(), e))
                     return
             else:
@@ -1925,30 +2059,84 @@ def codec_for_msg(msg_type):
     return None
 
 
-class DecoderManager:
-    """デコーダー (CodecContext) を1つだけ保持し、パケットのコーデックが変わったら作り直す。"""
+HW_DEVICE_TYPE = "d3d11va"
+HW_MAX_FAILS = 45   # ハードウェアで一度も映像を出せないまま、デコードの失敗がこの回数続いたらソフトウェアに切り替える
+CODEC_NAMES = {"h264": "H.264", "hevc": "HEVC(H.265)"}
 
-    def __init__(self, factory):
+
+class DecoderManager:
+    """デコーダー (CodecContext) を1つだけ保持し、パケットのコーデックが変わったら作り直す。
+    ハードウェアデコード (hw_wanted) を試し、使えない・失敗したときはソフトウェアへ自動で切り替える。"""
+
+    def __init__(self, factory, hw=False):
         self._factory = factory
         self.codec = None
         self.decoder = None
+        self.hw_wanted = bool(hw)      # 次にデコーダーを作るときにハードウェアを試すか
+        self.hw_active = False         # 今のデコーダーが実際にハードウェアか
+        self.hw_error = ""             # ハードウェアが使えなかった理由
+        self.hw_disabled = False       # 失敗して、このセッション中は使わないと決めた
+        self._requested_hw = None
+        self._ok = 0
+        self._fail = 0
 
     def get(self, codec):
-        """(decoder, switched)。switched は既存デコーダーから別コーデックへ切り替えたとき True。"""
-        switched = False
-        if self.decoder is None or codec != self.codec:
+        """(decoder, switched)。switched は既存のデコーダーを作り直したとき (コーデックの切替・ハードウェア⇔ソフトウェア) True。"""
+        want = bool(self.hw_wanted) and not self.hw_disabled
+        if self.decoder is None or codec != self.codec or want != self._requested_hw:
             switched = self.decoder is not None
-            self.decoder = self._factory(codec)
+            info = {}
+            if want:
+                self.decoder = self._factory(codec, True, info)
+            else:
+                self.decoder = self._factory(codec)
             self.codec = codec
-        return self.decoder, switched
+            self._requested_hw = want
+            self.hw_active = bool(info.get("hw"))
+            if want:
+                self.hw_error = info.get("hw_error", "")
+            elif not self.hw_disabled:
+                self.hw_error = ""
+            self._ok = 0
+            self._fail = 0
+            return self.decoder, switched
+        return self.decoder, False
+
+    def note_ok(self):
+        self._ok += 1
+        self._fail = 0
+
+    def note_error(self):
+        """デコード例外を数える。ハードウェアで成功が無いまま続くならソフトウェアに切り替える (True)。"""
+        if not self.hw_active:
+            return False
+        self._fail += 1
+        if self._ok == 0 and self._fail >= HW_MAX_FAILS:
+            return self.disable_hw("ハードウェアデコードで映像を出せませんでした")
+        return False
+
+    def disable_hw(self, reason):
+        """このセッションではハードウェアを使わない。次の get() でソフトウェアのデコーダーを作る。"""
+        self.hw_disabled = True
+        self.hw_error = reason
+        return True
 
 
-def make_decoder(codec="h264"):
-    ctx = av.CodecContext.create(codec, "r")
+def _hwaccel_class():
+    """PyAV の HWAccel (PyAV 14 以降)。無ければ None。"""
     try:
-        ctx.thread_type = "SLICE"
+        from av.codec.hwaccel import HWAccel
+        return HWAccel
     except Exception:
-        pass
+        return None
+
+
+def _tune_decoder(ctx, threads=True):
+    if threads:
+        try:
+            ctx.thread_type = "SLICE"
+        except Exception:
+            pass
     # 低遅延フラグ (PyAV のバージョン差を吸収するため何重にも試す)
     applied = False
     try:
@@ -1970,6 +2158,29 @@ def make_decoder(codec="h264"):
             ctx.options = {"flags": "low_delay"}
         except Exception:
             pass
+
+
+def make_decoder(codec="h264", hw=False, info=None):
+    """デコーダーを作る。hw=True なら d3d11va を試し、できなければソフトウェア。
+    info (dict) に結果を入れる: info["hw"]=ハードウェアで開けたか、info["hw_error"]=開けなかった理由。
+    ハードウェアは allow_software_fallback=False で開く (PyAV が黙ってソフトウェアに落ちると、どちらで動いているか分からないため)。"""
+    if info is None:
+        info = {}
+    info["hw"] = False
+    if hw:
+        try:
+            cls = _hwaccel_class()
+            if cls is None:
+                raise RuntimeError("PyAV がハードウェアデコードに対応していません")
+            ctx = av.CodecContext.create(codec, "r", hwaccel=cls(device_type=HW_DEVICE_TYPE, allow_software_fallback=False))
+            _tune_decoder(ctx, threads=False)
+            ctx.open()  # デバイスが作れないならここで例外になる
+            info["hw"] = True
+            return ctx
+        except Exception as e:
+            info["hw_error"] = "ハードウェアデコードを開始できませんでした (%s)" % e
+    ctx = av.CodecContext.create(codec, "r")
+    _tune_decoder(ctx)
     return ctx
 
 
@@ -1986,6 +2197,8 @@ class Link:
         self._stop = threading.Event()
         self._sock = None
         self._send_lock = threading.Lock()
+        self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
+        self._decoder_key = None
 
     # -- 公開 API --------------------------------------------------------
     def start(self):
@@ -2011,7 +2224,9 @@ class Link:
             t.join(timeout=3.0)
         self._thread = None
         self.vcam.park()
-        self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-")
+        self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-",
+                          codec_in_use="-", decoder="-", decoder_note="")
+        self._decoder_key = None
         self.latency.reset()
 
     def send_control(self, control):
@@ -2075,7 +2290,8 @@ class Link:
     def _session(self, sock, stop):
         if av is None or np is None:
             raise PhoneCamError("av / numpy がインストールされていません。install.bat を実行してください")
-        decoders = DecoderManager(make_decoder)
+        decoders = DecoderManager(make_decoder, hw=self._hw_wanted())
+        self._decoder_key = None
         self.state.update(status_text="接続済み", connected=True, error_text="")
 
         # 保存済み設定を全部送る + キーフレーム要求
@@ -2103,6 +2319,27 @@ class Link:
         finally:
             ping_stop.set()
 
+    def _hw_wanted(self):
+        return bool(self.settings.get("hw_decode", True)) and not self.hw_disabled
+
+    def _report_decoder(self, decoders, codec_name):
+        """使っているコーデックとデコーダー (ハードウェア/ソフトウェア) を表示用に記録する。"""
+        kind = "hw" if decoders.hw_active else "sw"
+        note = ""
+        if not decoders.hw_active and self.settings.get("hw_decode", True):
+            note = decoders.hw_error or "ハードウェアデコードを使えないため、ソフトウェアで処理しています"
+        key = (codec_name, kind, note)
+        if key != self._decoder_key:
+            self._decoder_key = key
+            self.state.update(codec_in_use=codec_name, decoder=kind, decoder_note=note)
+
+    def _frame_to_image(self, frame, fmt, fitter):
+        """デコード結果 → 出力サイズの BGR/RGB 配列。縮小と形式変換は reformat の1回で行う。"""
+        canvas = canvas_size(self.settings)
+        if canvas is None or canvas == (frame.width, frame.height):
+            return frame.to_ndarray(format=fmt)
+        return fitter.process(frame, fmt, canvas, self.settings.get("fit", "pad"), pad_color_for(self.settings))
+
     def _ping_loop(self, ping_stop):
         """1秒ごとに ping を送る (遅延計測用)。"""
         while not ping_stop.is_set():
@@ -2118,13 +2355,18 @@ class Link:
             if codec_name is not None:
                 timing, pending_timing = pending_timing, None
                 t0 = t_recv
+                decoders.hw_wanted = bool(self.settings.get("hw_decode", True))  # 設定の切替をすぐ反映する
+                decoders.hw_disabled = self.hw_disabled
                 try:
                     decoder, switched = decoders.get(codec_name)
                     if switched:
                         last_kf = time.time()
                         self.send_control({"keyframe": True})
+                    self._report_decoder(decoders, codec_name)
                     frames = decoder.decode(av.Packet(payload))
                 except Exception:
+                    if decoders.note_error():
+                        self.hw_disabled = True  # ソフトウェアで作り直して続ける
                     now = time.time()
                     if now - last_kf >= 1.0:
                         last_kf = now
@@ -2137,12 +2379,18 @@ class Link:
                 frame = frames[-1]
                 self.vcam.apply_pending_reset()
                 fmt = self.vcam.frame_format()
-                canvas = canvas_size(self.settings)
-                if canvas is None or canvas == (frame.width, frame.height):
-                    img = frame.to_ndarray(format=fmt)
-                else:
-                    img = fitter.process(frame, fmt, canvas, self.settings.get("fit", "pad"),
-                                         pad_color_for(self.settings))
+                try:
+                    img = self._frame_to_image(frame, fmt, fitter)
+                except Exception:
+                    if not decoders.hw_active:
+                        raise
+                    # ハードウェアのフレームを変換できない: ソフトウェアに切り替えて続ける
+                    decoders.disable_hw("ハードウェアのフレームを変換できませんでした")
+                    self.hw_disabled = True
+                    last_kf = time.time()
+                    self.send_control({"keyframe": True})
+                    continue
+                decoders.note_ok()
                 if self.settings.get(mirror_key(self.settings)):
                     img = img[:, ::-1]
                 if self.settings.get("rotate180"):
@@ -2155,10 +2403,15 @@ class Link:
                 frame_count += 1
                 now = time.time()
                 if now - fps_t0 >= 1.0:
+                    out_w, out_h = img.shape[1], img.shape[0]
+                    if (frame.width, frame.height) == (out_w, out_h):
+                        res_text = "%dx%d" % (out_w, out_h)
+                    else:
+                        res_text = "受信 %dx%d → 出力 %dx%d" % (frame.width, frame.height, out_w, out_h)
                     self.state.update(
                         recv_fps=frame_count / (now - fps_t0),
                         decode_ms=decode_avg,
-                        resolution="%dx%d" % (img.shape[1], img.shape[0]),
+                        resolution=res_text,
                     )
                     frame_count = 0
                     fps_t0 = now
@@ -2202,8 +2455,13 @@ SHUTTER_VALUES = [30, 50, 60, 100, 120, 250, 500, 1000]
 ORIENT_LABELS = [("auto", "自動"), ("landscape", "横"), ("portrait", "縦")]
 BACKEND_LABELS = [("phonecam", "PhoneCam（専用カメラ）"), ("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Capture")]
 CODEC_LABELS = [("h264", "H.264"), ("hevc", "HEVC(H.265)")]
+OUTPUT_SIZE_LABELS = [("720p", "1280×720（HD）"), ("1080p", "1920×1080（フルHD・おすすめ）"), ("4K", "3840×2160（4K）")]
 CANVAS_LABELS = [("follow", "向きの設定に合わせる"), ("landscape", "横長で固定"), ("portrait", "縦長で固定"),
-                 ("native", "映像のサイズそのまま（向きが変わるとOBSで再読み込みが必要）")]
+                 ("native", "映像のサイズそのまま（サイズが変わるとOBS・Discordで再読み込みが必要）")]
+DECODER_LABELS = {"hw": "ハードウェア", "sw": "ソフトウェア"}
+CAM_REG_EXPLAIN = ("OBSやDiscordのカメラ一覧に「PhoneCam」を出すための登録です。普段はそのままで大丈夫です。"
+                   "新しいバージョンにして「更新が必要」と出たときは「登録する（更新）」を押してください。"
+                   "「登録を解除」はPhoneCamを使わなくなったとき（アンインストール）に使います。")
 FIT_LABELS = [("pad", "余白を付けて全体を表示"), ("crop", "はみ出す部分を切り取って埋める")]
 BG_MODE_LABELS = [("off", "オフ"), ("blur", "ぼかし"), ("green", "切り抜き(緑)")]
 BG_QUALITY_LABELS = [("fast", "速度優先"), ("balanced", "バランス")]
@@ -2216,6 +2474,29 @@ METER_MIN_DB = -60.0
 THERMAL_WARNING = "iPhoneが熱くなっています。fpsを30に下げるか、エフェクトをオフにしてください"
 HINT_FG = "#666666"
 THROTTLE_MS = 50  # 1コントロールあたり最大 20 msg/s
+
+
+def setup_outcome_text(out, name_of):
+    """インストール結果の要約 (成功 / 完了しなかった項目 / 再起動が必要)。name_of: 項目ID → 表示名。"""
+    notes = []
+    failed = {c: r for c, r in out.get("results", {}).items() if not r.get("ok")}
+    if out.get("error"):
+        notes.append(out["error"])
+    elif failed:
+        details = " / ".join("%s: %s" % (name_of(c), r.get("detail", "")) for c, r in failed.items())
+        notes.append("完了しなかった項目があります。" + details)
+    else:
+        notes.append("インストールが完了しました。")
+    if out.get("reboot"):
+        notes.append("再起動が必要です。PCを再起動してください。")
+    return "\n".join(notes)
+
+
+def watch_text(watcher, now):
+    """状態タブの「使用中の検出」: 使用中 / 未使用 / 共有メモリなし (+補足)。"""
+    label = WATCH_STATE_LABELS.get(watcher.state(now), "-")
+    detail = watcher.detail()
+    return "%s（%s）" % (label, detail) if detail else label
 
 
 def format_battery(level, state):
@@ -2246,6 +2527,8 @@ class App:
         self.stream = StreamController(self.settings)
         self.link = Link(self.settings, self.state, self._get_mode_ip, audio=self.audio, stream=self.stream)
         self.watcher = ConsumerWatcher(SoftcamMemoryReader())
+        # カメラを作り直す直前に共有メモリの監視を手放す (掴んだままだと同じ名前で作り直せない)
+        self.link.vcam.release_hooks.append(lambda: self.watcher.reader.close(hold=CAM_RELEASE_HOLD_SEC))
         self._vcam_gen = -1
         self._closing = False
         self.wanted = False
@@ -2376,6 +2659,7 @@ class App:
         self._build_audio(p_aud)
         p4 = self._page("状態")
         self._build_phone_status(p4)
+        self._build_pc_status(p4)
         self._build_latency(p4)
         self._build_thermal_graph(p4)
         p_setup = self._page("セットアップ")
@@ -2468,7 +2752,7 @@ class App:
         self.dec_var = tk.StringVar(value="-")
         self.res_var = tk.StringVar(value="-")
         for i, (name, var) in enumerate([("状態", self.status_var), ("受信fps", self.fps_var),
-                                         ("デコード時間", self.dec_var), ("解像度", self.res_var)]):
+                                         ("デコード時間", self.dec_var), ("映像サイズ", self.res_var)]):
             ttk.Label(f, text=name).grid(row=2 + i, column=0, sticky="w")
             ttk.Label(f, textvariable=var, wraplength=px(380), justify="left").grid(row=2 + i, column=1, columnspan=2, sticky="w", padx=6)
         self.error_var = tk.StringVar(value="")
@@ -2537,11 +2821,13 @@ class App:
                 self._vcam_gen = vc.generation
             self.watcher.poll(now)
             self.stream.note_in_use(self.watcher.in_use(now), now)
+            self.watch_var.set(watch_text(self.watcher, now))
         else:
             if self._vcam_gen != -2:
                 self.watcher.reset()
                 self._vcam_gen = -2
             self.stream.note_in_use(False, now)
+            self.watch_var.set("-（出力先が「PhoneCam（専用カメラ）」のときだけ判定します）")
         snap = self.state.snapshot()
         connected = snap["connected"]
         want = self.stream.pending(connected, now)
@@ -2564,7 +2850,7 @@ class App:
         cb.bind("<<ComboboxSelected>>", lambda e: self._lens_changed())
         self.lens_combo = cb
 
-        ttk.Label(f, text="解像度").grid(row=1, column=0, sticky="w", pady=2)
+        ttk.Label(f, text="iPhoneから送る解像度").grid(row=1, column=0, sticky="w", pady=2)
         self.res_sel_var = tk.StringVar(value=self.settings["resolution"])
         cb = ttk.Combobox(f, textvariable=self.res_sel_var, values=RES_LABELS, state="readonly", width=14)
         cb.grid(row=1, column=1, sticky="w", padx=6)
@@ -2597,28 +2883,51 @@ class App:
         cb.grid(row=7, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("orientation", self._label_to_value(ORIENT_LABELS, self.orient_var.get()), "video"))
 
-        ttk.Label(f, text="出力の形").grid(row=8, column=0, sticky="w", pady=2)
+        ttk.Label(f, text="出力サイズ（仮想カメラ）").grid(row=8, column=0, sticky="w", pady=2)
+        self.out_size_var = tk.StringVar(value=self._value_to_label(OUTPUT_SIZE_LABELS, self.settings["output_size"]))
+        cb = ttk.Combobox(f, textvariable=self.out_size_var, values=[l for _, l in OUTPUT_SIZE_LABELS], state="readonly", width=24)
+        cb.grid(row=8, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed(
+            "output_size", self._label_to_value(OUTPUT_SIZE_LABELS, self.out_size_var.get()), None))
+
+        ttk.Label(f, text="出力の形").grid(row=9, column=0, sticky="w", pady=2)
         self.canvas_var = tk.StringVar(value=self._value_to_label(CANVAS_LABELS, self.settings["canvas"]))
         cb = ttk.Combobox(f, textvariable=self.canvas_var, values=[l for _, l in CANVAS_LABELS], state="readonly", width=24)
-        cb.grid(row=8, column=1, sticky="w", padx=6)
+        cb.grid(row=9, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("canvas", self._label_to_value(CANVAS_LABELS, self.canvas_var.get()), None))
-        ttk.Label(f, text="合わせ方").grid(row=9, column=0, sticky="w", pady=2)
+        ttk.Label(f, text="合わせ方").grid(row=10, column=0, sticky="w", pady=2)
         self.fit_var = tk.StringVar(value=self._value_to_label(FIT_LABELS, self.settings["fit"]))
         cb = ttk.Combobox(f, textvariable=self.fit_var, values=[l for _, l in FIT_LABELS], state="readonly", width=24)
-        cb.grid(row=9, column=1, sticky="w", padx=6)
+        cb.grid(row=10, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("fit", self._label_to_value(FIT_LABELS, self.fit_var.get()), None))
-        self._hint(f, 10, "向きが変わってもOBSの映像が止まらないよう、出力サイズを固定します")
+        self._hint(f, 11, "仮想カメラのサイズは固定です。iPhoneから送る解像度や向きを変えても、OBSやDiscordの映像は止まりません。"
+                          "ここを変えたときだけ、OBSはソースを非表示→表示、Discordはカメラを一度オフ→オンにしてください")
 
-        ttk.Label(f, text="コーデック").grid(row=11, column=0, sticky="w", pady=2)
+        ttk.Label(f, text="コーデック").grid(row=12, column=0, sticky="w", pady=2)
         self.codec_var = tk.StringVar(value=self._value_to_label(CODEC_LABELS, self.settings["codec"]))
         cb = ttk.Combobox(f, textvariable=self.codec_var, values=[l for _, l in CODEC_LABELS], state="readonly", width=14)
-        cb.grid(row=11, column=1, sticky="w", padx=6)
+        cb.grid(row=12, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed("codec", self._label_to_value(CODEC_LABELS, self.codec_var.get()), "codec"))
-        self._hint(f, 12, "HEVC は同じ画質をより低いビットレートで送れます（Wi-Fi向き）")
-        self._hint(f, 13, "出力先「PhoneCam（専用カメラ）」は OBS や Discord のカメラ一覧に「PhoneCam」と表示されます。"
+        self.codec_now_var = tk.StringVar(value="現在: -")
+        ttk.Label(f, textvariable=self.codec_now_var, foreground=HINT_FG).grid(row=12, column=2, sticky="w")
+        self._hint(f, 13, "HEVCは同じ画質をより少ないデータ量で送れます。USB接続ではH.264で十分です。"
+                          "Wi-Fiで映像が乱れるときにHEVCを試してください（PCのデコード負荷は少し増えます）")
+
+        self.hw_var = tk.BooleanVar(value=bool(self.settings["hw_decode"]))
+        ttk.Checkbutton(f, text="ハードウェアデコード（GPUで処理）", variable=self.hw_var,
+                        command=self._hw_changed).grid(row=14, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.decoder_now_var = tk.StringVar(value="現在: -")
+        ttk.Label(f, textvariable=self.decoder_now_var, foreground=HINT_FG).grid(row=14, column=2, sticky="w", pady=(6, 0))
+        self._hint(f, 15, "4Kなど重い映像でPCの負荷を減らします。使えないPCでは自動でソフトウェアに切り替わります")
+
+        self._hint(f, 16, "出力先「PhoneCam（専用カメラ）」は OBS や Discord のカメラ一覧に「PhoneCam」と表示されます。"
                           "OBSの仮想カメラと同時に使えます" +
-                          ("（初回は下の「登録する」が必要です）" if _is_frozen() else "（初回は register.bat が必要）"))
-        self._build_cam_registration(f, 14)
+                          ("（初回は下の「登録する」が必要です）" if _is_frozen() else "（初回は register.bat が必要）"), pady=(4, 0))
+        self._build_cam_registration(f, 17)
+
+    def _hw_changed(self):
+        self.link.hw_disabled = False  # 前回失敗していても、入れ直したら試す
+        self._changed("hw_decode", bool(self.hw_var.get()), None)
 
     def _build_power(self, parent):
         f = self._section(parent, "省電力")
@@ -2665,6 +2974,7 @@ class App:
         self.cam_note_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.cam_note_var, foreground="#c0392b", wraplength=px(480),
                   justify="left").grid(row=row + 1, column=0, columnspan=3, sticky="w")
+        self._hint(f, row + 2, CAM_REG_EXPLAIN, pady=(2, 0))
         if not _is_frozen():
             self.cam_status_var.set("exe 版のみ（ソース実行では register.bat を使います）")
             self._set_enabled(self.cam_reg_btn, False)
@@ -2799,12 +3109,17 @@ class App:
             self.setup_panel.render()
             self._setup_update_summary()
         if what == "start":
-            self.setup_note_var.set("インストール中です。管理者の確認が表示されたら「はい」を押してください…")
+            # ウィザードから始めたときは、ウィザード側に表示があるので、ここには「実行中」の文を出さない
+            # (出すと、終わっても消えずに残る)
+            self.setup_note_var.set("" if self._wizard is not None else
+                                    "インストール中です。管理者の確認が表示されたら「はい」を押してください…")
             self._setup_clear_manual()
         elif what == "stage" and self.setup.busy and self._wizard is None:
             self.setup_note_var.set(self.setup.stage)
         elif what == "done":
             self._setup_show_outcome()
+        elif what == "audio":
+            self._setup_show_audio()
 
     def _setup_update_summary(self):
         ps = phonecam_setup
@@ -2834,28 +3149,28 @@ class App:
     def _setup_show_outcome(self):
         ps = phonecam_setup
         out = self.setup.outcome or {}
-        if self._wizard is not None:
-            return
-        notes = []
-        if out.get("error"):
-            notes.append(out["error"])
-        failed = [ps.COMPONENT_BY_ID[c]["name"] for c, r in out.get("results", {}).items() if not r.get("ok")]
-        if failed and not out.get("error"):
-            details = " / ".join("%s: %s" % (ps.COMPONENT_BY_ID[c]["name"], r.get("detail", "")) for c, r in
-                                 out["results"].items() if not r.get("ok"))
-            notes.append("完了しなかった項目があります。" + details)
-        if out.get("reboot"):
-            notes.append("再起動が必要です。PCを再起動してください。")
-        if not notes:
-            notes.append("インストールが完了しました。")
-        self.setup_note_var.set("\n".join(notes))
         self._setup_clear_manual()
+        if self._wizard is not None:
+            self.setup_note_var.set("")  # 結果はウィザードに表示される。「インストール中です」を残さない
+            return
+        self.setup_note_var.set(setup_outcome_text(out, lambda cid: ps.COMPONENT_BY_ID[cid]["name"]))
         for m in out.get("manual", []):
             ps.make_link(self.setup_manual_box, "%s の公式ページを開く（%s）" % (m["name"], m["text"]),
                          lambda u=m["url"]: webbrowser_open(u), bg=ps.BG).pack(anchor="w")
 
+    def _setup_show_audio(self):
+        """VB-CABLE 導入後の音声デバイスの戻し結果 (完了のあとに届く) を、結果の下に足す。"""
+        msg = getattr(self.setup, "audio_message", "")
+        if not msg or self.setup.busy or self._wizard is not None:
+            return
+        cur = self.setup_note_var.get()
+        if msg not in cur:
+            self.setup_note_var.set((cur + "\n" if cur else "") + msg)
+
     def _setup_recheck(self):
         if self.setup is not None:
+            self.setup_note_var.set("")
+            self._setup_clear_manual()
             self.setup.recheck()
 
     def _setup_install_one(self, cid):
@@ -3293,6 +3608,36 @@ class App:
             pass
         self.root.after(50, self._meter_tick)
 
+    def _build_pc_status(self, parent):
+        f = self._section(parent, "PCでの受信・出力")
+        self.pc_vars = {}
+        for row, (key, name) in enumerate([("codec", "受信中のコーデック"), ("decoder", "デコーダー"),
+                                           ("out", "出力サイズ（仮想カメラ）"), ("watch", "使用中の検出")]):
+            ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=2)
+            var = tk.StringVar(value="-")
+            ttk.Label(f, textvariable=var, wraplength=px(340), justify="left").grid(row=row, column=1, sticky="w", padx=6)
+            self.pc_vars[key] = var
+        self.watch_var = self.pc_vars["watch"]
+        self._hint(f, 4, "「使用中の検出」は、OBSやDiscordが専用カメラを開いているかをPhoneCamが見ている結果です。"
+                         "「未使用」のままカメラが動かないときは、アプリ側でカメラを一度オフ→オンにしてください", pady=(6, 0))
+
+    def _update_pc_status(self, snap):
+        connected = snap["connected"]
+        name = CODEC_NAMES.get(snap["codec_in_use"]) if connected else None
+        if connected and not name:
+            name = CODEC_NAMES.get(snap["phone_status"].get("codec"))  # まだ映像が来ていないときは iPhone の申告値
+        self.codec_now_var.set("現在: %s" % (name or "-"))
+        self.pc_vars["codec"].set(name or "-")
+        dec = DECODER_LABELS.get(snap["decoder"]) if connected else None
+        self.decoder_now_var.set("現在: %s" % (dec or "-") if self.settings.get("hw_decode", True)
+                                 else "現在: %s" % (dec or "ソフトウェア"))
+        text = dec or "-"
+        if dec and snap.get("decoder_note"):
+            text += "（%s）" % snap["decoder_note"]
+        self.pc_vars["decoder"].set(text)
+        size = canvas_size(self.settings)
+        self.pc_vars["out"].set("%dx%d" % size if size else "映像のサイズそのまま")
+
     def _build_latency(self, parent):
         f = self._section(parent, "遅延（直近の平均）")
         self.lat_vars = {}
@@ -3350,70 +3695,102 @@ class App:
         tick()
 
     def _build_thermal_graph(self, parent):
-        f = self._section(parent, "温度の履歴（直近30分）")
-        self.graph = tk.Canvas(f, height=140, highlightthickness=0, borderwidth=0, background="#fbfbfd")
-        self.graph.grid(row=0, column=0, columnspan=3, sticky="ew")
+        f = self._section(parent, "温度と受信fpsの履歴")
+        self._graph_range = 5
+        bar = ttk.Frame(f)
+        bar.grid(row=0, column=0, columnspan=3, sticky="e", pady=(0, 4))
+        self.graph_range_var = tk.StringVar(value=str(self._graph_range))
+        for m in GRAPH_RANGES:
+            ttk.Radiobutton(bar, text="%d分" % m, value=str(m), variable=self.graph_range_var, style="Toolbutton",
+                            command=self._graph_range_changed).pack(side="left", padx=1)
+        self.graph = tk.Canvas(f, height=px(214), highlightthickness=0, borderwidth=0, background="#fbfbfd")
+        self.graph.grid(row=1, column=0, columnspan=3, sticky="ew")
+        f.columnconfigure(0, weight=1)
         self.graph.bind("<Configure>", lambda e: setattr(self, "_graph_dirty", True))
-        self._hint(f, 1, "色つきの太い線: iPhoneの温度　灰色の細い線: 受信fps", pady=(4, 0))
+
+    def _graph_range_changed(self):
+        try:
+            m = int(self.graph_range_var.get())
+        except Exception:
+            m = 5
+        self._graph_range = m if m in GRAPH_RANGES else 5
+        self._graph_dirty = True
+        self._graph_drawn = 0.0  # 範囲の切替はすぐ描き直す
 
     def _draw_graph(self):
+        """上: 温度の帯 (1秒=1ブロック)。下: 受信fpsの折れ線。どちらも右端が「今」。"""
         c = self.graph
         c.delete("all")
         W = c.winfo_width()
-        H = int(c.cget("height"))
-        if W < 120:
+        if W < px(200):
             return
-        L, R, T, B = 52, 10, 10, 22
-        pw, ph = W - L - R, H - T - B
-        N = HISTORY_SECONDS
-        samples = list(self.thermal_log.samples)
-        n = len(samples)
+        minutes = getattr(self, "_graph_range", 5)
+        N = minutes * 60
+        window = graph_window(self.thermal_log.samples, N)
+        L, R = px(40), px(10)
+        pw = W - L - R
+        grey, dark, font_s, font_b = "#8e8e93", "#1d1d1f", ("", 8), ("", 9, "bold")
 
         def X(i):
-            return L + pw * (1.0 - (n - 1 - i) / float(N - 1))
+            return L + pw * i / float(N)
 
-        def Y(level):
-            return T + ph * (1.0 - level / 3.0)
-
-        for lv, name in enumerate(("正常", "やや高い", "高い", "危険")):
-            y = Y(lv)
-            c.create_line(L, y, W - R, y, fill="#ececf0")
-            c.create_text(L - 6, y, text=name, anchor="e", fill="#8e8e93", font=("", 8))
-        c.create_text(L, H - B + 6, text="30分前", anchor="nw", fill="#8e8e93", font=("", 8))
-        c.create_text(W - R, H - B + 6, text="今", anchor="ne", fill="#8e8e93", font=("", 8))
-        if n < 2:
-            return
-        # 受信fps (薄いグレーの細線、副目盛り)
-        max_fps = max(60.0, max(f for _, f in samples))
-        cur = []
-        for i, (lv, fps) in enumerate(samples + [(None, 0.0)]):
+        # --- 温度 ---
+        cur_lv = window[-1][0]
+        cur_text = THERMAL_LABELS[THERMAL_LEVELS[cur_lv]] if cur_lv is not None else "-"
+        y = px(4)
+        c.create_text(L, y, text="温度", anchor="nw", fill=dark, font=font_b)
+        c.create_text(W - R, y, anchor="ne", fill=grey, font=font_s,
+                      text="現在: %s　　高い以上の累計 %s" % (cur_text, format_mmss(self.thermal_log.hot_seconds)))
+        sy0, sy1 = px(24), px(24) + px(28)
+        c.create_rectangle(L, sy0, L + pw, sy1, fill=THERMAL_NO_DATA_COLOR, width=0)
+        for start, length, lv in level_runs(window):
             if lv is None:
-                if len(cur) >= 4:
-                    c.create_line(*cur, fill="#c7c7cc", width=1)
-                cur = []
-            else:
-                cur += [X(i), T + ph * (1.0 - min(fps, max_fps) / max_fps)]
-        # 温度 (4段階の階段線)
-        i = 0
-        prev_end_level = None
-        prev_end_i = None
-        while i < n:
-            lv = samples[i][0]
-            if lv is None:
-                i += 1
-                prev_end_level = None
                 continue
-            j = i
-            while j + 1 < n and samples[j + 1][0] == lv:
-                j += 1
-            color = THERMAL_COLORS[THERMAL_LEVELS[lv]]
-            y = Y(lv)
-            if prev_end_level is not None and prev_end_i == i - 1:
-                c.create_line(X(i), Y(prev_end_level), X(i), y, fill=color, width=2)
-            x1 = X(j) if X(j) > X(i) else X(i) + 1
-            c.create_line(X(i), y, x1, y, fill=color, width=2)
-            prev_end_level, prev_end_i = lv, j
-            i = j + 1
+            x0, x1 = X(start), X(start + length)
+            c.create_rectangle(x0, sy0, max(x1, x0 + 1), sy1, fill=THERMAL_BLOCK_COLORS[THERMAL_LEVELS[lv]], width=0)
+        lx = L
+        ly = sy1 + px(10)
+        chip = px(10)
+        for name, key in (("正常", "nominal"), ("やや高い", "fair"), ("高い", "serious"), ("危険", "critical")):
+            c.create_rectangle(lx, ly - chip // 2, lx + chip, ly + chip // 2, fill=THERMAL_BLOCK_COLORS[key], width=0)
+            t = c.create_text(lx + chip + px(4), ly, text=name, anchor="w", fill=grey, font=font_s)
+            bb = c.bbox(t)
+            lx = (bb[2] if bb else lx + px(60)) + px(14)
+        c.create_rectangle(lx, ly - chip // 2, lx + chip, ly + chip // 2, fill=THERMAL_NO_DATA_COLOR, width=0)
+        c.create_text(lx + chip + px(4), ly, text="データなし", anchor="w", fill=grey, font=font_s)
+
+        # --- 受信fps ---
+        y = px(96)
+        samples = list(self.thermal_log.samples)
+        cur_fps = samples[-1][1] if samples and samples[-1][0] is not None and samples[-1][1] >= 0.5 else None
+        c.create_text(L, y, text="受信fps", anchor="nw", fill=dark, font=font_b)
+        c.create_text(W - R, y, anchor="ne", fill=dark if cur_fps is not None else grey, font=font_b,
+                      text="%.0f fps" % cur_fps if cur_fps is not None else "-")
+        top, bottom = px(118), px(118) + px(70)
+        ph = bottom - top
+
+        def Y(v):
+            return bottom - ph * min(max(v, 0.0), GRAPH_FPS_MAX) / GRAPH_FPS_MAX
+
+        for v in (0, 30, 60):
+            yy = Y(v)
+            c.create_line(L, yy, L + pw, yy, fill="#e3e3e8" if v else "#c7c7cc")
+            c.create_text(L - px(6), yy, text=str(v), anchor="e", fill=grey, font=font_s)
+        lw = max(2, px(2))
+        for run in fps_runs(window):
+            if len(run) == 1:
+                x, v = run[0]
+                r = lw
+                c.create_oval(X(x + 0.5) - r, Y(v) - r, X(x + 0.5) + r, Y(v) + r, fill="#0071e3", width=0)
+                continue
+            pts = []
+            for i, v in run:
+                pts += [X(i + 0.5), Y(v)]
+            c.create_line(*pts, fill="#0071e3", width=lw, capstyle="round", joinstyle="round")
+        ty = bottom + px(6)
+        c.create_text(L, ty, text=range_label(minutes), anchor="nw", fill=grey, font=font_s)
+        c.create_text(L + pw / 2.0, ty, text=range_label(minutes, 0.5), anchor="n", fill=grey, font=font_s)
+        c.create_text(L + pw, ty, text="今", anchor="ne", fill=grey, font=font_s)
 
     # -- 有効/無効 -----------------------------------------------------------
     @staticmethod
@@ -3479,6 +3856,7 @@ class App:
         self.dec_var.set("%.1f ms" % snap["decode_ms"] if snap["connected"] else "-")
         self.res_var.set(snap["resolution"])
         self.error_var.set(snap["error_text"])
+        self._update_pc_status(snap)
 
         if st:
             self._apply_ranges(st)

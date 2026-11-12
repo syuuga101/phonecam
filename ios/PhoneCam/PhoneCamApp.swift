@@ -219,6 +219,10 @@ final class AppModel: ObservableObject {
                 self.streamActiveUI = true
                 self.isConnected = true
                 self.connectionKind = kind
+                // 保存済みの「真っ黒」を再適用する (PC も接続時に再送する)
+                if UserDefaults.standard.bool(forKey: "screenBlack") {
+                    self.setScreenBlack(true, persist: false)
+                }
             }
         }
         server.onClientDisconnected = { [weak self] in
@@ -232,6 +236,8 @@ final class AppModel: ObservableObject {
                 self.isConnected = false
                 self.connectionKind = ""
                 self.sentFps = 0
+                // 切断したら省電力を解除する (保存値は残す)
+                self.setScreenBlack(false, persist: false)
             }
         }
         server.onControl = { [weak self] json in
@@ -274,9 +280,7 @@ final class AppModel: ObservableObject {
         stateLock.lock()
         autoBlackFlag = autoBlackSeconds
         stateLock.unlock()
-        if defaults.bool(forKey: "screenBlack") {
-            setScreenBlack(true)
-        }
+        // 起動時は未接続なので黒画面にはしない (保存値は接続時に再適用する)
 
         server.start()
         updateCameraRunning()   // camera.start() より前に要求を積む (最初は停止)
@@ -477,7 +481,11 @@ final class AppModel: ObservableObject {
     }
 
     /// メインスレッドで呼ぶ
-    func setScreenBlack(_ on: Bool) {
+    func setScreenBlack(_ on: Bool, persist: Bool = true) {
+        stateLock.lock()
+        let connectedNow = active
+        stateLock.unlock()
+        if on && !connectedNow { return }   // 黒画面は接続中のみ
         if on != screenBlack {
             if on {
                 if !dimScreen {
@@ -491,7 +499,9 @@ final class AppModel: ObservableObject {
             stateLock.lock()
             screenBlackFlag = on
             stateLock.unlock()
-            UserDefaults.standard.set(on, forKey: "screenBlack")
+            if persist {
+                UserDefaults.standard.set(on, forKey: "screenBlack")
+            }
             timerQueue.async { [weak self] in self?.sendFullStatus() }
         }
         noteTouch()
@@ -521,8 +531,9 @@ final class AppModel: ObservableObject {
         let black = screenBlackFlag
         let auto = autoBlackFlag
         let last = lastTouch
+        let connectedNow = active
         stateLock.unlock()
-        guard !black, auto > 0 else { return }
+        guard connectedNow, !black, auto > 0 else { return }
         if ProcessInfo.processInfo.systemUptime - last >= Double(auto) {
             DispatchQueue.main.async { self.setScreenBlack(true) }
         }
@@ -721,8 +732,17 @@ struct ContentView: View {
                             set: { model.setScreenBlack($0) }
                         ))
                         .tint(.green)
+                        .disabled(!model.isConnected)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
+                        if !model.isConnected {
+                            Text("PCと接続中のみ使えます")
+                                .font(.system(size: 13))
+                                .foregroundColor(Color(white: 0.55))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 10)
+                        }
                     }
                     .foregroundColor(.white)
                     .background(cardColor)
