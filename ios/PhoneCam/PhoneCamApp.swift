@@ -8,7 +8,6 @@ struct PhoneCamApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
-                .preferredColorScheme(.dark)
                 .onAppear { model.start() }
         }
     }

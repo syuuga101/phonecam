@@ -688,6 +688,18 @@ final class AppModel: ObservableObject {
         noteTouch()
     }
 
+    /// 自動で黒くするまでの秒数 (0 = しない)。メインスレッドで呼ぶ。保存し、PC へステータスも送る。
+    func setAutoBlackSeconds(_ value: Int) {
+        let v = min(max(value, 0), 3600)
+        autoBlackSeconds = v
+        stateLock.lock()
+        autoBlackFlag = v
+        stateLock.unlock()
+        UserDefaults.standard.set(v, forKey: "autoBlackSeconds")
+        noteTouch()
+        timerQueue.async { [weak self] in self?.sendFullStatus() }
+    }
+
     private func applyScreenControl(_ sc: [String: Any]) {
         DispatchQueue.main.async {
             if let a = sc["autoBlackSeconds"] as? NSNumber {

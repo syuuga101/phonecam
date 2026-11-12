@@ -17,173 +17,82 @@ struct MutePill: View {
     }
 }
 
+/// 行の左に置く SF Symbols (幅 28pt の列にそろえる)
+struct RowIcon: View {
+    let symbol: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17))
+            .foregroundStyle(.secondary)
+            .frame(width: 28, alignment: .leading)
+    }
+}
+
 struct InfoRow: View {
+    let symbol: String
     let title: String
     let value: String
 
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
+            RowIcon(symbol: symbol)
             Text(title)
-                .font(.system(size: 15))
-                .foregroundColor(Color(white: 0.6))
+                .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(.system(size: 15, weight: .medium, design: .monospaced))
-                .foregroundColor(.white)
+                .font(.system(size: 17, design: .monospaced))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 }
 
 extension ContentView {
-    var infoCard: some View {
-        VStack(spacing: 0) {
-            InfoRow(title: model.wifiAllowed ? "Wi-Fi アドレス" : "Wi-Fi接続",
-                    value: model.wifiAllowed ? model.wifiAddress : "オフ")
-            Divider().background(Color(white: 0.2))
-            InfoRow(title: "映像", value: model.formatText)
-            Divider().background(Color(white: 0.2))
-            InfoRow(title: "ビットレート", value: model.bitrateText)
-            Divider().background(Color(white: 0.2))
-            InfoRow(title: "送信fps", value: "\(model.sentFps)")
-            Divider().background(Color(white: 0.2))
-            InfoRow(title: "温度状態", value: model.thermalText)
-            Divider().background(Color(white: 0.2))
-            InfoRow(title: "バッテリー", value: model.batteryText)
-        }
-        .background(cardColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    var togglesCard: some View {
-        VStack(spacing: 0) {
-            Toggle("プレビュー", isOn: $model.previewEnabled)
-                .tint(.green)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            if !model.previewEnabled && rotationHint {
-                Text("プレビューをオンにすると映る範囲を確認できます")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(white: 0.55))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
-            }
-            Divider().background(Color(white: 0.2))
-            Toggle("接続時に振動", isOn: $model.vibrateOnConnect)
-                .tint(.green)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            Divider().background(Color(white: 0.2))
-            Toggle("画面を暗くする", isOn: Binding(
-                get: { model.dimScreen },
-                set: { model.setDim($0) }
-            ))
-            .tint(.green)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            Divider().background(Color(white: 0.2))
-            Toggle("画面を真っ黒にする", isOn: Binding(
-                get: { model.screenBlack },
-                set: { model.setScreenBlack($0) }
-            ))
-            .tint(.green)
-            .disabled(!model.isConnected)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            if !model.isConnected {
-                Text("PCと接続中のみ使えます")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(white: 0.55))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
-            }
-        }
-        .foregroundColor(.white)
-        .background(cardColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    var wifiCard: some View {
-        VStack(spacing: 0) {
-            Toggle("Wi-Fiからの接続を許可", isOn: Binding(
-                get: { model.wifiAllowed },
-                set: { model.setWifiAllowed($0) }
-            ))
-            .tint(.green)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+    /// 「配信情報」セクション (inset grouped List の中に置く)
+    var infoSection: some View {
+        Section {
+            InfoRow(symbol: "cable.connector", title: "接続",
+                    value: model.isConnected ? model.connectionKind : "未接続")
             if model.wifiAllowed {
-                Divider().background(Color(white: 0.2))
-                VStack(spacing: 6) {
-                    Text("ペアリングコード")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(white: 0.55))
-                    Text(model.pairingCode)
-                        .font(.system(size: 44, weight: .semibold, design: .monospaced))
-                        .kerning(6)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .foregroundColor(.white)
-                    Button(action: { model.regeneratePairingCode() }) {
-                        Text("コードを変更")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Color.blue)
-                    }
-                    .padding(.top, 2)
-                    Text("PCの「ペアリングコード」欄に入力してください。USB接続では不要です。")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(white: 0.55))
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                InfoRow(symbol: "wifi", title: "Wi-Fi アドレス", value: model.wifiAddress)
             }
+            InfoRow(symbol: "video", title: "映像", value: model.formatText)
+            InfoRow(symbol: "speedometer", title: "ビットレート", value: model.bitrateText)
+            InfoRow(symbol: "film", title: "送信 fps", value: "\(model.sentFps)")
+            InfoRow(symbol: "thermometer.medium", title: "温度状態", value: model.thermalText)
+            InfoRow(symbol: "battery.100", title: "バッテリー", value: model.batteryText)
+        } header: {
+            Text("配信情報")
         }
-        .foregroundColor(.white)
-        .background(cardColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     var recordRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
+            RowIcon(symbol: "circle.inset.filled")
             Text("録画")
-                .font(.system(size: 17))
-                .foregroundColor(.white)
-            if model.recActive {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 10, height: 10)
-                Text("REC " + ContentView.timeText(model.recSeconds))
-                    .font(.system(size: 15, weight: .medium, design: .monospaced))
-                    .foregroundColor(.red)
-            }
             Spacer()
-            Button(action: { model.toggleRecording() }) {
-                Text(model.recActive ? "停止" : "開始")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 7)
-                    .background(model.recActive ? Color.red : Color(white: 0.28))
-                    .clipShape(Capsule())
+            if model.recActive {
+                Text(ContentView.timeText(model.recSeconds))
+                    .font(.system(size: 17, design: .monospaced))
+                    .foregroundStyle(.red)
             }
+            Circle()
+                .fill(Color.red)
+                .frame(width: 10, height: 10)
+            Button(action: { model.toggleRecording() }) {
+                Text(model.recActive ? "停止" : "録画開始")
+            }
+            .buttonStyle(.borderless)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(cardColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     var footnotes: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("マイク: \(model.micText)")
                 .font(.system(size: 13))
-                .foregroundColor(Color(white: 0.55))
+                .foregroundStyle(.secondary)
 
             if !model.recError.isEmpty {
                 Text(model.recError)
@@ -199,7 +108,7 @@ extension ContentView {
 
             Text("アプリは前面に表示したままにしてください")
                 .font(.system(size: 13))
-                .foregroundColor(Color(white: 0.55))
+                .foregroundStyle(.secondary)
         }
     }
 

@@ -219,6 +219,7 @@ struct PreviewPanel: View {
     let region: CGSize
     let showGrid: Bool
     let showLevel: Bool
+    var cornerRadius: CGFloat = 14
 
     private static func isQuarter(_ a: Int) -> Bool {
         let n = ((a % 360) + 360) % 360
@@ -286,7 +287,7 @@ struct PreviewPanel: View {
             .allowsHitTesting(false)
         }
         .frame(width: region.width, height: region.height)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
