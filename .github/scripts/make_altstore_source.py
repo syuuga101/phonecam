@@ -46,7 +46,7 @@ def build_source(repo, version, build, ipa_size, date=None, tag=None, ipa_name="
         "tintColor": "000000",
         "category": "photo-video",
         "screenshots": [],
-        "appPermissions": {"entitlements": [], "privacy": dict(PRIVACY)},
+        "appPermissions": {"entitlements": ["get-task-allow"], "privacy": dict(PRIVACY)},
         "versions": [{
             "version": version,
             "buildVersion": str(build),
