@@ -310,10 +310,22 @@ def detect_itunes(entries=None):
     return {"state": STATE_MISSING, "detail": ""}
 
 
+def _store_icloud_installed():
+    """Microsoft Store 版の iCloud (AppleInc.iCloud_*) が入っているか"""
+    try:
+        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Packages")
+        return any(name.startswith("AppleInc.iCloud") for name in os.listdir(base))
+    except Exception:
+        return False
+
+
 def detect_icloud(entries=None):
     entries = uninstall_entries() if entries is None else entries
     if _has_entry(entries, "icloud", exact=True) or _any_file([os.path.join("Common Files", "Apple", "Internet Services", "iCloud.exe")]):
         return {"state": STATE_OK, "detail": ""}
+    if _store_icloud_installed():
+        # Store 版があると公式サイト版のインストールは失敗する (終了コード 1603)。AltStore が動いていればそのままでよい
+        return {"state": STATE_WARN, "detail": "Microsoft Store版が入っています。AltStoreの更新（Refresh）が通っていればこのままで大丈夫です"}
     return {"state": STATE_MISSING, "detail": ""}
 
 
@@ -509,7 +521,7 @@ SIGNER_POLICY = {
     "vcredist": {"publisher": "Microsoft Corporation", "names": ["Microsoft Corporation"], "match": "exact", "unsigned_ok": False},
     "itunes": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
     "icloud": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
-    "vbcable": {"publisher": "VB-Audio Software", "names": ["VB-Audio", "Vincent Burel"], "match": "contains", "unsigned_ok": False},
+    "vbcable": {"publisher": "VB-Audio Software (Vincent Burel)", "names": ["VB-Audio", "Vincent Burel"], "match": "contains", "unsigned_ok": False},
     # AltServer は公式の配布物が署名されているか確認できていない。署名されていれば発行元を確認し、
     # 署名が無いときだけは「ジョブファイルのSHA-256による改ざん検知」(従来の保護) に頼って実行する。
     "altserver": {"publisher": "Riley Testut / AltStore", "names": ["Riley", "Testut", "AltStore"], "match": "contains",
@@ -537,7 +549,11 @@ def _signer_matches(policy, signers):
     for want in policy["names"]:
         w = want.casefold()
         for n in names:
-            if (n == w) if policy["match"] == "exact" else (w in n):
+            if policy["match"] == "exact":
+                if n == w:
+                    return True
+            # 部分一致は語順を問わない (例: 実際の署名者は "BUREL VINCENT Entrepreneur individuel")
+            elif w in n or all(tok in n.split() for tok in w.split()):
                 return True
     return False
 
@@ -776,6 +792,8 @@ def _run_installer(step, kind, path, res, runner, verifier):
     res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
     if not res["ok"]:
         res["detail"] = "インストーラーが失敗しました (終了コード %s)" % code
+        if code == 1603 and step.get("id") == "icloud":
+            res["detail"] += "。Microsoft Store版のiCloudが入っていると失敗します。AltStoreの更新（Refresh）が通っていれば、このままで大丈夫です"
     return res
 
 
@@ -896,7 +914,9 @@ def expand_selection(ids, statuses):
     chosen = set(ids)
     if "altserver" in chosen:
         for dep in ("itunes", "icloud"):
-            if statuses.get(dep, {}).get("state") != STATE_OK:
+            st = statuses.get(dep, {}).get("state")
+            # iTunes は公式サイト版が必要なので「要確認」でも入れる。iCloud の「要確認」(Store版あり) は入れ直さない
+            if st == STATE_MISSING or (dep == "itunes" and st != STATE_OK):
                 chosen.add(dep)
     if "camera" in chosen and statuses.get("vcredist", {}).get("state") == STATE_MISSING:
         chosen.add("vcredist")
