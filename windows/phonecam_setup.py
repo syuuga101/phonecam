@@ -1493,10 +1493,16 @@ class SetupWizard:
         self.panel = SetupPanel(self.body, self.controller, "wizard")
         self.panel.pack(fill="x")
         self.mic_var = tk.BooleanVar(value=self.controller.mic)
-        mic = tk.Checkbutton(self.body, text="iPhoneのマイクを使う（VB-CABLEを入れます）", variable=self.mic_var, bg=BG,
-                             activebackground=BG, fg=FG, font=(FONT, 10), bd=0, highlightthickness=0,
-                             command=self._mic_changed)
-        mic.pack(anchor="w", pady=(px(12), 0))
+        # VB-CABLE が導入済みなら選ぶ必要がないので表示しない (_sync_mic_option で出し入れする)
+        self.mic_box = tk.Frame(self.body, bg=BG)
+        tk.Checkbutton(self.mic_box, text="iPhoneをマイクとしても使う", variable=self.mic_var, bg=BG,
+                       activebackground=BG, fg=FG, font=(FONT, 10), bd=0, highlightthickness=0,
+                       command=self._mic_changed).pack(anchor="w")
+        tk.Label(self.mic_box, text="OBSやDiscordでiPhoneの音声を使うための「VB-CABLE」（無料）を一緒に入れます。"
+                                    "PCのマイクを使う場合は不要です。",
+                 bg=BG, fg=SUB, font=(FONT, 9), justify="left", anchor="w",
+                 wraplength=px(480)).pack(anchor="w", fill="x", padx=(px(22), 0))
+        self._sync_mic_option()
         make_link(self.footer, "スキップ", self._skip).pack(side="left")
         self.next_btn = make_button(self.footer, "インストール", self._start_install, primary=True)
         self.next_btn.pack(side="right")
@@ -1505,6 +1511,19 @@ class SetupWizard:
         self._update_next_label()
         if not self.controller.checked:
             self.controller.recheck()
+
+    def _sync_mic_option(self):
+        box = getattr(self, "mic_box", None)
+        if box is None:
+            return
+        try:
+            installed = self.controller.statuses.get("vbcable", {}).get("state") == STATE_OK
+            if installed:
+                box.pack_forget()
+            elif not box.winfo_ismapped():
+                box.pack(anchor="w", fill="x", pady=(px(12), 0))
+        except Exception:
+            pass
 
     def _mic_changed(self):
         self.controller.set_mic(self.mic_var.get())
@@ -1925,6 +1944,7 @@ class SetupWizard:
         if what == "statuses" or what == "checking":
             if self.page == PAGE_CHECK and self.panel is not None:
                 self.panel.render()
+                self._sync_mic_option()
                 self._update_next_label()
                 self._fit_window()
         elif what == "stage" and self.stage_label is not None:
