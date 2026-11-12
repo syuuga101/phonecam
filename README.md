@@ -34,7 +34,7 @@ USB ケーブルでつなぐだけで、OBS・Discord・Zoom などに「PhoneCa
 3. **カメラを選ぶ**: OBS の「映像キャプチャデバイス」や Discord のカメラで **「PhoneCam」** を選びます。
 
 > Windows の青い警告（SmartScreen）が出たら、**詳細情報 → 実行** を選んでください。PhoneCam の exe には、まだ署名がついていないためです。
-> 詳しい手順は [Wiki のはじめに](https://github.com/syuuga101/phonecam/wiki/はじめに（セットアップ）) を見てください。
+> 詳しい手順は [ガイドのはじめに](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%81%AF%E3%81%98%E3%82%81%E3%81%AB%EF%BC%88%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%EF%BC%89.md) を見てください。
 
 ## よくある質問
 
@@ -56,16 +56,16 @@ AltStore の「My Apps」で AltStore を一度 **Refresh** してから、も�
 **Q. VB-CABLE を入れたら PC の音が出なくなりました**
 タスクバーのスピーカーのアイコンから、出力先を元のスピーカー／ヘッドホンに戻してください（PhoneCam も自動で戻します）。
 
-そのほかの質問は [よくある質問とトラブル](https://github.com/syuuga101/phonecam/wiki/よくある質問とトラブル) にまとめています。
+そのほかの質問は [よくある質問とトラブル](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB.md) にまとめています。
 
-## 使い方のガイド（Wiki）
+## 使い方ガイド
 
-- [はじめに（セットアップ）](https://github.com/syuuga101/phonecam/wiki/はじめに（セットアップ）)
-- [iPhoneアプリの入れ方（AltStore）](https://github.com/syuuga101/phonecam/wiki/iPhoneアプリの入れ方（AltStore）)
-- [OBSで使う](https://github.com/syuuga101/phonecam/wiki/OBSで使う) / [Discordで使う](https://github.com/syuuga101/phonecam/wiki/Discordで使う)
-- [音声（iPhoneのマイク）を使う](https://github.com/syuuga101/phonecam/wiki/音声（iPhoneのマイク）を使う)
-- [画質と遅延の調整](https://github.com/syuuga101/phonecam/wiki/画質と遅延の調整) / [録画機能](https://github.com/syuuga101/phonecam/wiki/録画機能)
-- [アップデート方法](https://github.com/syuuga101/phonecam/wiki/アップデート方法)
+- [はじめに（セットアップ）](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%81%AF%E3%81%98%E3%82%81%E3%81%AB%EF%BC%88%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%EF%BC%89.md)
+- [iPhoneアプリの入れ方（AltStore）](https://github.com/syuuga101/phonecam/blob/main/docs/guide/iPhone%E3%82%A2%E3%83%97%E3%83%AA%E3%81%AE%E5%85%A5%E3%82%8C%E6%96%B9%EF%BC%88AltStore%EF%BC%89.md)
+- [OBSで使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/OBS%E3%81%A7%E4%BD%BF%E3%81%86.md) / [Discordで使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/Discord%E3%81%A7%E4%BD%BF%E3%81%86.md)
+- [音声（iPhoneのマイク）を使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E9%9F%B3%E5%A3%B0%EF%BC%88iPhone%E3%81%AE%E3%83%9E%E3%82%A4%E3%82%AF%EF%BC%89%E3%82%92%E4%BD%BF%E3%81%86.md)
+- [画質と遅延の調整](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E7%94%BB%E8%B3%AA%E3%81%A8%E9%81%85%E5%BB%B6%E3%81%AE%E8%AA%BF%E6%95%B4.md) / [録画機能](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E9%8C%B2%E7%94%BB%E6%A9%9F%E8%83%BD.md)
+- [アップデート方法](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%A2%E3%83%83%E3%83%97%E3%83%87%E3%83%BC%E3%83%88%E6%96%B9%E6%B3%95.md)
 
 ## 困ったときは・ご意見
 
