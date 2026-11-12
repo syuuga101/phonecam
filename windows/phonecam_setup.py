@@ -20,6 +20,7 @@ import threading
 import time
 import zipfile
 import queue
+import re
 import webbrowser
 import urllib.error
 import urllib.request
@@ -378,9 +379,9 @@ def remove_store_package(cid, runner=None):
             code = subprocess.run(cmd, creationflags=flags, timeout=300,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
     except Exception as e:
-        return False, "Microsoft Store版を削除できませんでした (%s)" % e
+        return False, "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: %s）" % e
     if code != 0:
-        return False, "Microsoft Store版を削除できませんでした (終了コード %s)。設定 > アプリ から手動でアンインストールしてください" % code
+        return False, "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード %s）" % code
     return True, "Microsoft Store版（%s）を削除しました" % "・".join(STORE_LABELS.get(p, p) for p in pkgs)
 
 
@@ -432,7 +433,7 @@ def detect_all():
         try:
             out[cid] = fn()
         except Exception as e:
-            out[cid] = {"state": STATE_WARN, "detail": "確認できませんでした (%s)" % e}
+            out[cid] = {"state": STATE_WARN, "detail": "確認できませんでした。「再チェック」を押してください"}
     return out
 
 
@@ -441,19 +442,30 @@ def detect_all():
 # ---------------------------------------------------------------------------
 
 class DownloadError(Exception):
-    pass
+    """利用者に見せる日本語メッセージ (次にやることを含む)。technical は「詳細」に出す技術的な内容。"""
+
+    def __init__(self, message="", technical=""):
+        Exception.__init__(self, message)
+        self.technical = technical
 
 
 def friendly_net_error(e):
+    """ダウンロード失敗の説明 (番号は含めない。番号は technical_net_error で「詳細」へ)。"""
     if isinstance(e, urllib.error.HTTPError):
-        return "ダウンロード元が応答しませんでした (HTTP %s)" % e.code
+        return "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください"
     if isinstance(e, (socket.timeout, TimeoutError)):
-        return "ダウンロードがタイムアウトしました。ネットワークを確認してください"
+        return "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください"
     if isinstance(e, urllib.error.URLError):
         if isinstance(getattr(e, "reason", None), (socket.timeout, TimeoutError)):
-            return "ダウンロードがタイムアウトしました。ネットワークを確認してください"
-        return "インターネットに接続できませんでした。ネットワークを確認してください"
-    return "ダウンロードに失敗しました (%s)" % e
+            return "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください"
+        return "インターネットに接続できませんでした。ネットワークを確認して、もう一度お試しください"
+    return "ダウンロードに失敗しました。ネットワークを確認して、もう一度お試しください"
+
+
+def technical_net_error(e):
+    if isinstance(e, urllib.error.HTTPError):
+        return "HTTP %s %s" % (e.code, getattr(e, "reason", ""))
+    return "%s: %s" % (type(e).__name__, e)
 
 
 def validate_download(path, kind, min_bytes=DEFAULT_MIN_BYTES, expected_size=None):
@@ -461,20 +473,21 @@ def validate_download(path, kind, min_bytes=DEFAULT_MIN_BYTES, expected_size=Non
     try:
         size = os.path.getsize(path)
     except OSError:
-        raise DownloadError("ダウンロードしたファイルが見つかりません")
+        raise DownloadError("ダウンロードしたファイルが見つかりません。もう一度お試しください")
     if size <= 0:
-        raise DownloadError("ダウンロードしたファイルが空でした")
+        raise DownloadError("ダウンロードしたファイルが空でした。もう一度お試しください")
     if size < min_bytes:
-        raise DownloadError("ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）")
+        raise DownloadError("ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）。"
+                            "しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください")
     if expected_size and size != expected_size:
-        raise DownloadError("ダウンロードが途中で切れました")
+        raise DownloadError("ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください")
     with open(path, "rb") as f:
         head = f.read(8)
     sigs = SIGNATURES.get(kind)
     if sigs and not any(head.startswith(s) for s in sigs):
-        raise DownloadError("ダウンロードしたファイルの形式が正しくありません")
+        raise DownloadError("ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください")
     if kind == "zip" and not zipfile.is_zipfile(path):
-        raise DownloadError("zipファイルが壊れています")
+        raise DownloadError("zipファイルが壊れています。もう一度ダウンロードしてください")
     return size
 
 
@@ -482,7 +495,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
     """url を dest へ保存して検証する。progress(done, total) を随時呼ぶ (total 不明なら 0)。"""
     opener = opener or urllib.request.urlopen
     if not str(url).lower().startswith("https://"):
-        raise DownloadError("安全でないURL (https以外) からはダウンロードしません")
+        raise DownloadError("安全でないURL (https以外) からはダウンロードしません。「公式ページを開く」から手動で入れてください")
     os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
     part = dest + ".part"
     req = urllib.request.Request(url, headers={"User-Agent": "PhoneCamSetup/%s" % APP_VERSION})
@@ -491,7 +504,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
         with opener(req, timeout=timeout) as resp:
             final_url = getattr(resp, "geturl", lambda: url)()
             if isinstance(final_url, str) and not final_url.lower().startswith("https://"):
-                raise DownloadError("ダウンロード先が安全でないURL (https以外) に転送されたため中止しました")
+                raise DownloadError("ダウンロード先が安全でないURL (https以外) に転送されたため中止しました。「公式ページを開く」から手動で入れてください")
             try:
                 expected = int(resp.headers.get("Content-Length") or 0)
             except Exception:
@@ -500,7 +513,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
             with open(part, "wb") as out:
                 while True:
                     if cancel is not None and cancel.is_set():
-                        raise DownloadError("キャンセルされました")
+                        raise DownloadError("キャンセルされました。もう一度やり直すときは「もう一度試す」を押してください")
                     chunk = resp.read(64 * 1024)
                     if not chunk:
                         break
@@ -513,7 +526,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
         raise
     except Exception as e:
         _silent_remove(part)
-        raise DownloadError(friendly_net_error(e))
+        raise DownloadError(friendly_net_error(e), technical=technical_net_error(e))
     try:
         validate_download(part, kind, min_bytes=min_bytes, expected_size=expected or None)
     except DownloadError:
@@ -544,10 +557,10 @@ def safe_extract_zip(zip_path, dest):
             # dest の外へ出るパス (../ や絶対パス・ドライブ指定) は拒否
             if (target != root and not target.startswith(root + os.sep)) or name.startswith("/") \
                     or ".." in name.split("/") or (len(name) > 1 and name[1] == ":"):
-                raise DownloadError("zipの中身が不正です")
+                raise DownloadError("zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください")
             total += info.file_size
         if total > MAX_UNZIPPED_BYTES:
-            raise DownloadError("zipの展開後のサイズが大きすぎます")
+            raise DownloadError("zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください")
         z.extractall(root)
     return root
 
@@ -630,7 +643,7 @@ def evaluate_signature(cid, info):
     から実行してよいかを決める。戻り値: (許可するか, 日本語メッセージ, 署名なしで許可したか)"""
     policy = SIGNER_POLICY.get(cid)
     if policy is None:
-        return False, "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした", False
+        return False, "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください", False
     result = (info or {}).get("result")
     if result == "valid":
         if _signer_matches(policy, (info or {}).get("signers") or []):
@@ -641,10 +654,13 @@ def evaluate_signature(cid, info):
     if result == "unsigned":
         if policy["unsigned_ok"]:
             return True, "署名のないファイルです（%s は署名なしで配布されています）。ファイルの改ざん検知のみで実行します" % policy["publisher"], True
-        return False, "インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）" % policy["publisher"], False
+        return False, ("インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）。"
+                       "ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください" % policy["publisher"]), False
     if result == "invalid":
-        return False, "インストーラーの電子署名が無効です（改ざんされているか、証明書を確認できません）。実行しませんでした", False
-    return False, "インストーラーの署名を確認できなかったため、実行しませんでした (%s)" % ((info or {}).get("detail") or "不明なエラー"), False
+        return False, ("インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。"
+                       "ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください"), False
+    return False, ("インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください"
+                   "（詳細: %s）" % ((info or {}).get("detail") or "不明なエラー")), False
 
 
 def _wintrust():
@@ -835,10 +851,31 @@ def _msiexec_path():
 ALLOWED_WINGET = frozenset(v["winget"] for v in SOURCES.values() if v.get("winget"))
 
 
+def explain_exit_code(code, cid=None):
+    """インストーラーの終了コード → 「何が起きたか + 次にやること」の1文 (番号は含めない。番号は「詳細」に出す)。"""
+    c = (code if code is not None else 1) & 0xFFFFFFFF
+    if c in (1602, 1223):
+        return "インストールが途中で取り消されました。もう一度やり直してください"
+    if c == 1603:
+        msg = "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください"
+        if cid in STORE_PACKAGES:
+            msg += "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください"
+        return msg
+    if c == 1618:
+        return "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください"
+    if c in (1619, 1620):
+        return "インストーラーのファイルが壊れています。ダウンロードからやり直してください"
+    if c in (5, 740, 1260):
+        return "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください"
+    if c == 1638:
+        return "すでに新しい版が入っています。そのままお使いいただけます"
+    return "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください"
+
+
 def _run_installer(step, kind, path, res, runner, verifier):
     """コピー済みのインストーラー (path) を、SHA-256 → 電子署名の順に確認して実行する。"""
     if sha256_file(path) != step["sha256"]:
-        res["detail"] = "インストーラーが変更されていたため実行しませんでした"
+        res["detail"] = "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください"
         return res
     allowed, message, unsigned = check_installer_signature(step.get("id"), path, verifier)
     res["signature"] = message
@@ -858,9 +895,8 @@ def _run_installer(step, kind, path, res, runner, verifier):
     res["ok"] = (code & 0xFFFFFFFF) in ok_codes or bool(step.get("lenient"))
     res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
     if not res["ok"]:
-        res["detail"] = "インストーラーが失敗しました (終了コード %s)" % code
-        if code == 1603 and step.get("id") in STORE_PACKAGES:
-            res["detail"] += "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールして、もう一度お試しください"
+        res["detail"] = explain_exit_code(code, step.get("id"))
+        res["technical"] = "終了コード %s" % code
     return res
 
 
@@ -875,15 +911,15 @@ def execute_step(step, runner=None, verifier=None):
             res["ok"] = ok
             res["code"] = 0 if ok else 1
             if not ok:
-                res["detail"] = "カメラの登録に失敗しました。OBSなどがPhoneCamカメラを使用中でないか確認してください"
+                res["detail"] = "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください"
             return res
         if kind in ("exe", "msi"):
             path = step["path"]
             if not os.path.isfile(path):
-                res["detail"] = "インストーラーが見つかりません"
+                res["detail"] = "インストーラーが見つかりません。もう一度ダウンロードからやり直してください"
                 return res
             if not step.get("sha256"):
-                res["detail"] = "インストーラーの検証情報がないため実行しませんでした"
+                res["detail"] = "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください"
                 return res
             # 一般ユーザーが触れない場所へコピーしてから、その実物を確認して実行する
             path, cleanup = _stage_for_run(path, step.get("stage_dir"))
@@ -893,20 +929,23 @@ def execute_step(step, runner=None, verifier=None):
                 cleanup()
         if kind == "winget":
             if step.get("pkg") not in ALLOWED_WINGET:
-                res["detail"] = "許可されていないwingetパッケージのため実行しませんでした"
+                res["detail"] = "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください"
                 return res
             code = _run_cmd(runner, winget_args(step["pkg"]), step.get("timeout", 900))
             res["code"] = code
             res["ok"] = (code & 0xFFFFFFFF) in WINGET_OK_CODES
             res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT
             if not res["ok"]:
-                res["detail"] = "wingetでのインストールに失敗しました (終了コード %s)" % code
+                res["detail"] = "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください"
+                res["technical"] = "winget 終了コード %s" % code
             return res
-        res["detail"] = "不明な手順です: %s" % kind
+        res["detail"] = "不明な手順です。PhoneCamを最新版にしてからやり直してください"
+        res["technical"] = "type=%s" % kind
     except subprocess.TimeoutExpired:
-        res["detail"] = "インストールが時間内に終わりませんでした"
+        res["detail"] = "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください"
     except Exception as e:
-        res["detail"] = "エラー: %s" % e
+        res["detail"] = "予期しないエラーが起きました。もう一度お試しください"
+        res["technical"] = str(e)
     return res
 
 
@@ -935,7 +974,7 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
             if progress:
                 _append_progress(progress, "%d|%d|done" % (i + 1, total))
     except Exception as e:
-        result["error"] = str(e)
+        result["error"] = "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: %s）" % e
     try:
         if result_path is None:
             result_path = os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
@@ -945,6 +984,701 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
     if result["error"] or any(not s["ok"] for s in result["steps"]):
         return 1
     return 3010 if any(s["reboot"] for s in result["steps"]) else 0
+
+
+# ---------------------------------------------------------------------------
+# 手順つきインストール (guided): 公式のインストーラーを画面に出して、手順を案内する
+# ---------------------------------------------------------------------------
+# 自動 (無人) でも確実なものだけを自動にする: VC++ ランタイム / PhoneCamカメラの登録 (と Store 版の削除)。
+# iTunes / iCloud / AltServer / VB-CABLE は、公式のインストーラーを普通のウィンドウで開き、手順を画面に出す。
+
+AUTO_IDS = ("vcredist", "camera")
+GUIDED_IDS = ("itunes", "icloud", "altserver", "vbcable")
+SLOW_SECONDS = 180          # インストーラーがこれより長く動いているとき、隠れていないか確認を促す
+AUTO_CHECK_SECONDS = 5.0    # インストーラーの実行中に、導入済みになったか裏で確かめる間隔
+SLOW_HINT = "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）"
+MISSING_COMMON = ("インストーラーを最後の「完了」まで進めてから「確認」を押してください。"
+                  "「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。")
+
+GUIDE = {
+    "itunes": {
+        "steps": ["「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
+                  "「次へ」→ 使用許諾に同意 →「インストール」を押します",
+                  "「ユーザーアカウント制御」が出たら「はい」を押します",
+                  "「完了」が出たら押して、この画面の「確認」を押します"],
+        "note": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
+        "missing": "Apple公式サイト版のiTunesがまだ見つかりません",
+    },
+    "icloud": {
+        "steps": ["「インストーラーを開く」を押します（iCloudのインストーラーが開きます）",
+                  "使用許諾に同意して「インストール」を押します",
+                  "「ユーザーアカウント制御」が出たら「はい」を押します",
+                  "完了したら「完了」を押して、この画面の「確認」を押します"],
+        "note": "iCloudにサインインする必要はありません。再起動を求められたら「いいえ（あとで）」を選び、すべて終わってからPCを再起動してください。",
+        "missing": "Apple公式サイト版のiCloudがまだ見つかりません",
+    },
+    "altserver": {
+        "steps": ["「インストーラーを開く」を押します（AltServerのインストーラーが開きます）",
+                  "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
+                  "「ユーザーアカウント制御」が出たら「はい」を押します",
+                  "「Finish」を押します。画面右下のタスクトレイにAltServerのアイコンが出ます",
+                  "この画面の「確認」を押します"],
+        "note": "Windowsファイアウォールの許可画面が出たら、「プライベート ネットワーク」にチェックを入れて「アクセスを許可する」を押してください"
+                "（AltServerがiPhoneを見つけるのに必要です）。",
+        "missing": "AltServerがまだ見つかりません",
+    },
+    "vbcable": {
+        "steps": ["「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
+                  "「ユーザーアカウント制御」が出たら「はい」を押します",
+                  "「Install Driver」ボタンを押します",
+                  "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
+                  "「OK」で閉じて、この画面の「確認」を押します"],
+        "note": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
+        "missing": "VB-CABLE（CABLE Input）がまだ見つかりません",
+    },
+}
+
+
+def split_ids(ids):
+    """選んだ項目を (自動で入れるもの, 手順つきで入れるもの) に分ける。"""
+    auto = [c for c in ids if c not in GUIDED_IDS]
+    guided = [c for c in ids if c in GUIDED_IDS]
+    return auto, guided
+
+
+def missing_words(cid, status):
+    """検出で見つからなかったときの、何が足りないかの説明 (平易な文)。"""
+    name = COMPONENT_BY_ID.get(cid, {}).get("name", cid)
+    g = GUIDE.get(cid, {})
+    detail = (status or {}).get("detail") or ""
+    if (status or {}).get("state") == STATE_WARN and detail:
+        head = "「%s」はまだ使える状態になっていません（%s）" % (name, detail)
+    else:
+        head = "%s。" % g.get("missing", "「%s」がまだ見つかりません" % name)
+    return head + "\n" + MISSING_COMMON
+
+
+class UserDeclined(Exception):
+    """インストーラーの管理者確認 (UAC) で「いいえ」が押された。"""
+
+
+class LaunchedProcess:
+    """起動したインストーラー。alive() は 実行中=True / 終了=False / 追跡できない=None。"""
+
+    def __init__(self, handle=None, kernel32=None):
+        self.handle = handle
+        self._k = kernel32
+
+    def alive(self):
+        if not self.handle or self._k is None:
+            return None
+        try:
+            return self._k.WaitForSingleObject(self.handle, 0) == 0x102  # WAIT_TIMEOUT
+        except Exception:
+            return None
+
+    def close(self):
+        if self.handle and self._k is not None:
+            try:
+                self._k.CloseHandle(self.handle)
+            except Exception:
+                pass
+        self.handle = None
+
+
+def shell_open(path, args=None, cwd=None):
+    """インストーラーを「普通のウィンドウ」で開く (ShellExecute の既定の動作)。インストーラーが管理者権限を
+    求めるときだけ、そのインストーラー自身の UAC が出る。戻り値: LaunchedProcess。
+    UAC で「いいえ」なら UserDeclined、起動できなければ OSError。"""
+    if os.name != "nt":
+        raise OSError("Windows 以外では開けません")
+    import ctypes
+
+    class SEI(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint32), ("fMask", ctypes.c_uint32), ("hwnd", ctypes.c_void_p),
+                    ("lpVerb", ctypes.c_wchar_p), ("lpFile", ctypes.c_wchar_p), ("lpParameters", ctypes.c_wchar_p),
+                    ("lpDirectory", ctypes.c_wchar_p), ("nShow", ctypes.c_int), ("hInstApp", ctypes.c_void_p),
+                    ("lpIDList", ctypes.c_void_p), ("lpClass", ctypes.c_wchar_p), ("hkeyClass", ctypes.c_void_p),
+                    ("dwHotKey", ctypes.c_uint32), ("hIconOrMonitor", ctypes.c_void_p), ("hProcess", ctypes.c_void_p)]
+
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SEI)]
+    shell32.ShellExecuteExW.restype = ctypes.c_int
+    kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    kernel32.WaitForSingleObject.restype = ctypes.c_uint32
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
+    info = SEI()
+    info.cbSize = ctypes.sizeof(SEI)
+    info.fMask = 0x00000040      # SEE_MASK_NOCLOSEPROCESS
+    info.lpVerb = None           # 既定 (open)。runas は付けない
+    info.lpFile = path
+    info.lpParameters = subprocess.list2cmdline(list(args)) if args else None
+    info.lpDirectory = cwd or os.path.dirname(os.path.abspath(path))
+    info.nShow = 1               # SW_SHOWNORMAL
+    ctypes.set_last_error(0)
+    if not shell32.ShellExecuteExW(ctypes.byref(info)):
+        err = ctypes.get_last_error()
+        if err == 1223:
+            raise UserDeclined()
+        raise OSError(err, "ShellExecute に失敗しました (%s)" % err)
+    return LaunchedProcess(info.hProcess, kernel32)
+
+
+class GuidedFlow:
+    """手順つきインストールの状態機械 (画面に依存しない)。複数の項目を順に進める。
+
+    phase: preparing (ダウンロード・署名確認など) → ready (「インストーラーを開く」待ち) → running (インストーラー実行中)
+           → checking (導入済みか確認中) → [done の次の項目へ | missing (見つからない) ]
+           失敗は failed (次にやることつきのメッセージ)。全項目が終わると finished = True。
+    prepare / launch / check は呼んだスレッドで実行する (UI は別スレッドで prepare と check を呼ぶ)。"""
+
+    PREPARING, READY, RUNNING, CHECKING, MISSING, FAILED = "preparing", "ready", "running", "checking", "missing", "failed"
+
+    def __init__(self, ids, directory, downloader=None, verifier=None, launcher=None, detector=None,
+                 store_remover=None, store_check=None, clock=None):
+        self.ids = [c for c in ids if c in GUIDED_IDS]
+        self.dir = directory
+        self.downloader = downloader or download_file
+        self.verifier = verifier
+        self.launcher = launcher or shell_open
+        self.detector = detector or detect_all
+        self.store_remover = store_remover or remove_store_package
+        self.store_check = store_check or store_package_installed
+        self.clock = clock or time.monotonic
+        self.index = 0
+        self.phase = self.PREPARING
+        self.finished = not self.ids
+        self.message = ""        # 利用者に見せる説明 (次にやることつき)
+        self.technical = ""      # 「詳細」に出す内容
+        self.notice = ""         # 補足 (署名なしの注意など)
+        self.job = None          # {"path", "args", "cwd", "sha256"}
+        self.proc = None
+        self.launched_at = None
+        self.detected = False    # 実行中に導入済みを検出できた
+        self.results = {}        # cid -> {"ok", "skipped", "detail"}
+        self.statuses = {}       # 最後の検出結果
+        self.reboot = False
+        self._last_auto = 0.0
+        self._exit_checked = False
+
+    # -- 状態 -------------------------------------------------------------
+    @property
+    def current(self):
+        return self.ids[self.index] if 0 <= self.index < len(self.ids) and not self.finished else None
+
+    def name(self, cid=None):
+        cid = cid or self.current
+        return COMPONENT_BY_ID.get(cid, {}).get("name", cid or "")
+
+    def page_url(self, cid=None):
+        return SOURCES.get(cid or self.current, {}).get("page", "")
+
+    def elapsed(self):
+        return 0.0 if self.launched_at is None else max(0.0, self.clock() - self.launched_at)
+
+    def is_slow(self):
+        return self.phase == self.RUNNING and self.elapsed() >= SLOW_SECONDS
+
+    def _fail(self, message, technical=""):
+        self.phase = self.FAILED
+        self.message = message
+        self.technical = technical
+
+    def _advance(self):
+        self.index += 1
+        self.job = None
+        self.proc = None
+        self.launched_at = None
+        self.detected = False
+        self._exit_checked = False
+        self.message = self.technical = self.notice = ""
+        if self.index >= len(self.ids):
+            self.finished = True
+            self.phase = self.PREPARING
+        else:
+            self.phase = self.PREPARING
+
+    def _finish_ok(self, cid, detail=""):
+        self.results[cid] = {"ok": True, "skipped": False, "detail": detail}
+        self._advance()
+
+    def skip(self):
+        cid = self.current
+        if cid is None:
+            return
+        self._close_proc()
+        self.results[cid] = {"ok": False, "skipped": True,
+                             "detail": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます"}
+        self._advance()
+
+    def abort(self):
+        """残りをすべて「あとで」にして終わる。"""
+        while not self.finished:
+            self.skip()
+
+    def _close_proc(self):
+        if self.proc is not None:
+            try:
+                self.proc.close()
+            except Exception:
+                pass
+
+    # -- 準備: 確認 → Store 版の削除 → ダウンロード → 署名確認 ------------------
+    def prepare(self, emit=None, cancel=None):
+        emit = emit or (lambda kind, **kw: None)
+        cid = self.current
+        if cid is None or self.finished:
+            return
+        name = self.name(cid)
+        self.phase = self.PREPARING
+        self.message = self.technical = self.notice = ""
+        try:
+            self.statuses = self.detector()
+        except Exception:
+            self.statuses = {}
+        if self.statuses.get(cid, {}).get("state") == STATE_OK:
+            emit("log", text="%s: すでに入っています" % name)
+            self._finish_ok(cid, "すでに入っていました")
+            return
+        if cid in STORE_PACKAGES and self.store_check(cid):
+            emit("stage", text="%s のMicrosoft Store版を削除しています…" % name)
+            ok, msg = self.store_remover(cid)
+            emit("log", text="%s: %s" % (name, msg))
+            if not ok:
+                self._fail(msg)
+                return
+        src = SOURCES[cid]
+        dest = os.path.join(self.dir, src["file"])
+
+        def prog(done, total, _n=name):
+            if total:
+                emit("stage", text="%s をダウンロード中… %s / %s" % (_n, _mb(done), _mb(total)))
+                emit("progress", value=min(1.0, done / float(total)))
+            else:
+                emit("stage", text="%s をダウンロード中… %s" % (_n, _mb(done)))
+
+        emit("stage", text="%s をダウンロード中…" % name)
+        emit("progress", value=0.0)
+        try:
+            self.downloader(src["url"], dest, src["kind"], progress=prog, cancel=cancel)
+            emit("log", text="%s: ダウンロード完了" % name)
+            emit("stage", text="%s のインストーラーを確認しています…" % name)
+            job = self._locate(cid, dest)
+            allowed, msg, unsigned = check_installer_signature(cid, job["path"], self.verifier)
+            emit("log", text="%s: %s" % (name, msg))
+            if not allowed:
+                self._fail(msg)
+                return
+            if unsigned:
+                self.notice = ("このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。")
+            job["sha256"] = sha256_file(job["path"])
+        except DownloadError as e:
+            self._fail(str(e), getattr(e, "technical", ""))
+            return
+        except Exception as e:
+            self._fail("インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください", str(e))
+            return
+        self.job = job
+        self.phase = self.READY
+        emit("stage", text="%s: 「インストーラーを開く」を押してください" % name)
+        emit("progress", value=1.0)
+
+    def _locate(self, cid, dest):
+        """ダウンロードしたファイルから、開くインストーラー {"path", "args", "cwd"} を決める。"""
+        if cid == "altserver":
+            root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
+            exe = find_file(root, ["setup.exe"])
+            if exe:
+                return {"path": exe, "args": [], "cwd": os.path.dirname(exe)}
+            msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
+            if msi:
+                return {"path": msi, "args": [], "cwd": os.path.dirname(msi), "msi": True}
+            raise DownloadError("zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください")
+        if cid == "vbcable":
+            root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
+            exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
+            if not exe:
+                raise DownloadError("zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください")
+            return {"path": exe, "args": [], "cwd": os.path.dirname(exe)}
+        return {"path": dest, "args": [], "cwd": os.path.dirname(dest)}
+
+    # -- 開く -------------------------------------------------------------
+    def launch(self):
+        """「インストーラーを開く」。確認済みのファイルのまま (変更されていない) か確かめてから、普通のウィンドウで開く。"""
+        cid = self.current
+        if cid is None or self.job is None or self.phase not in (self.READY, self.RUNNING, self.MISSING):
+            return False
+        job = self.job
+        try:
+            if sha256_file(job["path"]) != job.get("sha256"):
+                self._fail("インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください")
+                return False
+        except Exception:
+            self._fail("インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください")
+            return False
+        self._close_proc()
+        try:
+            if job.get("msi"):
+                self.proc = self.launcher(_msiexec_path(), ["/i", job["path"]], job.get("cwd"))
+            else:
+                self.proc = self.launcher(job["path"], job.get("args") or [], job.get("cwd"))
+        except UserDeclined:
+            self.message = "管理者の確認で「いいえ」が押されました。もう一度「インストーラーを開く」を押して、「はい」を選んでください"
+            self.phase = self.READY
+            return False
+        except Exception as e:
+            self.proc = None
+            self._fail("インストーラーを開けませんでした。ウイルス対策ソフトがブロックしていないか確認して、"
+                       "「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+            return False
+        self.message = ""
+        self.phase = self.RUNNING
+        self.launched_at = self.clock()
+        self._last_auto = self.launched_at
+        self._exit_checked = False
+        self.detected = False
+        return True
+
+    # -- 確認 -------------------------------------------------------------
+    def process_alive(self):
+        return self.proc.alive() if self.proc is not None else None
+
+    def needs_auto_check(self):
+        """実行中に、裏で確認すべきか (インストーラーが終わった / 一定時間たった)。"""
+        if self.phase not in (self.RUNNING, self.MISSING) or self.finished:
+            return False
+        if self.phase == self.RUNNING and self.process_alive() is False and not self._exit_checked:
+            return True
+        return self.clock() - self._last_auto >= AUTO_CHECK_SECONDS
+
+    def check(self, auto=False):
+        """導入済みか確認する。戻り値: "done" (次へ進んだ) / "missing" (見つからない) / "running" (まだ実行中)。
+        auto=True は裏での確認 (見つからなくても画面に何も出さない)。"""
+        cid = self.current
+        if cid is None:
+            return "done"
+        self._last_auto = self.clock()
+        alive = self.process_alive()
+        if alive is False:
+            self._exit_checked = True
+        if not auto:
+            self.phase = self.CHECKING
+        try:
+            self.statuses = self.detector()
+        except Exception:
+            self.statuses = {}
+        st = self.statuses.get(cid, {})
+        if st.get("state") == STATE_OK:
+            if auto and alive is not False:
+                # インストーラーがまだ開いている (または追跡できない)。閉じる / 「確認」を押すと次へ進む
+                self.detected = True
+                return "running"
+            if cid == "vbcable":
+                self.reboot = True
+            self._close_proc()
+            self._finish_ok(cid)
+            return "done"
+        if alive:
+            if not auto:
+                self.phase = self.RUNNING
+                self.message = "インストーラーがまだ動いています。画面の案内に沿って「完了」まで進めてから、もう一度「確認」を押してください"
+            return "running"
+        if auto and alive is None and self.phase == self.RUNNING:
+            return "running"   # 追跡できないときは、利用者が「確認」を押すまで待つ
+        if auto and self.phase == self.MISSING:
+            return "missing"
+        self.phase = self.MISSING
+        self.message = missing_words(cid, st)
+        return "missing"
+
+    def retry(self):
+        """最初 (ダウンロード) からやり直す。"""
+        if self.finished:
+            return
+        self._close_proc()
+        self.proc = None
+        self.phase = self.PREPARING
+        self.message = self.technical = ""
+
+    def summary(self):
+        return dict(self.results)
+
+
+# ---------------------------------------------------------------------------
+# AltServer の診断 (エラー 2003 など「iPhoneが見つからない」ときの原因探し)
+# ---------------------------------------------------------------------------
+# 外部コマンドはシェルを通さず、引数のリストで実行する。出力の解析はコマンドの実行と切り離してあり、
+# 実行関数 (run) を差し替えてテストできる。日本語/英語どちらの Windows でも読めるよう、文言ではなく構造で判定する。
+
+DIAG_OK, DIAG_NG, DIAG_WARN = "ok", "ng", "warn"
+VPN_KEYWORDS = ("tailscale", "wireguard", "openvpn", "nordlynx", "zerotier", "warp", "wintun", "tap-windows",
+                "expressvpn", "protonvpn", "mullvad", "vpn", "cisco anyconnect", "forticlient", "globalprotect")
+NET_PRIVATE, NET_PUBLIC, NET_DOMAIN = "private", "public", "domain"
+
+
+def run_text(cmd, timeout=20):
+    """コマンドを (ウィンドウなし・shell なし) で実行して (終了コード, 出力文字列) を返す。失敗は (None, "")。"""
+    try:
+        kw = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "timeout": timeout}
+        if os.name == "nt":
+            kw["creationflags"] = _CREATE_NO_WINDOW
+        r = subprocess.run(list(cmd), **kw)
+        raw = r.stdout or b""
+        text = None
+        for enc in (("utf-8",) if cmd and str(cmd[0]).lower().startswith("powershell") else ()) + ("oem", "mbcs", "cp932", "utf-8"):
+            try:
+                text = raw.decode(enc)
+                break
+            except Exception:
+                continue
+        return r.returncode, text if text is not None else raw.decode("utf-8", "replace")
+    except Exception:
+        return None, ""
+
+
+def parse_tasklist_has(stdout, image):
+    """tasklist /FO CSV /NH の出力に image (例: AltServer.exe) のプロセスがあるか。"""
+    return ('"%s"' % image).lower() in (stdout or "").lower()
+
+
+def parse_sc_state(rc, stdout):
+    """sc query の結果 → "running" / "stopped" / "missing" (サービスなし) / "unknown"。"""
+    text = stdout or ""
+    if rc == 1060:
+        return "missing"
+    # 「STATE : 4  RUNNING」(日本語の Windows では「状態 : 4  RUNNING」)。TYPE の行と混ざらないよう状態名で探す
+    m = re.search(r":\s*(\d+)\s+(RUNNING|STOPPED|START_PENDING|STOP_PENDING|CONTINUE_PENDING|PAUSE_PENDING|PAUSED)\b", text)
+    if m:
+        return "running" if m.group(2) == "RUNNING" else "stopped"
+    if "1060" in text:
+        return "missing"
+    return "unknown"
+
+
+def _net_category(v):
+    if isinstance(v, int) or (isinstance(v, str) and v.strip().isdigit()):
+        return {0: NET_PUBLIC, 1: NET_PRIVATE, 2: NET_DOMAIN}.get(int(v), "")
+    t = str(v or "").strip().lower()
+    if t.startswith("public"):
+        return NET_PUBLIC
+    if t.startswith("private"):
+        return NET_PRIVATE
+    if t.startswith("domain"):
+        return NET_DOMAIN
+    return ""
+
+
+def _as_list(v):
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+def parse_network_json(stdout):
+    """PowerShell の JSON 出力 → ({"profiles": [{name, alias, category}], "adapters": [{name, desc}]}) または None。"""
+    text = (stdout or "").strip()
+    i, j = text.find("{"), text.rfind("}")
+    if i < 0 or j <= i:
+        return None
+    try:
+        data = json.loads(text[i:j + 1])
+    except Exception:
+        return None
+    profiles = [{"name": str(p.get("name") or ""), "alias": str(p.get("alias") or ""), "category": _net_category(p.get("cat"))}
+                for p in _as_list(data.get("profiles")) if isinstance(p, dict)]
+    adapters = [{"name": str(a.get("name") or ""), "desc": str(a.get("desc") or "")}
+                for a in _as_list(data.get("adapters")) if isinstance(a, dict)]
+    return {"profiles": profiles, "adapters": adapters}
+
+
+def find_vpn_adapters(adapters):
+    out = []
+    for a in adapters or []:
+        text = ("%s %s" % (a.get("name", ""), a.get("desc", ""))).lower()
+        if any(k in text for k in VPN_KEYWORDS):
+            out.append(a.get("name") or a.get("desc") or "")
+    return out
+
+
+def parse_firewall(stdout, keyword="altserver"):
+    """netsh advfirewall firewall show rule name=all の出力から、keyword を含むルールを調べる。
+    戻り値: {"found": 件数, "allow_in": 有効な受信許可があるか, "block": 有効なブロックがあるか}。
+    項目名は英語/日本語の両方を読む。ルールは空行で区切られる。"""
+    res = {"found": 0, "allow_in": False, "block": False}
+    for block in re.split(r"\r?\n\s*\r?\n", stdout or ""):
+        if keyword.lower() not in block.lower():
+            continue
+        res["found"] += 1
+        enabled = re.search(r"(?:Enabled|有効)\s*:\s*(\S+)", block)
+        action = re.search(r"(?:Action|操作)\s*:\s*(\S+)", block)
+        direction = re.search(r"(?:Direction|方向)\s*:\s*(\S+)", block)
+        if enabled and enabled.group(1).lower() not in ("yes", "はい"):
+            continue
+        a = (action.group(1).lower() if action else "")
+        d = (direction.group(1).lower() if direction else "in")
+        if a in ("allow", "許可"):
+            if d in ("in", "入", "受信"):
+                res["allow_in"] = True
+        elif a in ("block", "ブロック"):
+            res["block"] = True
+    return res
+
+
+_NET_SCRIPT = (
+    "$ErrorActionPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+    "$p=@(Get-NetConnectionProfile | ForEach-Object { @{name=$_.Name; alias=$_.InterfaceAlias; cat=[int]$_.NetworkCategory} }); "
+    "$a=@(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { @{name=$_.Name; desc=$_.InterfaceDescription} }); "
+    "@{profiles=$p; adapters=$a} | ConvertTo-Json -Compress -Depth 4")
+
+
+def _diag(did, label, state, detail="", fix=""):
+    return {"id": did, "label": label, "state": state, "detail": detail, "fix": fix}
+
+
+def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=None):
+    """AltServer の診断。戻り値: [{id, label, state(ok/ng/warn), detail, fix}]。
+    run(cmd_list, timeout) -> (rc, text) を差し替えてテストできる。itunes_status / usb_snapshot も差し替え可。"""
+    run = run or run_text
+    out = []
+
+    def note(msg):
+        if progress:
+            try:
+                progress(msg)
+            except Exception:
+                pass
+
+    # 1. AltServer.exe が動いているか
+    note("AltServer が起動しているか確認しています…")
+    rc, txt = run(["tasklist", "/FI", "IMAGENAME eq AltServer.exe", "/FO", "CSV", "/NH"], 15)
+    if rc is None:
+        out.append(_diag("altserver", "AltServer が起動している", DIAG_WARN, "確認できませんでした", "もう一度「診断」を押してください"))
+    elif parse_tasklist_has(txt, "AltServer.exe"):
+        out.append(_diag("altserver", "AltServer が起動している", DIAG_OK))
+    else:
+        out.append(_diag("altserver", "AltServer が起動している", DIAG_NG, "AltServer が動いていません",
+                         "スタートメニューから AltServer を起動してください（セットアップタブの「AltServerを起動」でも開けます）"))
+
+    # 2. Apple Mobile Device Service / 3. Bonjour Service
+    for did, label, svc, fix_missing, fix_stopped in (
+            ("amds", "Apple Mobile Device Service が動いている", "Apple Mobile Device Service",
+             "Apple公式サイト版のiTunesを入れて、PCを再起動してください（セットアップタブの「インストール」から入れられます）",
+             "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します"),
+            ("bonjour", "Bonjour Service が動いている", "Bonjour Service",
+             "Bonjour は公式サイト版のiTunes / iCloudと一緒に入ります。公式サイト版を入れ直してください",
+             "サービスを開始してください（Windowsキー → 「サービス」→ Bonjour サービス →「開始」）。直らないときはPCを再起動します")):
+        note("%s を確認しています…" % svc)
+        rc, txt = run(["sc.exe", "query", svc], 15)
+        state = "unknown" if rc is None else parse_sc_state(rc, txt)
+        if state == "running":
+            out.append(_diag(did, label, DIAG_OK))
+        elif state == "stopped":
+            out.append(_diag(did, label, DIAG_NG, "サービスが止まっています", fix_stopped))
+        elif state == "missing":
+            out.append(_diag(did, label, DIAG_NG, "サービスが見つかりません", fix_missing))
+        else:
+            out.append(_diag(did, label, DIAG_WARN, "確認できませんでした", "もう一度「診断」を押してください"))
+
+    # 4. 公式サイト版 iTunes
+    note("iTunes を確認しています…")
+    try:
+        st = itunes_status() if itunes_status else detect_itunes()
+    except Exception:
+        st = {"state": STATE_WARN, "detail": "確認できませんでした"}
+    if st.get("state") == STATE_OK:
+        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_OK))
+    elif st.get("state") == STATE_WARN:
+        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_NG, st.get("detail", ""),
+                         "Microsoft Store版は使えません。セットアップタブの「インストール」で公式サイト版に入れ替えてください"))
+    else:
+        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_NG, "iTunes が見つかりません",
+                         "セットアップタブの「インストール」からApple公式サイト版のiTunesを入れてください"))
+
+    # 5. iPhone が USB でつながっている (+ 信頼)
+    note("iPhone を確認しています…")
+    try:
+        snap = usb_snapshot() if usb_snapshot else (iphone.query_usbmux() if iphone is not None else {})
+    except Exception:
+        snap = {}
+    if snap.get("usb"):
+        if snap.get("trusted") is False:
+            out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_NG, "つながっていますが、このPCを信頼していません",
+                             "iPhoneのロックを解除して、「このコンピュータを信頼」→「信頼」を押してください"))
+        else:
+            out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_OK))
+    else:
+        out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_NG, "iPhoneが見つかりません",
+                         "LightningケーブルでPCにつなぎ、iPhoneのロックを解除して「信頼」を押してください。"
+                         "更新中はUSBでつないだままにするのがいちばん確実です"))
+
+    # 6. ネットワークの種類 / 7. VPN
+    note("ネットワークの設定を確認しています…")
+    rc, txt = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _NET_SCRIPT], 30)
+    net = parse_network_json(txt) if rc is not None else None
+    if net is None:
+        out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN, "確認できませんでした",
+                         "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク で「プライベート」を選んでください"))
+        out.append(_diag("vpn", "VPN がオフ", DIAG_WARN, "確認できませんでした", "Tailscale などのVPNを使っているときは、いったんオフにしてください"))
+    else:
+        publics = [p for p in net["profiles"] if p["category"] == NET_PUBLIC]
+        others = [p for p in net["profiles"] if p["category"] in (NET_PRIVATE, NET_DOMAIN)]
+        fix_net = ("設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、"
+                   "ネットワーク プロファイルを「プライベート」にしてください")
+        if not net["profiles"]:
+            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN, "ネットワークが見つかりません",
+                             "Wi-Fi または有線LANにつないでください"))
+        elif publics and not others:
+            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_NG,
+                             "「パブリック」になっています（%s）" % "・".join(p["name"] or p["alias"] for p in publics), fix_net))
+        elif publics:
+            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN,
+                             "「パブリック」のネットワークもあります（%s）" % "・".join(p["name"] or p["alias"] for p in publics),
+                             "iPhoneと同じネットワークが「パブリック」なら、" + fix_net))
+        else:
+            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_OK))
+        vpns = find_vpn_adapters(net["adapters"])
+        if vpns:
+            out.append(_diag("vpn", "VPN がオフ", DIAG_WARN, "VPNらしい接続が有効です（%s）" % "・".join(vpns),
+                             "Tailscale などのVPNをいったんオフにしてから更新してください（AltServerがiPhoneを見つけにくくなります）"))
+        else:
+            out.append(_diag("vpn", "VPN がオフ", DIAG_OK))
+
+    # 8. ファイアウォール
+    note("ファイアウォールを確認しています…（少し時間がかかります）")
+    rc, txt = run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], 40)
+    if rc is None:
+        out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_WARN, "確認できませんでした",
+                         "AltServer を起動したときの Windows セキュリティの画面で、「プライベート ネットワーク」を許可してください"))
+    else:
+        fw = parse_firewall(txt, "altserver")
+        if fw["allow_in"] and not fw["block"]:
+            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_OK))
+        elif fw["block"]:
+            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_NG, "AltServer をブロックするルールがあります",
+                             "Windowsセキュリティ > ファイアウォールとネットワーク保護 > ファイアウォールによるアプリケーションの許可 で、"
+                             "AltServer の「プライベート」にチェックを入れてください"))
+        else:
+            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_NG, "AltServer を許可するルールが見つかりません",
+                             "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。"
+                             "出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します"))
+    note("")
+    return out
+
+
+def diagnostics_summary(results):
+    """診断結果の1行まとめ。"""
+    ng = [r for r in results if r["state"] == DIAG_NG]
+    warn = [r for r in results if r["state"] == DIAG_WARN]
+    if not ng and not warn:
+        return "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。"
+    parts = []
+    if ng:
+        parts.append("直す必要があるもの: %d 件" % len(ng))
+    if warn:
+        parts.append("確認してほしいもの: %d 件" % len(warn))
+    return "、".join(parts) + "。下の「→」の案内を上から順に試してください。"
 
 
 # ---------------------------------------------------------------------------
@@ -1064,8 +1798,9 @@ class SetupEngine:
                 steps.append(self._prepare(cid, emit, cancel, prog))
                 emit("log", text="%s: ダウンロード完了" % name)
             except Exception as e:
-                msg = str(e) if isinstance(e, DownloadError) else "準備に失敗しました (%s)" % e
-                emit("log", text="%s: %s" % (name, msg))
+                msg = str(e) if isinstance(e, DownloadError) else "準備に失敗しました。もう一度お試しください"
+                emit("log", text="%s: %s%s" % (name, msg, (" [%s]" % getattr(e, "technical", "")) if getattr(e, "technical", "")
+                                              else ("" if isinstance(e, DownloadError) else " [%s]" % e)))
                 src = SOURCES[cid]
                 if src.get("winget") and self.winget_finder():
                     emit("log", text="%s: wingetで代わりにインストールします" % name)
@@ -1100,7 +1835,7 @@ class SetupEngine:
         try:
             out["statuses"] = self.detector()
         except Exception as e:
-            out["error"] = out["error"] or "確認に失敗しました (%s)" % e
+            out["error"] = out["error"] or "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: %s）" % e
         # インストールは成功したのに検出できない場合は「要確認」
         for cid, r in out["results"].items():
             st = out["statuses"].get(cid, {}).get("state")
@@ -1158,17 +1893,21 @@ class SetupEngine:
             elif kind == "timeout":
                 out["error"] = "インストールが時間内に終わりませんでした。もう一度お試しください。"
             else:
-                out["error"] = "インストールを実行できませんでした (%s %s)。" % (kind, code)
+                out["error"] = ("インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を"
+                                "右クリック →「管理者として実行」でやり直してください")
+                emit("log", text="詳細: %s %s" % (kind, code))
             for cid in step_by_id:
                 out["results"][cid] = {"ok": False, "detail": out["error"], "code": None}
             return
         if result.get("error"):
             out["error"] = result["error"]
         for r in result.get("steps", []):
-            out["results"][r["id"]] = {"ok": bool(r.get("ok")), "detail": r.get("detail", ""), "code": r.get("code")}
+            out["results"][r["id"]] = {"ok": bool(r.get("ok")), "detail": r.get("detail", ""), "code": r.get("code"),
+                                       "technical": r.get("technical", "")}
             if r.get("reboot"):
                 out["reboot"] = True
-            emit("log", text="%s: %s" % (r.get("title", r.get("id")), "完了" if r.get("ok") else ("失敗 " + r.get("detail", ""))))
+            emit("log", text="%s: %s" % (r.get("title", r.get("id")), "完了" if r.get("ok") else (
+                "失敗 " + r.get("detail", "") + ((" [" + r["technical"] + "]") if r.get("technical") else ""))))
         for cid in step_by_id:
             out["results"].setdefault(cid, {"ok": False, "detail": "実行されませんでした", "code": None})
         state["units"] = base_units + len(steps)
@@ -1221,6 +1960,12 @@ class SetupController:
         self.stage = ""
         self.progress = 0.0
         self.listeners = []
+        self.guided = None           # GuidedFlow (手順つきインストール中)
+        self.guided_working = False  # prepare / check をスレッドで実行中
+        self._guided_guard = None
+        self._pending_guided = []
+        self.guided_directory = None
+        self.guided_factory = None   # テスト用に GuidedFlow の作り方を差し替える
         self.cancel = threading.Event()
         self._q = queue.Queue()
         self._pumping = False
@@ -1254,7 +1999,7 @@ class SetupController:
     def _tick(self):
         self._pumping = False
         self.pump()
-        if (self.busy or self.checking or self.audio_polling) and not self.closed:
+        if (self.busy or self.checking or self.audio_polling or self.guided_working) and not self.closed:
             self._arm()
 
     def pump(self):
@@ -1290,6 +2035,8 @@ class SetupController:
             self.audio_polling = False
             self.audio_message = (payload or {}).get("message", "")
             self._notify("audio")
+        elif kind == "guided":
+            self._guided_updated()
         elif kind == "done":
             self.busy = False
             self.outcome = payload
@@ -1300,6 +2047,9 @@ class SetupController:
             self._notify("done")
             self._notify("statuses")
             self.on_changed()
+            if self._pending_guided:
+                ids, self._pending_guided = self._pending_guided, []
+                self.guided_begin(ids)
 
     # -- 検出 -------------------------------------------------------------
     def recheck(self):
@@ -1312,7 +2062,7 @@ class SetupController:
             try:
                 res = self.detector()
             except Exception as e:
-                res = {c["id"]: {"state": STATE_WARN, "detail": "確認できませんでした (%s)" % e} for c in COMPONENTS}
+                res = {c["id"]: {"state": STATE_WARN, "detail": "確認できませんでした。「再チェック」を押してください"} for c in COMPONENTS}
             self._q.put(("checked", res))
 
         threading.Thread(target=work, name="setup-detect", daemon=True).start()
@@ -1346,13 +2096,25 @@ class SetupController:
         """ids をインストールする。開始できなければ False。"""
         if self.busy or not ids or not self.can_start():
             return False
+        if self.guided is not None and not self.guided.finished:
+            return False
         ids = expand_selection(ids, self.statuses)
-        guard = self.audio_guard if "vbcable" in ids else None
-        if guard is not None:
-            try:
-                guard.before_install()  # 通常権限のこのプロセスで、現在の既定の音声デバイスを控える
-            except Exception:
-                guard = None
+        auto_ids, guided_ids = split_ids(ids)
+        self._pending_guided = list(guided_ids)
+        if not auto_ids:
+            # 自動で入れるものがない: 手順つきインストールだけを始める (管理者の確認は出さない)
+            self._pending_guided = []
+            self.audio_message = ""
+            self.outcome = {"results": {}, "manual": [], "reboot": False, "error": "", "statuses": {}, "ids": []}
+            self.log_lines = []
+            self.stage = "準備しています…"
+            self.progress = 0.0
+            self.cancel.clear()
+            self._notify("start")
+            self.guided_begin(guided_ids)
+            return True
+        ids = auto_ids
+        guard = None  # 音声デバイスの保護は VB-CABLE (手順つき) のほうで行う
         self.audio_message = ""
         self.busy = True
         self.outcome = None
@@ -1371,7 +2133,7 @@ class SetupController:
                 out = self.engine.run(ids, emit=emit, cancel=self.cancel)
             except Exception as e:
                 out = {"results": {}, "manual": [], "reboot": False, "statuses": {}, "ids": ids,
-                       "error": "セットアップ中にエラーが発生しました (%s)" % e}
+                       "error": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: %s）" % e}
             if guard is not None:
                 self.audio_polling = True  # "done" より先に立てる (UI の更新ループを止めないため)
             self._q.put(("done", out))
@@ -1385,6 +2147,155 @@ class SetupController:
         threading.Thread(target=work, name="setup-run", daemon=True).start()
         self._arm()
         return True
+
+    # -- 手順つきインストール -----------------------------------------------
+    def _emit_guided(self, kind, **kw):
+        self._q.put((kind, kw.get("text") if kind in ("stage", "log") else kw.get("value")))
+
+    def guided_begin(self, ids):
+        """iTunes / iCloud / AltServer / VB-CABLE を、公式インストーラーを開く形で順に進める。"""
+        ids = [c for c in ids if c in GUIDED_IDS]
+        if not ids:
+            return False
+        make = self.guided_factory or (lambda i: GuidedFlow(
+            i, self.engine.dir, downloader=self.engine.downloader, store_remover=self.engine.store_remover,
+            detector=self.detector))
+        self.guided = make(ids)
+        self._guided_guard = None
+        if "vbcable" in ids and self.audio_guard is not None:
+            try:
+                self.audio_guard.before_install()  # 通常権限のこのプロセスで、現在の既定の音声デバイスを控える
+                self._guided_guard = self.audio_guard
+            except Exception:
+                self._guided_guard = None
+        self.cancel.clear()
+        self._notify("guided")
+        self._guided_run(lambda: None)
+        return True
+
+    def _guided_run(self, action):
+        """action (check など) を実行してから、次の項目の準備 (ダウンロード) まで、ワーカースレッドで進める。"""
+        flow = self.guided
+        if flow is None or self.guided_working:
+            return False
+        self.guided_working = True
+
+        def work():
+            try:
+                action()
+                while flow.phase == GuidedFlow.PREPARING and not flow.finished and not self.closed:
+                    flow.prepare(self._emit_guided, self.cancel)
+            except Exception as e:
+                flow._fail("予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+            finally:
+                self.guided_working = False
+                self._q.put(("guided", None))
+
+        threading.Thread(target=work, name="setup-guided", daemon=True).start()
+        self._arm()
+        return True
+
+    def guided_open(self):
+        """「インストーラーを開く」。UAC の確認で止まることがあるので、スレッドで開く。"""
+        flow = self.guided
+        if flow is None or self.guided_working or flow.phase not in (GuidedFlow.READY, GuidedFlow.RUNNING, GuidedFlow.MISSING):
+            return False
+        self.guided_working = True
+
+        def work():
+            try:
+                flow.launch()
+            except Exception as e:
+                flow._fail("インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+            finally:
+                self.guided_working = False
+                self._q.put(("guided", None))
+
+        threading.Thread(target=work, name="setup-guided-open", daemon=True).start()
+        self._arm()
+        return True
+
+    def guided_confirm(self):
+        """「確認」: 導入済みか確かめる (済みなら次の項目へ)。"""
+        flow = self.guided
+        if flow is None or flow.phase not in (GuidedFlow.RUNNING, GuidedFlow.MISSING):
+            return False
+        return self._guided_run(lambda: flow.check(auto=False))
+
+    def guided_retry(self):
+        flow = self.guided
+        if flow is None:
+            return False
+        flow.retry()
+        self._notify("guided")
+        return self._guided_run(lambda: None)
+
+    def guided_skip(self):
+        flow = self.guided
+        if flow is None or self.guided_working:
+            return False
+        flow.skip()
+        self._notify("guided")
+        return self._guided_run(lambda: None) if not flow.finished else self._guided_updated()
+
+    def guided_abort(self):
+        flow = self.guided
+        if flow is None:
+            return False
+        self.cancel.set()
+        flow.abort()
+        self._guided_updated()
+        return True
+
+    def guided_tick(self):
+        """UI から1秒ごとに呼ぶ。実行中のインストーラーが終わった / 一定時間たったら、裏で導入済みか確かめる。"""
+        flow = self.guided
+        if flow is None or flow.finished or self.guided_working:
+            return False
+        try:
+            if flow.needs_auto_check():
+                return self._guided_run(lambda: flow.check(auto=True))
+        except Exception:
+            pass
+        return False
+
+    def _guided_updated(self):
+        flow = self.guided
+        if flow is not None and flow.finished and not getattr(flow, "_merged", False):
+            flow._merged = True
+            out = self.outcome if isinstance(self.outcome, dict) else {"results": {}, "manual": [], "reboot": False,
+                                                                       "error": "", "statuses": {}, "ids": []}
+            self.outcome = out
+            out["ids"] = list(out.get("ids", []))
+            out["results"] = dict(out.get("results", {}))
+            for cid in flow.ids:
+                r = flow.results.get(cid, {"ok": False, "skipped": True, "detail": ""})
+                out.setdefault("results", {})[cid] = dict(r, code=None)
+                if cid not in out.setdefault("ids", []):
+                    out["ids"].append(cid)
+            if flow.reboot:
+                out["reboot"] = True
+            guard = self._guided_guard
+            if guard is not None:
+                self.audio_polling = True
+                self._guided_guard = None
+
+                def after():
+                    try:
+                        res = guard.after_install()
+                    except Exception:
+                        res = {"message": ""}
+                    self._q.put(("audio", res))
+
+                threading.Thread(target=after, name="setup-audio", daemon=True).start()
+                self._arm()
+            self._notify("guided")
+            self._notify("guided_done")
+            self.recheck()
+            self.on_changed()
+            return True
+        self._notify("guided")
+        return False
 
     def close(self):
         self.closed = True
@@ -1432,12 +2343,12 @@ def detect_scale(root):
         return 1.0
 
 
-def make_button(parent, text, command, primary=False, state="normal"):
-    """角のない平らなボタン。"""
+def make_button(parent, text, command, primary=False, state="normal", big=False):
+    """角のない平らなボタン。big は押す場所をはっきり見せたいときの大きいボタン。"""
     if primary:
         b = tk.Button(parent, text=text, command=command, bg=ACCENT, fg="#ffffff", activebackground="#0077ed",
-                      activeforeground="#ffffff", relief="flat", bd=0, padx=px(22), pady=px(7), cursor="hand2",
-                      font=(FONT, 10, "bold"), disabledforeground="#c7c7cc", state=state)
+                      activeforeground="#ffffff", relief="flat", bd=0, padx=px(40 if big else 22), pady=px(12 if big else 7),
+                      cursor="hand2", font=(FONT, 12 if big else 10, "bold"), disabledforeground="#c7c7cc", state=state)
     else:
         b = tk.Button(parent, text=text, command=command, bg=PANEL, fg=FG, activebackground="#e8e8ed",
                       activeforeground=FG, relief="flat", bd=0, padx=px(16), pady=px(6), cursor="hand2",
@@ -1624,6 +2535,9 @@ class SetupPanel:
         if detail:
             wrapped_label(text_col, detail, inner, reserve, font=(FONT, 9),
                           fg=(BAD if res is not None else WARN)).pack(fill="x")
+        if cid in GUIDED_IDS and state != STATE_OK and res is None and self.mode in ("wizard", "tab"):
+            wrapped_label(text_col, "公式のインストーラーを開いて、手順を画面で案内します", inner, reserve, font=(FONT, 9),
+                          fg=ACCENT).pack(fill="x")
         if self.mode == "wizard" and res is None:
             self._wizard_action(action, comp, state)
         elif self.mode == "tab" and res is None:
@@ -1665,6 +2579,170 @@ def find_itunes():
     return _any_file([os.path.join("iTunes", "iTunes.exe")])
 
 
+def text_section(parent, title, lines, container, numbered=False, intro=""):
+    """見出し + 箇条書き (または番号つき) の文章ブロック。"""
+    tk.Label(parent, text=title, bg=BG, fg=FG, font=(FONT, 11, "bold"), anchor="w").pack(anchor="w", pady=(px(14), 0))
+    if intro:
+        wrapped_label(parent, intro, container, font=(FONT, 9)).pack(fill="x", pady=(px(2), 0))
+    for n, line in enumerate(lines, 1):
+        mark = ("%d.  " % n) if numbered else "・"
+        wrapped_label(parent, mark + line, container, fg=FG, font=(FONT, 9)).pack(fill="x", pady=(px(3), 0))
+
+
+DIAG_ICONS = {DIAG_OK: ("✓", GOOD), DIAG_NG: ("✗", BAD), DIAG_WARN: ("!", WARN)}
+
+
+class DiagnosticsDialog:
+    """「AltServerの診断」。チェックごとに ✓/✗ と、直し方を1行で出す。診断は別スレッドで実行する。"""
+
+    def __init__(self, root, runner=None, open_url=None):
+        self.runner = runner or run_diagnostics
+        self.open_url = open_url or webbrowser.open
+        self.root = root
+        self.results = None
+        self.running = False
+        self.progress_text = ""
+        self._box = []
+        self._job = None
+        self.closed = False
+        set_scale(detect_scale(root))
+        self.top = tk.Toplevel(root)
+        self.top.title("AltServerの診断")
+        self.top.configure(bg=BG)
+        try:
+            self.top.minsize(px(520), px(420))
+            self.top.protocol("WM_DELETE_WINDOW", self.close)
+        except Exception:
+            pass
+        foot = tk.Frame(self.top, bg=BG)
+        foot.pack(side="bottom", fill="x", padx=px(24), pady=px(12))
+        make_button(foot, "閉じる", self.close).pack(side="right")
+        self.run_btn = make_button(foot, "もう一度診断する", self.run, primary=True)
+        self.run_btn.pack(side="right", padx=(0, px(10)))
+        self.scroll = ScrollFrame(self.top)
+        self.scroll.outer.pack(side="top", fill="both", expand=True)
+        self.body = tk.Frame(self.scroll.inner, bg=BG)
+        self.body.pack(fill="both", expand=True, padx=px(24), pady=px(18))
+        try:
+            self.top.bind("<MouseWheel>", self.scroll.wheel)
+        except Exception:
+            pass
+        self.render()
+        self.run()
+
+    def run(self):
+        if self.running or self.closed:
+            return
+        self.running = True
+        self.results = None
+        self.progress_text = "診断しています…"
+        self._box = []
+        try:
+            self.run_btn.config(state="disabled")
+        except Exception:
+            pass
+        self.render()
+
+        def prog(msg):
+            if msg:
+                self.progress_text = msg
+
+        def work():
+            try:
+                self._box.append(self.runner(progress=prog))
+            except Exception as e:
+                self._box.append([_diag("error", "診断", DIAG_WARN, "診断を実行できませんでした (%s)" % e, "もう一度「診断する」を押してください")])
+
+        threading.Thread(target=work, name="altserver-diag", daemon=True).start()
+        self._schedule()
+
+    def _schedule(self):
+        try:
+            self._job = self.top.after(300, self._poll)
+        except Exception:
+            self._job = None
+
+    def _poll(self):
+        self._job = None
+        if self.closed:
+            return
+        if self._box:
+            self.results = self._box[0]
+            self.running = False
+            try:
+                self.run_btn.config(state="normal")
+            except Exception:
+                pass
+            self.render()
+            return
+        if self.status_label is not None:
+            try:
+                self.status_label.config(text=self.progress_text)
+            except Exception:
+                pass
+        self._schedule()
+
+    def render(self):
+        for w in list(self.body.winfo_children()):
+            w.destroy()
+        self.status_label = None
+        tk.Label(self.body, text="AltServerの診断", bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
+        if self.running or self.results is None:
+            self.status_label = wrapped_label(self.body, self.progress_text or "診断しています…", self.body, fg=SUB)
+            self.status_label.pack(fill="x", pady=(px(8), 0))
+        else:
+            wrapped_label(self.body, diagnostics_summary(self.results), self.body, fg=FG, font=(FONT, 10)).pack(
+                fill="x", pady=(px(6), px(8)))
+            for r in self.results:
+                icon, color = DIAG_ICONS.get(r["state"], DIAG_ICONS[DIAG_WARN])
+                row = tk.Frame(self.body, bg=BG)
+                row.pack(fill="x", pady=px(5))
+                row.columnconfigure(1, weight=1)
+                tk.Label(row, text=icon, fg=color, bg=BG, font=(FONT, 12, "bold")).grid(row=0, column=0, sticky="nw",
+                                                                                      padx=(0, px(10)))
+                col = tk.Frame(row, bg=BG)
+                col.grid(row=0, column=1, sticky="ew")
+                tk.Label(col, text=r["label"], fg=FG, bg=BG, font=(FONT, 10, "bold")).pack(anchor="w")
+                if r.get("detail"):
+                    wrapped_label(col, r["detail"], row, px(40), fg=color, font=(FONT, 9)).pack(fill="x")
+                if r.get("fix") and r["state"] != DIAG_OK:
+                    wrapped_label(col, "→ " + r["fix"], row, px(40), fg=FG, font=(FONT, 9)).pack(fill="x")
+        if iphone is not None:
+            text_section(self.body, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
+            text_section(self.body, "更新に使うPCの条件", iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
+                         intro="AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。")
+            wrapped_label(self.body, iphone.ALTSTORE_NEW_PC_NOTE, self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
+        make_link(self.body, "AltStore公式の手順を開く", lambda: self.open_url(FAQ_URL)).pack(anchor="w", pady=(px(10), 0))
+        try:
+            self.top.update_idletasks()
+            sw, sh = self.top.winfo_screenwidth(), self.top.winfo_screenheight()
+            w = min(max(self.top.winfo_width(), px(620)), int(sw * 0.9))
+            h = min(max(self.top.winfo_height(), px(560)), int(sh * 0.9))
+            self.top.geometry("%dx%d" % (w, h))
+        except Exception:
+            pass
+
+    def close(self):
+        self.closed = True
+        if self._job is not None:
+            try:
+                self.top.after_cancel(self._job)
+            except Exception:
+                pass
+        try:
+            self.top.destroy()
+        except Exception:
+            pass
+
+
+def open_diagnostics(root, open_url=None, runner=None):
+    """「AltServerの診断」ウィンドウを開く。開けなかったら None。"""
+    try:
+        return DiagnosticsDialog(root, runner=runner, open_url=open_url)
+    except Exception:
+        return None
+
+
 def downloads_dir():
     d = os.path.join(os.path.expanduser("~"), "Downloads")
     return d if os.path.isdir(d) else tempfile.gettempdir()
@@ -1690,7 +2768,7 @@ class SetupWizard:
     """初回セットアップ / やり直し用のウィザード (リサイズ可能な Toplevel)。
     start="iphone" のときは iPhone の手順だけを開く (セットアップタブの「iPhoneのセットアップ」)。"""
 
-    TITLES = ["ようこそ", "必要なソフトの確認", "インストール中", "iPhoneの準備"]
+    TITLES = ["ようこそ", "必要なソフトの確認", "インストール", "iPhoneの準備"]
 
     def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None, start="setup"):
         self.root = root
@@ -1743,7 +2821,7 @@ class SetupWizard:
         self._next_probe = 0.0
         self._pump_job = None
         self._dl_state = None
-        self.show(PAGE_IPHONE if start == "iphone" else PAGE_WELCOME)
+        self.show(PAGE_IPHONE if start == "iphone" else (PAGE_INSTALL if start == "guided" else PAGE_WELCOME))
         try:
             self.top.grab_set()
         except Exception:
@@ -1767,6 +2845,12 @@ class SetupWizard:
         self.chip = None
         self.dl_label = None
         self.dl_btn = None
+        self.guided_holder = None
+        self.manual_holder = None
+        self.abort_btn = None
+        self.g_elapsed = None
+        self.g_hint = None
+        self._g_job = None
 
     def _title(self, text, sub=None):
         tk.Label(self.body, text=text, bg=BG, fg=FG, font=(FONT, 20, "bold"), anchor="w").pack(anchor="w")
@@ -1818,8 +2902,9 @@ class SetupWizard:
     def _page_welcome(self):
         tk.Label(self.body, text="PhoneCam へようこそ", bg=BG, fg=FG, font=(FONT, 22, "bold"), anchor="w").pack(
             anchor="w", pady=(px(36), 0))
-        wrapped_label(self.body, "iPhoneをOBSのカメラにするために必要なソフトを確認して、足りないものをまとめて入れます。\n"
-                                 "すでに入っているものは飛ばします。管理者の確認は最初に1回だけ表示されます。\n"
+        wrapped_label(self.body, "iPhoneをOBSのカメラにするために必要なソフトを確認します。すでに入っているものは飛ばします。\n"
+                                 "Visual C++ とカメラの登録は自動で入れます（管理者の確認が1回出ます）。\n"
+                                 "iTunes・iCloud・AltServer・VB-CABLE は、公式のインストーラーを画面に開いて、押すボタンを1つずつご案内します。\n"
                                  "そのあと、iPhoneにPhoneCamを入れる手順もご案内します。",
                       self.body, font=(FONT, 11)).pack(fill="x", pady=(px(16), 0))
         make_link(self.footer, "スキップ", self._skip).pack(side="left")
@@ -1888,7 +2973,7 @@ class SetupWizard:
 
     # -- ページ3 ----------------------------------------------------------
     def _page_install(self):
-        self._title("インストール中")
+        self._title("インストール")
         self.stage_label = wrapped_label(self.body, self.controller.stage, self.body, fg=FG)
         self.stage_label.pack(fill="x")
         self.bar = ThinProgress(self.body)
@@ -1906,14 +2991,54 @@ class SetupWizard:
         self.log_visible = False
         self._refill_log()
         self.result_holder = tk.Frame(self.body, bg=BG)
+        self.manual_holder = tk.Frame(self.body, bg=BG)
         self.note_label = wrapped_label(self.body, "", self.body, fg=WARN)
+        self.guided_holder = tk.Frame(self.body, bg=BG)
+        self.guided_holder.pack(fill="x", pady=(px(10), 0))
         self.audio_label = wrapped_label(self.body, "", self.body, fg=SUB, font=(FONT, 9))
-        self.next_btn = make_button(self.footer, "次へ", lambda: self.show(PAGE_IPHONE), primary=True, state="disabled")
+        self.g_elapsed = self.g_hint = None
+        last_label = "閉じる" if self.mode == "guided" else "次へ"
+        self.next_btn = make_button(self.footer, last_label, self._after_install, primary=True, state="disabled")
         self.next_btn.pack(side="right")
         self.retry_btn = make_button(self.footer, "もう一度試す", self._retry)
+        self.abort_btn = make_link(self.footer, "あとで（中止）", self._abort_guided)
         if not self.controller.busy and self.controller.outcome is not None:
             self._show_outcome()
+        self._render_guided()
         self._show_audio_note()
+        self._update_install_footer()
+        self._schedule_guided_timer()
+
+    def _after_install(self):
+        if self.mode == "guided":
+            self._end(self.on_finish)
+        else:
+            self.show(PAGE_IPHONE)
+
+    def _guided_active(self):
+        g = self.controller.guided
+        return g is not None and not g.finished
+
+    def _install_complete(self):
+        c = self.controller
+        return (not c.busy) and (not self._guided_active()) and c.outcome is not None
+
+    def _update_install_footer(self):
+        try:
+            if self.next_btn is not None:
+                self.next_btn.config(state="normal" if self._install_complete() else "disabled")
+            ab = getattr(self, "abort_btn", None)
+            if ab is not None:
+                if self._guided_active():
+                    ab.pack(side="left")
+                else:
+                    ab.pack_forget()
+        except Exception:
+            pass
+
+    def _abort_guided(self):
+        self.controller.guided_abort()
+        self._show_outcome()
 
     def _toggle_log(self):
         self.log_visible = not self.log_visible
@@ -1953,37 +3078,60 @@ class SetupWizard:
         except Exception:
             pass
 
+    @staticmethod
+    def overall_text(out, guided_pending=False):
+        res = (out or {}).get("results", {})
+        if guided_pending:
+            return "続けて、下の案内に沿ってインストールします"
+        failed = [r for r in res.values() if not r.get("ok") and not r.get("skipped")]
+        skipped = [r for r in res.values() if r.get("skipped")]
+        if (out or {}).get("error") or failed:
+            return "一部のインストールが完了しませんでした（下の案内を見てください）"
+        if skipped:
+            return "完了しました（あとで入れる項目があります）"
+        return "完了しました"
+
     def _show_outcome(self):
         out = self.controller.outcome or {}
+        pending = self._guided_active() or bool(getattr(self.controller, "_pending_guided", []))
         if self.stage_label is not None:
-            self.stage_label.config(text="完了しました" if not out.get("error") and all(
-                r.get("ok") for r in out.get("results", {}).values()) else "一部のインストールが完了しませんでした")
-        if self.bar is not None:
+            self.stage_label.config(text=self.overall_text(out, pending))
+        if self.bar is not None and not pending:
             self.bar.set(1.0)
         self._render_results(out)
-        self.result_holder.pack(fill="x", pady=(px(8), 0))
+        self.result_holder.pack(fill="x", pady=(px(8), 0), before=self.guided_holder)
         notes = []
         if out.get("error"):
             notes.append(out["error"])
         if out.get("reboot"):
-            notes.append("再起動が必要です。セットアップ後にPCを再起動してください。")
+            notes.append("再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。")
         for m in out.get("manual", []):
             notes.append("%s は自動で入れられませんでした。「%s」" % (m["name"], m["text"]))
+        for w in list(self.manual_holder.winfo_children()):
+            w.destroy()
         if notes:
             self.note_label.config(text="\n".join(notes))
-            self.note_label.pack(fill="x", pady=(px(8), 0))
+            self.note_label.pack(fill="x", pady=(px(8), 0), before=self.guided_holder)
+        else:
+            try:
+                self.note_label.pack_forget()
+            except Exception:
+                pass
+        self.manual_holder.pack(fill="x", before=self.guided_holder)
         for m in out.get("manual", []):
             url = m["url"]
-            make_link(self.body, "%s の公式ページを開く" % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
-        if self.next_btn is not None:
-            self.next_btn.config(state="normal")
-        failed = [cid for cid, r in out.get("results", {}).items() if not r.get("ok")]
-        if failed and self.retry_btn is not None:
+            make_link(self.manual_holder, "%s の公式ページを開く" % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
+        failed = [cid for cid, r in out.get("results", {}).items() if not r.get("ok") and not r.get("skipped")
+                  and cid not in GUIDED_IDS]
+        if failed and self.retry_btn is not None and not pending:
             self.retry_btn.pack(side="right", padx=(0, px(10)))
+        self._update_install_footer()
         self._fit_window()
 
     def _render_results(self, out):
         """結果の行 (インストールした項目だけ) を描画する。"""
+        for w in list(self.result_holder.winfo_children()):
+            w.destroy()
         ids = out.get("ids", [])
         for cid in ids:
             comp = COMPONENT_BY_ID[cid]
@@ -1991,15 +3139,123 @@ class SetupWizard:
             row = tk.Frame(self.result_holder, bg=BG)
             row.pack(fill="x", pady=px(3))
             row.columnconfigure(1, weight=1)
-            icon, color = ("✓", GOOD) if r.get("ok") else ("✗", BAD)
+            if r.get("ok"):
+                icon, color = "✓", GOOD
+            elif r.get("skipped"):
+                icon, color = "○", SUB
+            else:
+                icon, color = "✗", BAD
             tk.Label(row, text=icon, fg=color, bg=BG, font=(FONT, 11, "bold")).grid(row=0, column=0, sticky="nw",
                                                                                    padx=(0, px(10)))
             col = tk.Frame(row, bg=BG)
             col.grid(row=0, column=1, sticky="ew")
             tk.Label(col, text=comp["name"], fg=FG, bg=BG, font=(FONT, 10, "bold")).pack(anchor="w")
             if r.get("detail"):
-                wrapped_label(col, r["detail"], row, px(40), fg=BAD if not r.get("ok") else WARN,
+                wrapped_label(col, r["detail"], row, px(40), fg=(BAD if not (r.get("ok") or r.get("skipped")) else WARN),
                               font=(FONT, 9)).pack(fill="x")
+            tech = r.get("technical") or (("終了コード %s" % r["code"]) if r.get("code") not in (None, 0) and not r.get("ok") else "")
+            if tech:
+                wrapped_label(col, "詳細: %s" % tech, row, px(40), fg=SUB, font=(FONT, 8)).pack(fill="x")
+
+    # -- 手順つきインストール (iTunes / iCloud / AltServer / VB-CABLE) ----------
+    def _render_guided(self):
+        holder = getattr(self, "guided_holder", None)
+        if holder is None:
+            return
+        for w in list(holder.winfo_children()):
+            w.destroy()
+        self.g_elapsed = self.g_hint = None
+        flow = self.controller.guided
+        if flow is None:
+            return
+        c = self.controller
+        if flow.finished:
+            self._update_install_footer()
+            return
+        cid = flow.current
+        g = GUIDE.get(cid, {"steps": [], "note": ""})
+        tk.Frame(holder, bg=LINE, height=1).pack(fill="x", pady=(0, px(10)))
+        tk.Label(holder, text="%s をインストール（%d / %d）" % (flow.name(cid), flow.index + 1, len(flow.ids)), bg=BG, fg=FG,
+                 font=(FONT, 14, "bold"), anchor="w").pack(anchor="w")
+        phase = flow.phase
+        if phase == GuidedFlow.PREPARING or phase == GuidedFlow.CHECKING:
+            text = "インストーラーを準備しています。上のバーが進みます…" if phase == GuidedFlow.PREPARING else "インストールされたか確認しています…"
+            wrapped_label(holder, text, self.body, fg=SUB).pack(fill="x", pady=(px(8), 0))
+        else:
+            if phase == GuidedFlow.FAILED:
+                wrapped_label(holder, flow.message, self.body, fg=BAD).pack(fill="x", pady=(px(8), 0))
+                if flow.technical:
+                    wrapped_label(holder, "詳細: %s" % flow.technical, self.body, fg=SUB, font=(FONT, 8)).pack(fill="x")
+            else:
+                for n, line in enumerate(g["steps"], 1):
+                    wrapped_label(holder, "%d.  %s" % (n, line), self.body, fg=FG, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
+                if g.get("note"):
+                    wrapped_label(holder, g["note"], self.body, fg=SUB, font=(FONT, 9)).pack(fill="x", pady=(px(8), 0))
+                if flow.notice:
+                    wrapped_label(holder, flow.notice, self.body, fg=WARN, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
+                if phase == GuidedFlow.READY and flow.message:
+                    wrapped_label(holder, flow.message, self.body, fg=WARN).pack(fill="x", pady=(px(8), 0))
+                if phase == GuidedFlow.RUNNING:
+                    self.g_elapsed = wrapped_label(holder, self._elapsed_text(flow), self.body, fg=ACCENT)
+                    self.g_elapsed.pack(fill="x", pady=(px(10), 0))
+                    if flow.message:
+                        wrapped_label(holder, flow.message, self.body, fg=WARN).pack(fill="x", pady=(px(4), 0))
+                    if flow.detected:
+                        wrapped_label(holder, "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます"
+                                              "（このまま「確認」を押しても進めます）", self.body, fg=GOOD).pack(fill="x", pady=(px(4), 0))
+                    self.g_hint = wrapped_label(holder, SLOW_HINT, self.body, fg=WARN)
+                    if flow.is_slow():
+                        self.g_hint.pack(fill="x", pady=(px(4), 0))
+                if phase == GuidedFlow.MISSING:
+                    wrapped_label(holder, flow.message, self.body, fg=WARN).pack(fill="x", pady=(px(10), 0))
+            row = tk.Frame(holder, bg=BG)
+            row.pack(anchor="w", pady=(px(14), 0))
+            if phase == GuidedFlow.READY:
+                make_button(row, "インストーラーを開く", c.guided_open, primary=True, big=True).pack(side="left")
+            elif phase == GuidedFlow.RUNNING:
+                make_button(row, "確認", c.guided_confirm, primary=True, big=True).pack(side="left")
+                make_button(row, "インストーラーをもう一度開く", c.guided_open).pack(side="left", padx=(px(10), 0))
+            elif phase == GuidedFlow.MISSING:
+                make_button(row, "確認", c.guided_confirm, primary=True, big=True).pack(side="left")
+                make_button(row, "インストーラーをもう一度開く", c.guided_open).pack(side="left", padx=(px(10), 0))
+            elif phase == GuidedFlow.FAILED:
+                make_button(row, "もう一度試す", c.guided_retry, primary=True, big=True).pack(side="left")
+            url = flow.page_url(cid)
+            row2 = tk.Frame(holder, bg=BG)
+            row2.pack(anchor="w", pady=(px(8), 0))
+            if url:
+                make_link(row2, "公式ページを開く", lambda u=url: self.open_url(u)).pack(side="left")
+            make_link(row2, "この項目はあとで", c.guided_skip).pack(side="left", padx=(px(10), 0))
+        self._update_install_footer()
+        self._fit_window()
+
+    @staticmethod
+    def _elapsed_text(flow):
+        sec = int(flow.elapsed())
+        return "インストーラーを実行中です（経過 %d:%02d）。画面の案内に沿って進めてください" % (sec // 60, sec % 60)
+
+    def _schedule_guided_timer(self):
+        if getattr(self, "_g_job", None) is None:
+            try:
+                self._g_job = self.top.after(1000, self._guided_timer)
+            except Exception:
+                self._g_job = None
+
+    def _guided_timer(self):
+        self._g_job = None
+        if self.finished or self.page != PAGE_INSTALL:
+            return
+        flow = self.controller.guided
+        if flow is not None and not flow.finished:
+            try:
+                self.controller.guided_tick()
+                if self.g_elapsed is not None and flow.phase == GuidedFlow.RUNNING:
+                    self.g_elapsed.config(text=self._elapsed_text(flow))
+                    if self.g_hint is not None and flow.is_slow():
+                        self.g_hint.pack(fill="x", pady=(px(4), 0))
+            except Exception:
+                pass
+        self._schedule_guided_timer()
 
     # -- ページ4〜10: iPhone の手順 ----------------------------------------
     def _ctx(self):
@@ -2078,9 +3334,15 @@ class SetupWizard:
     def _extra_altstore(self):
         path = find_altserver()
         self._btn_row([("AltServerを起動", lambda: self.launch(path), bool(path)),
-                       ("公式の手順を開く", lambda: self.open_url(FAQ_URL), True)])
+                       ("公式の手順を開く", lambda: self.open_url(FAQ_URL), True),
+                       ("AltServerの診断", lambda: open_diagnostics(self.top, self.open_url), True)])
         wrapped_label(self.body, "うまくいかないときは、AltServerを「管理者として実行」してみてください。",
                       self.body, font=(FONT, 9)).pack(fill="x")
+        if iphone is not None:
+            text_section(self.body, "更新に使うPCの条件", iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
+                         intro="AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。")
+            wrapped_label(self.body, iphone.ALTSTORE_NEW_PC_NOTE, self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
+            text_section(self.body, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
 
     def _extra_phonecam(self):
         repo = APP_REPO
@@ -2249,6 +3511,11 @@ class SetupWizard:
     def _close(self):
         if self.controller.busy:
             return
+        if self._guided_active():
+            self.controller.guided_abort()
+        if self.mode == "guided":
+            self._end(self.on_skip)
+            return
         if self.page >= PAGE_IPHONE:
             self._skip_iphone()
         else:
@@ -2298,6 +3565,11 @@ class SetupWizard:
             self._show_audio_note()
         elif what == "done" and self.page == PAGE_INSTALL:
             self._show_outcome()
+        elif what in ("guided", "guided_done") and self.page == PAGE_INSTALL:
+            self._render_guided()
+            if what == "guided_done" or not self._guided_active():
+                self._show_outcome()
+            self._update_install_footer()
 
 
 def _startfile(path):

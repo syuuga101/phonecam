@@ -183,7 +183,8 @@ IPHONE_STEPS = [
                "7日ごとの自動更新に使います。更新を手動で行うなら省略できます。"]},
     {"id": "altstore", "title": "AltStoreをiPhoneに入れる",
      "lines": ["AltServerを起動し、タスクトレイのAltServerのアイコン → Install AltStore → このiPhone を選びます。",
-               "Apple IDとパスワードを入力します。サブのApple IDでも大丈夫です。"]},
+               "Apple IDとパスワードを入力します。サブのApple IDでも大丈夫です。",
+               "AltServerは「PCごと」の仕組みです。別のPCでAltStoreを更新するときは、そのPCでも下の条件がそろっている必要があります。"]},
     {"id": "settings", "title": "iPhone側の設定",
      "lines": ["設定 > プライバシーとセキュリティ > デベロッパモード をオンにして、iPhoneを再起動します。",
                "設定 > 一般 > VPNとデバイス管理 で自分のApple IDを開き、「信頼」を押します。"]},
@@ -194,6 +195,28 @@ IPHONE_STEPS = [
      "lines": ["iPhoneでPhoneCamを開いたままにします（初回はカメラとローカルネットワークを「許可」）。",
                "つながると自動で次へ進めます。"]},
 ]
+# AltStore の更新 (Refresh) は「どのPCのAltServerからでも」できるが、そのPCが次の条件を満たしている必要がある
+ALTSTORE_REQUIREMENTS = [
+    "Apple公式サイト版の iTunes と iCloud が入っている（Microsoft Store版は不可）",
+    "そのPCにiPhoneをUSBでつないで、「このコンピュータを信頼」を一度押してある",
+    "iTunesで「Wi-Fi経由でこのiPhoneと同期」がオンになっている",
+    "AltServerが起動している（タスクトレイにアイコンがある）",
+    "iPhoneと同じネットワークにいて、VPN（Tailscaleなど）がオフ。Windowsのネットワークの種類が「プライベート」で、"
+    "ファイアウォールがAltServerとBonjourを許可している",
+]
+ALTSTORE_NEW_PC_NOTE = ("新しいPCで更新できないときは、そのPCで AltServer → Install AltStore を一度実行してください。"
+                        "そのPCとiPhoneのペアリングがやり直され、入れてあるアプリはそのまま残ります。")
+
+# エラー 2003 (AltServer could not find this device) が出たとき
+ALT_2003_TITLE = "エラー2003「AltServer could not find this device」が出るとき"
+ALT_2003_CHECKLIST = [
+    "iPhoneをUSBでつないだまま、ロックを解除して更新する",
+    "タスクトレイのAltServerを終了して、もう一度起動する",
+    "iTunesでiPhoneを開き、「Wi-Fi経由でこのiPhoneと同期」にチェックを入れて「適用」を押す",
+    "iPhoneとPCを同じWi-Fiにつなぐ。VPN（Tailscaleなど）はオフにする",
+    "それでもだめなら、このPCから AltServer → Install AltStore でAltStoreを入れ直す（入れてあるアプリは残ります）",
+]
+
 STEP_IDS = [s["id"] for s in IPHONE_STEPS]
 STEP_BY_ID = {s["id"]: s for s in IPHONE_STEPS}
 AUTO_ADVANCE = ("usb", "trust")  # 満たされていたら、初めて開いたときに限って自動で次へ進める手順
