@@ -3466,6 +3466,17 @@ class App:
     def _hint(self, parent, row, text, **grid):
         lbl = ttk.Label(parent, text=text, foreground=HINT_FG, wraplength=px(480), justify="left")
         lbl.grid(row=row, column=0, columnspan=3, sticky="w", **grid)
+
+        # 画面の狭いノートPCでも見切れないよう、折り返し幅を親の実際の幅に合わせる
+        def fit(event, _lbl=lbl):
+            try:
+                _lbl.configure(wraplength=max(px(160), event.width - px(16)))
+            except Exception:
+                pass
+        try:
+            parent.bind("<Configure>", fit, add="+")
+        except Exception:
+            pass
         return lbl
 
     def _slider(self, parent, row, label, key, lo, hi, group, fmt, round_to, as_int=False, var_init=None):
@@ -3520,8 +3531,8 @@ class App:
         self.pair_var = tk.StringVar(value=self.settings.get("pair_code", ""))
         self.pair_var.trace_add("write", lambda *_: self._pair_code_edited())
         ttk.Entry(f, textvariable=self.pair_var, width=10).grid(row=2, column=1, sticky="w", padx=6)
-        self._hint(f, 3, "Wi-Fiで接続するときだけ必要です。iPhoneアプリの画面に出る6桁の数字を入力してください"
-                         "（USBでは不要）", pady=(0, 4))
+        self._hint(f, 3, "Wi-Fiで接続するときだけ必要です（USBでは不要）。iPhoneのPhoneCamアプリで"
+                         "「Wi-Fiからの接続を許可」をオンにすると、6桁のコードが表示されます", pady=(0, 4))
 
         self.status_var = tk.StringVar(value="停止中")
         self.fps_var = tk.StringVar(value="-")
