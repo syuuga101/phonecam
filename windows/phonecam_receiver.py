@@ -1824,6 +1824,10 @@ class StreamController:
     # -- 入力 ------------------------------------------------------------
     def note_in_use(self, in_use, now):
         with self._lock:
+            # 自動モードの「一時停止」は、アプリがカメラを開き直したら (未使用→使用中) 解除する。
+            # 押したまま忘れて「自動で起動しない」状態にならないようにするため
+            if in_use and not self.in_use and self.user_paused and self.mode() == "auto":
+                self.user_paused = False
             self.in_use = bool(in_use)
             if in_use:
                 self.last_in_use = now
@@ -1913,7 +1917,9 @@ class StreamController:
         if manual:
             return "待機中（開始を押すと動きます）"
         if paused:
-            return "一時停止中"
+            if self.mode() == "auto":
+                return "一時停止中（「開始」を押すか、アプリでカメラを開き直すと再開）"
+            return "一時停止中（「開始」を押すと再開）"
         return "待機中（使っているアプリなし）"
 
 
