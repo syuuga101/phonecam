@@ -305,18 +305,54 @@ def detect_itunes(entries=None):
     nonstore = _has_entry(entries, "itunes", exact=True) or bool(_any_file([os.path.join("iTunes", "iTunes.exe")]))
     if service and nonstore:
         return {"state": STATE_OK, "detail": ""}
+    if store_package_installed("itunes"):
+        return {"state": STATE_WARN, "detail": "Microsoft Store版です（インストール時に削除して公式サイト版に入れ替えます）"}
     if service:
         return {"state": STATE_WARN, "detail": "USB接続はOK・AltServerには公式サイト版が必要"}
     return {"state": STATE_MISSING, "detail": ""}
 
 
-def _store_icloud_installed():
-    """Microsoft Store 版の iCloud (AppleInc.iCloud_*) が入っているか"""
+# Microsoft Store 版のパッケージ名。公式サイト版と共存できず、AltServer は公式サイト版が必要なので入れ替える
+STORE_PACKAGES = {"icloud": "AppleInc.iCloud", "itunes": "AppleInc.iTunes"}
+
+
+def store_package_installed(cid):
+    """Microsoft Store 版 (AppleInc.iCloud_* など) が入っているか"""
+    pkg = STORE_PACKAGES.get(cid)
+    if not pkg:
+        return False
     try:
         base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Packages")
-        return any(name.startswith("AppleInc.iCloud") for name in os.listdir(base))
+        return any(name.startswith(pkg + "_") for name in os.listdir(base))
     except Exception:
         return False
+
+
+def _store_icloud_installed():
+    return store_package_installed("icloud")
+
+
+def remove_store_package(cid, runner=None):
+    """Store 版を現在のユーザーから削除する (管理者権限は不要。通常権限のプロセスで呼ぶこと)。
+    戻り値: (成功したか, メッセージ)"""
+    pkg = STORE_PACKAGES.get(cid)
+    if not pkg:
+        return True, ""
+    script = ("$p = Get-AppxPackage -Name '%s'; if ($p) { $p | Remove-AppxPackage -ErrorAction Stop }; "
+              "if (Get-AppxPackage -Name '%s') { exit 2 } else { exit 0 }") % (pkg, pkg)
+    cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script]
+    try:
+        if runner is not None:
+            code = runner(cmd)
+        else:
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            code = subprocess.run(cmd, creationflags=flags, timeout=300,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+    except Exception as e:
+        return False, "Microsoft Store版を削除できませんでした (%s)" % e
+    if code != 0:
+        return False, "Microsoft Store版を削除できませんでした (終了コード %s)。設定 > アプリ から手動でアンインストールしてください" % code
+    return True, "Microsoft Store版を削除しました"
 
 
 def detect_icloud(entries=None):
@@ -325,7 +361,7 @@ def detect_icloud(entries=None):
         return {"state": STATE_OK, "detail": ""}
     if _store_icloud_installed():
         # Store 版があると公式サイト版のインストールは失敗する (終了コード 1603)。AltStore が動いていればそのままでよい
-        return {"state": STATE_WARN, "detail": "Microsoft Store版が入っています。AltStoreの更新（Refresh）が通っていればこのままで大丈夫です"}
+        return {"state": STATE_WARN, "detail": "Microsoft Store版が入っています（インストール時に削除して公式サイト版に入れ替えます）"}
     return {"state": STATE_MISSING, "detail": ""}
 
 
@@ -792,8 +828,8 @@ def _run_installer(step, kind, path, res, runner, verifier):
     res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
     if not res["ok"]:
         res["detail"] = "インストーラーが失敗しました (終了コード %s)" % code
-        if code == 1603 and step.get("id") == "icloud":
-            res["detail"] += "。Microsoft Store版のiCloudが入っていると失敗します。AltStoreの更新（Refresh）が通っていれば、このままで大丈夫です"
+        if code == 1603 and step.get("id") in STORE_PACKAGES:
+            res["detail"] += "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールして、もう一度お試しください"
     return res
 
 
@@ -914,9 +950,8 @@ def expand_selection(ids, statuses):
     chosen = set(ids)
     if "altserver" in chosen:
         for dep in ("itunes", "icloud"):
-            st = statuses.get(dep, {}).get("state")
-            # iTunes は公式サイト版が必要なので「要確認」でも入れる。iCloud の「要確認」(Store版あり) は入れ直さない
-            if st == STATE_MISSING or (dep == "itunes" and st != STATE_OK):
+            # 「要確認」(Store版など) も公式サイト版に入れ替える
+            if statuses.get(dep, {}).get("state") != STATE_OK:
                 chosen.add(dep)
     if "camera" in chosen and statuses.get("vcredist", {}).get("state") == STATE_MISSING:
         chosen.add("vcredist")
@@ -938,6 +973,7 @@ class SetupEngine:
         self.dir = directory or setup_dir()
         self.downloader = downloader or download_file
         self.winget_finder = winget_finder or (lambda: shutil.which("winget"))
+        self.store_remover = remove_store_package
         self.detector = detector or detect_all
 
     # -- 1コンポーネント分のステップを作る ---------------------------------
@@ -1008,6 +1044,21 @@ class SetupEngine:
                     out["manual"].append({"id": cid, "name": name, "url": src["page"], "text": MANUAL_TEXT.get(cid, "")})
             state["units"] += 1
             set_progress()
+
+        # Store 版は公式サイト版と共存できないので、管理者ジョブの前に通常権限で削除する (Store アプリはユーザー単位のため)
+        kept = []
+        for st in steps:
+            cid = st.get("id")
+            if cid in STORE_PACKAGES and store_package_installed(cid):
+                name = COMPONENT_BY_ID[cid]["name"]
+                emit("stage", text="%s のMicrosoft Store版を削除しています…" % name)
+                ok, msg = self.store_remover(cid)
+                emit("log", text="%s: %s" % (name, msg))
+                if not ok:
+                    out["results"][cid] = {"ok": False, "detail": msg, "code": None}
+                    continue
+            kept.append(st)
+        steps = kept
 
         if steps:
             self._run_elevated(steps, out, emit, state, total_units)
