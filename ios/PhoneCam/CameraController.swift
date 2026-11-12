@@ -36,6 +36,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var micWanted = false          // PC からの "mic"
     private var recAudioWanted = false     // 録画に音声を入れる
     private var audioRequestPending = false
+    // 低遅延マイク (AVAudioEngine)。sessionQueue 上で操作する
+    private let lowLatencyMic = LowLatencyMic()
+    private var llActive = false           // LowLatencyMic で配信中
+    private var llFailed = false           // 起動失敗 → capture 経路にフォールバック (mic が OFF になるまで)
     private var recordHighRes = false      // 録画のため 4K に切り替え中
 
     // 複数スレッドから読む値 (flagLock で保護)
@@ -205,6 +209,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             "available": micAvailable,
             "sampleRate": rate
         ] as [String: Any]
+        s["micPath"] = llActive ? "lowLatency" : "capture"
 
         guard let dev = device else {
             return s
@@ -324,6 +329,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
         if let m = json["mic"] as? [String: Any], let en = m["enabled"] as? NSNumber {
             micWanted = en.boolValue
+            if !micWanted { llFailed = false }
             flagLock.lock()
             micSendFlag = micWanted
             flagLock.unlock()
@@ -730,32 +736,92 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     // MARK: - マイク (sessionQueue 上)
 
-    /// マイクが必要か (PC のマイク or 録画の音声) に合わせて入力/出力を追加・削除する
+    /// マイクが必要か (PC のマイク or 録画の音声) に合わせて経路を切り替える。
+    /// - 録画の音声あり: capture セッション経路 (配信も同じ経路)
+    /// - 配信のみ: LowLatencyMic (AVAudioEngine)。失敗したら capture 経路
     private func updateAudioOnQueue() {
         let want = micWanted || recAudioWanted
-        if want && audioInput == nil {
-            switch AVCaptureDevice.authorizationStatus(for: .audio) {
-            case .authorized:
-                addAudio()
-            case .notDetermined:
-                if audioRequestPending { return }
-                audioRequestPending = true
-                AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
-                    self?.sessionQueue.async {
-                        guard let self = self else { return }
-                        self.audioRequestPending = false
-                        if self.started && (self.micWanted || self.recAudioWanted) {
-                            self.updateAudioOnQueue()
-                        }
-                        self.publishState()
-                    }
-                }
-            default:
-                break
-            }
-        } else if !want && audioInput != nil {
-            removeAudio()
+        if !want {
+            stopLowLatencyOnQueue()
+            if audioInput != nil { removeAudio() }
+            return
         }
+
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            break
+        case .notDetermined:
+            if audioRequestPending { return }
+            audioRequestPending = true
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
+                self?.sessionQueue.async {
+                    guard let self = self else { return }
+                    self.audioRequestPending = false
+                    if self.started && (self.micWanted || self.recAudioWanted) {
+                        self.updateAudioOnQueue()
+                    }
+                    self.publishState()
+                }
+            }
+            return
+        default:
+            return
+        }
+
+        let wantLL = micWanted && !recAudioWanted && !llFailed
+        if wantLL {
+            if !llActive {
+                // capture 側の音声を先に外し、アプリのオーディオセッションを LowLatencyMic に任せる
+                if audioInput != nil { removeAudio() }
+                session.automaticallyConfiguresApplicationAudioSession = false
+                lowLatencyMic.onSamples = { [weak self] data, rate, t in
+                    self?.handleLowLatencySamples(data, rate: rate, captureTime: t)
+                }
+                if lowLatencyMic.start() {
+                    llActive = true
+                    flagLock.lock()
+                    audioRate = lowLatencyMic.sampleRate
+                    flagLock.unlock()
+                    publishState()
+                    return
+                }
+                lowLatencyMic.stop()
+                llFailed = true
+                publishState()
+            } else {
+                return
+            }
+        } else {
+            stopLowLatencyOnQueue()
+        }
+
+        // capture セッション経路
+        if audioInput == nil {
+            session.automaticallyConfiguresApplicationAudioSession = true
+            addAudio()
+        }
+    }
+
+    private func stopLowLatencyOnQueue() {
+        guard llActive else { return }
+        lowLatencyMic.stop()
+        lowLatencyMic.onSamples = nil
+        llActive = false
+        flagLock.lock()
+        audioRate = 0
+        flagLock.unlock()
+        session.automaticallyConfiguresApplicationAudioSession = true
+        publishState()
+    }
+
+    /// LowLatencyMic からのサンプル (LowLatencyMic の送信キュー上)
+    private func handleLowLatencySamples(_ data: Data, rate: Int, captureTime: Double) {
+        flagLock.lock()
+        audioRate = rate
+        let send = micSendFlag
+        flagLock.unlock()
+        guard send, rate > 0, let callback = onAudio else { return }
+        callback(captureTime, rate, data)
     }
 
     private func addAudio() {

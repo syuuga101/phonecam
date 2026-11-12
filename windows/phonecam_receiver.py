@@ -630,6 +630,8 @@ DEFAULT_SETTINGS = {
     "mic_volume": 100,
     "mic_mute": False,
     "mic_delay_ms": 0,
+    "mic_exclusive": None,       # WASAPI排他モード。None=自動 (出力先が CABLE Input のときだけ ON)
+    "mic_priority": "low",       # "low"=低遅延優先 / "stable"=安定優先
     # iPhoneのカメラを動かすタイミング
     "run_mode": "auto",
     "idle_stop_sec": 10,
@@ -716,6 +718,10 @@ def sanitize_settings(s):
         s[key] = min(hi, max(lo, v))
     if not isinstance(s.get("mic_device"), str):
         s["mic_device"] = DEFAULT_SETTINGS["mic_device"]
+    if s.get("mic_exclusive") is not None and not isinstance(s.get("mic_exclusive"), bool):
+        s["mic_exclusive"] = None
+    if s.get("mic_priority") not in AUDIO_PRIORITIES:
+        s["mic_priority"] = DEFAULT_SETTINGS["mic_priority"]
     # カメラの動かし方
     if s.get("run_mode") not in RUN_MODES:
         s["run_mode"] = DEFAULT_SETTINGS["run_mode"]
@@ -1220,23 +1226,48 @@ DEFAULT_DEVICE_LABEL = "システム既定"
 SYSTEM_DEFAULT_KEY = "__default__"
 CABLE_KEYWORD = "CABLE Input"
 AUDIO_START_MS = 20.0       # ジッターを測る前の目標 (これにユーザーの遅延設定を足す)
-AUDIO_MIN_MS = 15.0         # 適応目標の下限
+AUDIO_MIN_MS = 15.0         # 適応目標の下限 (大きめのパケットのとき・低遅延優先)
+AUDIO_MIN_STABLE_MS = 20.0  # 「安定優先」の下限
+AUDIO_MIN_FAST_MS = 8.0     # 「低遅延優先」でパケットが小さく安定しているときの下限
+AUDIO_SMALL_PACKET_MS = 10.0  # 到着間隔がこれ以下なら「小さいパケット」(iPhoneの低遅延マイク経路は約5ms)
 AUDIO_MAX_MS = 120.0        # 適応目標の上限 (ユーザーの遅延設定は別に足す)
 AUDIO_JITTER_FACTOR = 2.5
 AUDIO_JITTER_ALPHA = 1.0 / 16.0
 AUDIO_JITTER_MIN_PACKETS = 10   # この数だけ測ってから適応に切り替える
-AUDIO_SLACK_MS = 40.0       # 目標をこれ以上超えて溜まったら目標まで捨てる
+AUDIO_SLACK_MIN_MS = 20.0   # 目標をこれ以上超えて溜まったら目標まで捨てる (下限。実際は max(20ms, 3×目標))
+AUDIO_SLACK_FACTOR = 3.0
 AUDIO_LAT_SAMPLES = 50
+AUDIO_PRIORITIES = ("low", "stable")   # 低遅延優先 / 安定優先
+EXCLUSIVE_FALLBACK_NOTICE = "排他モードを使えなかったため共有モードで再生中"
+EXCLUSIVE_RATES_FIRST = 48000
+EXCLUSIVE_DTYPES = ("int16", "int32", "float32")
+EXCLUSIVE_BUDGET_SEC = 2.0  # 排他モードの試行にかける時間の上限 (超えたら共有モードへ)
 
 
-def adaptive_audio_target_ms(jitter_ms, delay_ms=0.0):
+def adaptive_audio_target_ms(jitter_ms, delay_ms=0.0, interval_ms=None, low_latency=True):
     """ジッター (パケット到着間隔の揺れ、EWMA, ms) から再生バッファの目標 [ms] を決める。
-    未計測 (None) のときは 20ms + ユーザー遅延。"""
+    未計測 (None) のときは 20ms + ユーザー遅延。
+    interval_ms: パケットの到着間隔 (EWMA)。10ms 以下の小さく安定したパケットなら、下限を
+    低遅延優先で 8ms / 安定優先で 20ms にする。大きいパケットは従来どおり max(15, 2.5×ジッター)
+    (安定優先では下限 20ms)。"""
+    return audio_base_target_ms(jitter_ms, interval_ms, low_latency) + float(delay_ms)
+
+
+def audio_base_target_ms(jitter_ms, interval_ms=None, low_latency=True):
+    """ユーザー遅延を含まない目標 [ms]。"""
     if jitter_ms is None:
-        base = AUDIO_START_MS
+        return AUDIO_START_MS
+    small = interval_ms is not None and interval_ms <= AUDIO_SMALL_PACKET_MS
+    if not low_latency:
+        floor = AUDIO_MIN_STABLE_MS
     else:
-        base = min(AUDIO_MAX_MS, max(AUDIO_MIN_MS, AUDIO_JITTER_FACTOR * float(jitter_ms)))
-    return base + float(delay_ms)
+        floor = AUDIO_MIN_FAST_MS if small else AUDIO_MIN_MS
+    return min(AUDIO_MAX_MS, max(floor, AUDIO_JITTER_FACTOR * float(jitter_ms)))
+
+
+def audio_slack_ms(base_target_ms):
+    """目標をどれだけ超えて溜まったら古い方を捨てるか [ms]: max(20ms, 3×目標)。"""
+    return max(AUDIO_SLACK_MIN_MS, AUDIO_SLACK_FACTOR * float(base_target_ms))
 
 
 def audio_latency_ms(now_pc, capture_phone, offset, buffered_ms):
@@ -1251,6 +1282,8 @@ def audio_latency_ms(now_pc, capture_phone, offset, buffered_ms):
 VBCABLE_PANEL_EXE = "VBCABLE_ControlPanel.exe"
 VBCABLE_LATENCY_HINT = ("VB-CABLEのコントロールパネルで \"Max Latency\" を 7168 → 2048 などに下げると、さらに遅延が減ります"
                         "（音が途切れる場合は戻してください）。管理者として開きます。変更の反映にはPCの再起動が必要なことがあります")
+OBS_AUDIO_TIP = ("OBSで「CABLE Output」の音声ソースのプロパティを開き、「デバイスのタイムスタンプを使用」を"
+                 "オフにすると遅延が減ることがあります")
 VBCABLE_PANEL_MISSING = "VB-CABLEのコントロールパネルが見つかりません（VB-CABLEが入っていないか、別の場所にあります）"
 
 
@@ -1334,10 +1367,16 @@ class AudioEngine:
         self.device_name = ""
         self.dropped_samples = 0
         self.underruns = 0
+        self._out_dtype = "float32"
+        self.low_latency = True        # True: 低遅延優先 (下限 8ms) / False: 安定優先 (下限 20ms)
+        self.mode = ""                 # 再生中のモード: "exclusive" / "shared" / ""
+        self.mode_detail = ""          # 例: "48000 Hz / 2ch / int16 / 5 ms"
+        self.notice = ""               # 排他モードを使えなかったときの案内
         self.offset_fn = None          # () -> iPhone時刻 - PC時刻 の推定 (LatencyTracker.offset)。無ければ None
         self._feed_lock = threading.Lock()   # 専用チャンネルと映像チャンネルの切替で2つのスレッドから呼ばれ得る
         self._jitter = None            # パケット到着間隔の揺れ (EWMA, ms)
         self._jitter_n = 0
+        self._interval = None          # パケット到着間隔 (EWMA, ms)
         self._last_arrival = None
         self._last_dur = 0.0
         self._lat = deque(maxlen=AUDIO_LAT_SAMPLES)
@@ -1365,6 +1404,7 @@ class AudioEngine:
     def _reset_stats(self):
         self._jitter = None
         self._jitter_n = 0
+        self._interval = None
         self._last_arrival = None
         self._lat.clear()
 
@@ -1372,18 +1412,30 @@ class AudioEngine:
         """測定済みのジッター (ms)。測り始めて間もないときは None。"""
         return self._jitter if self._jitter_n >= AUDIO_JITTER_MIN_PACKETS else None
 
+    def interval_ms(self):
+        """パケット到着間隔の平均 (ms)。測り始めて間もないときは None。"""
+        return self._interval if self._jitter_n >= AUDIO_JITTER_MIN_PACKETS else None
+
+    def _base_target_ms(self):
+        return audio_base_target_ms(self.jitter_ms(), self.interval_ms(), self.low_latency)
+
     def _target(self, delay_ms):
-        ms = adaptive_audio_target_ms(self.jitter_ms(), delay_ms)
+        ms = self._base_target_ms() + float(delay_ms)
         return int(self.rate * ms / 1000.0)
 
     def target_ms(self):
-        return adaptive_audio_target_ms(self.jitter_ms(), float(self._get_params()[2]))
+        return self._base_target_ms() + float(self._get_params()[2])
 
     def _note_arrival(self, now, dur_ms):
         """到着間隔が直前のパケットの長さからどれだけずれたかを EWMA で集計する。"""
         last = self._last_arrival
         if last is not None:
-            dev = abs((now - last) * 1000.0 - self._last_dur)
+            gap = (now - last) * 1000.0
+            dev = abs(gap - self._last_dur)
+            if self._interval is None:
+                self._interval = gap
+            else:
+                self._interval += (gap - self._interval) * AUDIO_JITTER_ALPHA
             if self._jitter is None:
                 self._jitter = dev
             else:
@@ -1430,7 +1482,8 @@ class AudioEngine:
             if ring is None:
                 return
             ring.write(x)
-            if ring.count > target + int(self.rate * AUDIO_SLACK_MS / 1000.0):
+            slack = int(self.rate * audio_slack_ms(self._base_target_ms()) / 1000.0)
+            if ring.count > target + slack:
                 self.dropped_samples += ring.drop(ring.count - target)  # 溜まりすぎ: 目標まで古い方を捨てる
 
     def pull(self, frames):
@@ -1480,7 +1533,13 @@ class AudioEngine:
     def _callback(self, outdata, frames, time_info, status):
         try:
             mono = self.pull(frames)
-            outdata[:] = mono[:, None]
+            dt = self._out_dtype
+            if dt == "int16":
+                outdata[:] = (mono * 32767.0).astype(np.int16)[:, None]
+            elif dt == "int32":
+                outdata[:] = (mono.astype(np.float64) * 2147483647.0).astype(np.int32)[:, None]
+            else:
+                outdata[:] = mono[:, None]
         except Exception:
             outdata.fill(0)
 
@@ -1488,9 +1547,86 @@ class AudioEngine:
         if not self._stopping:
             self.dead = True
 
-    def start(self, saved_device):
-        """ストリームを開く。成功なら True。失敗時は self.error に日本語の理由を入れる。"""
+    @staticmethod
+    def default_exclusive(device_name):
+        """排他モードの既定: 出力先の名前に 'CABLE Input' を含むときだけ ON。"""
+        return CABLE_KEYWORD.lower() in str(device_name or "").lower()
+
+    @staticmethod
+    def make_wasapi_settings(exclusive):
+        """sd.WasapiSettings を作る。古い sounddevice や非 Windows では None。"""
+        try:
+            return sd.WasapiSettings(exclusive=bool(exclusive))
+        except Exception:  # AttributeError (WASAPI なし) / TypeError (古い署名)
+            return None
+
+    def _make_stream(self, dev, rate, ch, dtype, blocksize, extra):
+        kw = dict(device=dev["index"], samplerate=rate, channels=ch, dtype=dtype,
+                  blocksize=blocksize, latency="low", callback=self._callback,
+                  finished_callback=self._finished)
+        if extra is not None:
+            kw["extra_settings"] = extra
+        stream = sd.OutputStream(**kw)
+        stream.start()
+        return stream
+
+    def _open_exclusive(self, dev):
+        """WASAPI 排他モードで開く。成功なら (stream, rate, ch, dtype, blocksize)、だめなら例外。"""
+        if "WASAPI" not in str(dev.get("api", "")).upper():
+            raise RuntimeError("WASAPI のデバイスではありません")
+        extra = self.make_wasapi_settings(True)
+        if extra is None:
+            raise RuntimeError("この sounddevice は WASAPI 排他モードに対応していません")
+        rates = []
+        for r in (EXCLUSIVE_RATES_FIRST, int(dev["rate"])):
+            if r and r not in rates:
+                rates.append(r)
+        chans = []
+        for c in (dev["channels"], 2, 1):
+            if c and c >= 1 and c not in chans:
+                chans.append(c)
+        last = None
+        deadline = time.monotonic() + EXCLUSIVE_BUDGET_SEC
+        for rate in rates:
+            for ch in chans:
+                for dtype in EXCLUSIVE_DTYPES:
+                    for blocksize in (max(32, rate // 200), 0):
+                        if time.monotonic() > deadline:
+                            raise last or RuntimeError("時間切れ")
+                        self._out_dtype = dtype
+                        self.setup(rate)
+                        try:
+                            return self._make_stream(dev, rate, ch, dtype, blocksize, extra), rate, ch, dtype, blocksize
+                        except Exception as e:
+                            last = e
+        raise last or RuntimeError("開けませんでした")
+
+    def _open_shared(self, dev):
+        """共有モード (従来どおり: float32、5ms ブロック)。成功なら (stream, rate, ch, 'float32', blocksize)。"""
+        last = None
+        tried = []
+        self._out_dtype = "float32"
+        self.setup(dev["rate"])
+        for ch in (min(2, dev["channels"]), dev["channels"], 1):
+            if ch < 1 or ch in tried:
+                continue
+            tried.append(ch)
+            # 5ms ごとのコールバック (小さいブロック)。デバイスが受け付けなければ既定のブロックサイズで再挑戦
+            for blocksize in (max(32, int(dev["rate"]) // 200), 0):
+                try:
+                    return self._make_stream(dev, dev["rate"], ch, "float32", blocksize, None), dev["rate"], ch, "float32", blocksize
+                except Exception as e:  # 次のブロックサイズ / チャンネル数で再挑戦
+                    last = e
+        raise last or RuntimeError("開けませんでした")
+
+    def start(self, saved_device, exclusive=None):
+        """ストリームを開く。成功なら True。失敗時は self.error に日本語の理由を入れる。
+        exclusive: True/False で排他モードを指定。None なら出力先が 'CABLE Input' のときだけ ON。
+        排他モードで開けなければ自動で共有モードに切り替え、self.notice に案内を入れる。"""
         self.stop()
+        self.notice = ""
+        self.mode = ""
+        self.mode_detail = ""
         if sd is None or np is None:
             self.error = "sounddevice がインストールされていません"
             return False
@@ -1502,40 +1638,38 @@ class AudioEngine:
                 if idx is None or idx < 0:
                     raise RuntimeError("出力デバイスが見つかりません")
                 info = sd.query_devices(idx)
-                dev = {"index": idx, "name": info["name"], "rate": int(info["default_samplerate"]),
+                try:
+                    api = sd.query_hostapis()[info["hostapi"]]["name"]
+                except Exception:
+                    api = ""
+                dev = {"index": idx, "name": info["name"], "api": api, "rate": int(info["default_samplerate"]),
                        "channels": int(info["max_output_channels"])}
-            self.setup(dev["rate"])
-            last = None
-            stream = None
-            tried = []
-            for ch in (min(2, dev["channels"]), dev["channels"], 1):
-                if ch < 1 or ch in tried:
-                    continue
-                tried.append(ch)
-                # 5ms ごとのコールバック (小さいブロック)。デバイスが受け付けなければ既定のブロックサイズで再挑戦
-                for blocksize in (max(32, int(dev["rate"]) // 200), 0):
-                    try:
-                        stream = sd.OutputStream(
-                            device=dev["index"], samplerate=dev["rate"], channels=ch, dtype="float32",
-                            blocksize=blocksize, latency="low", callback=self._callback,
-                            finished_callback=self._finished)
-                        stream.start()
-                        break
-                    except Exception as e:  # 次のブロックサイズ / チャンネル数で再挑戦
-                        last = e
-                        stream = None
-                if stream is not None:
-                    break
-            if stream is None:
-                raise last or RuntimeError("開けませんでした")
+            want_ex = self.default_exclusive(dev["name"]) if exclusive is None else bool(exclusive)
+            opened = None
+            if want_ex:
+                try:
+                    opened = self._open_exclusive(dev)
+                    self.mode = "exclusive"
+                except Exception:
+                    self.notice = EXCLUSIVE_FALLBACK_NOTICE
+                    opened = None
+            if opened is None:
+                opened = self._open_shared(dev)
+                self.mode = "shared"
+            stream, rate, ch, dtype, blocksize = opened
         except Exception as e:
             self.error = "音声の出力先を開けませんでした。別のデバイスを選ぶか、他のアプリが占有していないか確認してください（%s）" % e
+            self.mode = ""
             with self._lock:
                 self.ring = None
             return False
         self._stream = stream
         self.channels = ch
         self.device_name = dev["name"]
+        self.mode_detail = "%d Hz / %dch / %s / %s" % (
+            rate, ch, dtype, ("%.0f ms" % (blocksize * 1000.0 / rate)) if blocksize else "自動")
+        self.underruns = 0
+        self.dropped_samples = 0
         self.dead = False
         self.error = ""
         return True
@@ -1554,6 +1688,7 @@ class AudioEngine:
                 pass
         self._stopping = False
         self.dead = False
+        self.mode = ""
         with self._lock:
             self.ring = None
 
@@ -2845,6 +2980,7 @@ OUTPUT_SIZE_LABELS = [("720p", "1280×720（HD）"), ("1080p", "1920×1080（フ
 CANVAS_LABELS = [("follow", "向きの設定に合わせる"), ("landscape", "横長で固定"), ("portrait", "縦長で固定"),
                  ("native", "映像のサイズそのまま（サイズが変わるとOBS・Discordで再読み込みが必要）")]
 DECODER_LABELS = {"hw": "ハードウェア", "sw": "ソフトウェア"}
+MIC_PATH_LABELS = {"lowLatency": "低遅延", "capture": "通常"}
 AUDIO_PATH_LABELS = {"dedicated": "専用（低遅延）", "shared": "映像と共用"}
 THIN_TEXT = "PCの処理が追いつかないためフレームを間引いています"
 CAM_REG_EXPLAIN = ("OBSやDiscordのカメラ一覧に「PhoneCam」を出すための登録です。普段はそのままで大丈夫です。"
@@ -3949,31 +4085,58 @@ class App:
         self.delay_scale, _, _ = self._slider(f, 5, "音声の遅延", "mic_delay_ms", 0, 500, None,
                                               lambda v: "%d ms" % round(v), 10, as_int=True)
         self._hint(f, 6, "映像より音が早いときに増やして、映像に合わせます", pady=(0, 4))
+
+        pf = ttk.Frame(f)
+        pf.grid(row=7, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Label(pf, text="再生バッファ").pack(side="left")
+        self.prio_var = tk.StringVar(value=self.settings["mic_priority"])
+        self.prio_rbs = []
+        for text, val in (("低遅延優先", "low"), ("安定優先", "stable")):
+            rb = ttk.Radiobutton(pf, text=text, value=val, variable=self.prio_var, command=self._prio_changed)
+            rb.pack(side="left", padx=(10, 0))
+            self.prio_rbs.append(rb)
+        self.excl_var = tk.BooleanVar(value=self._exclusive_effective())
+        self.excl_cb = ttk.Checkbutton(f, text="排他モード（さらに低遅延）", variable=self.excl_var,
+                                       command=self._exclusive_toggled)
+        self.excl_cb.grid(row=8, column=0, columnspan=3, sticky="w", pady=(4, 0))
+
         self.audio_info_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.audio_info_var, foreground=HINT_FG, wraplength=px(520), justify="left").grid(
-            row=7, column=0, columnspan=3, sticky="w")
+            row=9, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self.audio_err_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.audio_err_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
-            row=8, column=0, columnspan=3, sticky="w", pady=(2, 0))
-        ttk.Label(f, text="音声経路").grid(row=9, column=0, sticky="w", pady=(6, 2))
+            row=10, column=0, columnspan=3, sticky="w", pady=(2, 0))
+        ttk.Label(f, text="音声経路").grid(row=11, column=0, sticky="w", pady=(6, 2))
         self.audio_path_var = tk.StringVar(value="-")
-        ttk.Label(f, textvariable=self.audio_path_var).grid(row=9, column=1, columnspan=2, sticky="w", padx=6, pady=(6, 2))
-        ttk.Label(f, text="音声の遅延（PCの出力まで）").grid(row=10, column=0, sticky="w", pady=2)
+        ttk.Label(f, textvariable=self.audio_path_var).grid(row=11, column=1, columnspan=2, sticky="w", padx=6, pady=(6, 2))
+        ttk.Label(f, text="iPhone側のマイク").grid(row=12, column=0, sticky="w", pady=2)
+        self.mic_path_var = tk.StringVar(value="-")
+        ttk.Label(f, textvariable=self.mic_path_var).grid(row=12, column=1, columnspan=2, sticky="w", padx=6)
+        ttk.Label(f, text="再生モード").grid(row=13, column=0, sticky="w", pady=2)
+        self.audio_mode_var = tk.StringVar(value="-")
+        ttk.Label(f, textvariable=self.audio_mode_var, wraplength=px(380), justify="left").grid(
+            row=13, column=1, columnspan=2, sticky="w", padx=6)
+        ttk.Label(f, text="音声の遅延（PCの出力まで）").grid(row=14, column=0, sticky="w", pady=2)
         self.audio_lat_var = tk.StringVar(value="-")
-        ttk.Label(f, textvariable=self.audio_lat_var, font=("", 9, "bold")).grid(row=10, column=1, columnspan=2, sticky="w", padx=6)
-        self._hint(f, 11, "VB-CABLE内部の遅延は含みません")
+        ttk.Label(f, textvariable=self.audio_lat_var, font=("", 9, "bold")).grid(row=14, column=1, columnspan=2, sticky="w", padx=6)
+        self.audio_under_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self.audio_under_var, foreground=HINT_FG, font=("", 8)).grid(
+            row=15, column=0, columnspan=3, sticky="w")
+        self._hint(f, 16, "アンダーランが増えるときは「安定優先」にするか、排他モードをオフにしてください。VB-CABLE内部の遅延は含みません")
         self.vbcable_btn = ttk.Button(f, text="VB-CABLEの遅延設定を開く", command=self._open_vbcable_panel)
-        self.vbcable_btn.grid(row=12, column=0, columnspan=3, sticky="w", pady=(6, 2))
+        self.vbcable_btn.grid(row=17, column=0, columnspan=3, sticky="w", pady=(6, 2))
         self._vbcable_path = find_vbcable_control_panel() if os.name == "nt" else None
         if self._vbcable_path is None:
             self._set_enabled(self.vbcable_btn, False)
-        self._hint(f, 13, VBCABLE_LATENCY_HINT)
-        self._hint(f, 14, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
+        self._hint(f, 18, VBCABLE_LATENCY_HINT)
+        self._hint(f, 19, OBS_AUDIO_TIP)
+        self._hint(f, 20, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
                           "OBSやDiscordでマイクとして「CABLE Output」を選べます", pady=(6, 0))
-        self._hint(f, 15, "初めて使うときは、iPhoneでマイクの許可が必要です")
+        self._hint(f, 21, "初めて使うときは、iPhoneでマイクの許可が必要です")
         if not AUDIO_AVAILABLE:
             self.audio_err_var.set("音声ライブラリ(sounddevice)が見つかりません。install.bat を実行してください")
-            for w in (self.mic_cb, self.audio_dev_cb, self.vol_scale, self.mute_cb, self.delay_scale):
+            for w in [self.mic_cb, self.audio_dev_cb, self.vol_scale, self.mute_cb, self.delay_scale,
+                      self.excl_cb] + self.prio_rbs:
                 self._set_enabled(w, False)
 
     def _open_vbcable_panel(self):
@@ -3997,7 +4160,36 @@ class App:
     def _audio_device_changed(self):
         label = self.audio_dev_var.get()
         self._changed("mic_device", SYSTEM_DEFAULT_KEY if label == DEFAULT_DEVICE_LABEL else label, None)
+        self.excl_var.set(self._exclusive_effective())  # 自動設定のときは出力先に合わせて既定が変わる
         self._apply_audio()
+
+    def _selected_output_name(self):
+        """今の設定で使う出力先の名前 (システム既定のときは既定デバイスの名前、分からなければ空)。"""
+        try:
+            cur = choose_output_device(self._audio_devices, self.settings["mic_device"])
+            if cur is not None:
+                return cur["name"]
+            if sd is not None and self.settings["mic_device"] in ("", SYSTEM_DEFAULT_KEY):
+                idx = sd.default.device[1]
+                if idx is not None and idx >= 0:
+                    return sd.query_devices(idx)["name"]
+        except Exception:
+            pass
+        return ""
+
+    def _exclusive_effective(self):
+        v = self.settings.get("mic_exclusive")
+        if v is None:
+            return AudioEngine.default_exclusive(self._selected_output_name())
+        return bool(v)
+
+    def _exclusive_toggled(self):
+        self._changed("mic_exclusive", bool(self.excl_var.get()), None)
+        self._apply_audio()
+
+    def _prio_changed(self):
+        self._changed("mic_priority", self.prio_var.get(), None)
+        self.audio.low_latency = self.settings["mic_priority"] == "low"
 
     def _apply_audio(self):
         """設定に合わせて音声ストリームを開く/閉じる。"""
@@ -4005,7 +4197,8 @@ class App:
             return
         self._audio_retry_t = time.monotonic()
         if self.settings["mic_enabled"]:
-            self.audio.start(self.settings["mic_device"])
+            self.audio.low_latency = self.settings["mic_priority"] == "low"
+            self.audio.start(self.settings["mic_device"], self.settings["mic_exclusive"])
         else:
             self.audio.stop()
 
@@ -4396,6 +4589,22 @@ class App:
         self.audio_path_var.set(AUDIO_PATH_LABELS.get(path, "-") if connected else "-")
         lat = self.audio.latency_ms() if (AUDIO_AVAILABLE and connected and self.audio.running) else None
         self.audio_lat_var.set("%d ms" % round(lat) if lat is not None else "-")
+        mp = st.get("micPath")
+        if mp is None and isinstance(st.get("mic"), dict):
+            mp = st["mic"].get("micPath")
+        self.mic_path_var.set(MIC_PATH_LABELS.get(mp, "-") if connected and self.settings["mic_enabled"] else "-")
+        if AUDIO_AVAILABLE and self.audio.running:
+            if self.audio.mode == "exclusive":
+                mode = "排他モード（%s）" % self.audio.mode_detail
+            else:
+                mode = "共有モード（%s）" % self.audio.mode_detail
+            if self.audio.notice:
+                mode = self.audio.notice + "\n" + mode
+            self.audio_mode_var.set(mode)
+            self.audio_under_var.set("アンダーラン回数: %d" % self.audio.underruns)
+        else:
+            self.audio_mode_var.set(self.audio.notice or "-")
+            self.audio_under_var.set("")
 
     def _housekeeping(self):
         """1秒ごと: 音声ストリームが止まっていたら、3秒以上あけて開き直す。"""
