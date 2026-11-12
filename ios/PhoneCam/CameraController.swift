@@ -22,6 +22,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     var onAudio: ((Double, Int, Data) -> Void)?
     /// 録画用に元の音声 CMSampleBuffer を渡す (audioQueue 上)
     var onAudioSample: ((CMSampleBuffer) -> Void)?
+    /// 使用中のカメラデバイスが変わったとき (sessionQueue 上・構成の確定後に呼ばれる)。プレビューの RotationCoordinator 用
+    var onDevice: ((AVCaptureDevice) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "phonecam.session")
     private let videoQueue = DispatchQueue(label: "phonecam.video", qos: .userInteractive)
@@ -34,6 +36,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var audioInput: AVCaptureDeviceInput?
     private var audioOutputAdded = false
     private var micWanted = false          // PC からの "mic"
+    private var micMuted = false           // ミュート (true の間は音声パケットを一切送らない)。sessionQueue 上
+    private var phoneEditSeq = 0           // iPhone 側で操作するたびに増やす (sessionQueue 上)
     private var recAudioWanted = false     // 録画に音声を入れる
     private var audioRequestPending = false
     // 低遅延マイク (AVAudioEngine)。sessionQueue 上で操作する
@@ -263,6 +267,12 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             "sampleRate": rate
         ] as [String: Any]
         s["micPath"] = llActive ? "lowLatency" : "capture"
+        s["micMuted"] = micMuted
+        s["phoneEdit"] = [
+            "seq": phoneEditSeq,
+            "lens": activeLens,
+            "micMuted": micMuted
+        ] as [String: Any]
 
         guard let dev = device else {
             return s
@@ -380,12 +390,16 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             parts.insert("torch")
         }
 
+        // PC / iPhone からのミュート (seq は applyOnQueue の呼び出し側 = phoneChange だけが増やす)
+        if let mm = json["micMuted"] as? NSNumber {
+            micMuted = mm.boolValue
+            updateSendFlag()
+        }
+
         if let m = json["mic"] as? [String: Any], let en = m["enabled"] as? NSNumber {
             micWanted = en.boolValue
             if !micWanted { llFailed = false }
-            flagLock.lock()
-            micSendFlag = micWanted
-            flagLock.unlock()
+            updateSendFlag()
             if started {
                 updateAudioOnQueue()
             }
@@ -404,6 +418,31 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
         }
         publishState()
+    }
+
+    /// 音声を送ってよいか (マイクがオン かつ ミュートでない) を flagLock 側へ反映する (sessionQueue 上)
+    private func updateSendFlag() {
+        flagLock.lock()
+        micSendFlag = micWanted && !micMuted
+        flagLock.unlock()
+    }
+
+    /// iPhone 側で操作されたレンズ / ミュートを適用し、phoneEdit.seq を 1 つ進める。どのスレッドからでも可。
+    /// 変化がなければ何もしない (seq も進めない)。
+    func phoneChange(lens: String?, micMuted newMuted: Bool?) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            var json: [String: Any] = [:]
+            if let l = lens, (l == "wide" || l == "ultrawide" || l == "front"), l != self.reqLens {
+                json["lens"] = l
+            }
+            if let m = newMuted, m != self.micMuted {
+                json["micMuted"] = NSNumber(value: m)
+            }
+            guard !json.isEmpty else { return }
+            self.phoneEditSeq += 1
+            self.applyOnQueue(json)
+        }
     }
 
     // MARK: - デバイス / フォーマット
@@ -568,6 +607,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         applyRotationOnQueue()
 
         session.commitConfiguration()
+        onDevice?(dev)
 
         let dim = CMVideoFormatDescriptionGetDimensions(choice.format.formatDescription)
         activeWidth = Int(dim.width)
