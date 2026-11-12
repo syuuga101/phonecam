@@ -316,15 +316,31 @@ def detect_itunes(entries=None):
 STORE_PACKAGES = {"icloud": "AppleInc.iCloud", "itunes": "AppleInc.iTunes"}
 
 
+APPX_REPO_KEY = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
+
+
 def store_package_installed(cid):
-    """Microsoft Store 版 (AppleInc.iCloud_* など) が入っているか"""
+    r"""Microsoft Store 版 (AppleInc.iCloud_* など) が今のユーザーに入っているか。
+    %LOCALAPPDATA%\Packages のフォルダはアンインストール後も残ることがあるので使わず、
+    インストール済みパッケージの登録 (HKCU の AppModel\Repository\Packages) を見る。"""
     pkg = STORE_PACKAGES.get(cid)
     if not pkg:
         return False
+    wr = _winreg()
+    if wr is None:
+        return False
     try:
-        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Packages")
-        return any(name.startswith(pkg + "_") for name in os.listdir(base))
-    except Exception:
+        with wr.OpenKey(wr.HKEY_CURRENT_USER, APPX_REPO_KEY) as root:
+            i = 0
+            while True:
+                try:
+                    name = wr.EnumKey(root, i)
+                except OSError:
+                    return False
+                i += 1
+                if name.startswith(pkg + "_"):
+                    return True
+    except OSError:
         return False
 
 
@@ -357,7 +373,9 @@ def remove_store_package(cid, runner=None):
 
 def detect_icloud(entries=None):
     entries = uninstall_entries() if entries is None else entries
-    if _has_entry(entries, "icloud", exact=True) or _any_file([os.path.join("Common Files", "Apple", "Internet Services", "iCloud.exe")]):
+    # 公式サイト版はアンインストール情報に「iCloud」で登録される。失敗したインストールの残りファイルで
+    # 誤判定しないよう、ファイルの有無ではなく登録で判定する
+    if _has_entry(entries, "icloud", exact=True):
         return {"state": STATE_OK, "detail": ""}
     if _store_icloud_installed():
         # Store 版があると公式サイト版のインストールは失敗する (終了コード 1603)。AltStore が動いていればそのままでよい
