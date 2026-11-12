@@ -7,10 +7,16 @@ import Photos
 
 /// 4K 入力をストリーム解像度へ縮小する (VTPixelTransferSession)。videoQueue 上でのみ使う。
 final class FrameDownscaler {
+    /// 0 以外ならプールから同時に出せるバッファ数の上限 (超えると scale は nil を返す = 呼び出し側で破棄する)
+    private let maxBuffers: Int
     private var session: VTPixelTransferSession?
     private var pool: CVPixelBufferPool?
     private var poolWidth = 0
     private var poolHeight = 0
+
+    init(maxBuffers: Int = 0) {
+        self.maxBuffers = maxBuffers
+    }
 
     deinit {
         if let s = session {
@@ -42,7 +48,13 @@ final class FrameDownscaler {
         }
         guard let p = pool, let s = session else { return nil }
         var out: CVPixelBuffer?
-        let st = CVPixelBufferPoolCreatePixelBuffer(nil, p, &out)
+        let st: CVReturn
+        if maxBuffers > 0 {
+            let aux = [kCVPixelBufferPoolAllocationThresholdKey as String: maxBuffers] as CFDictionary
+            st = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, p, aux, &out)
+        } else {
+            st = CVPixelBufferPoolCreatePixelBuffer(nil, p, &out)
+        }
         guard st == kCVReturnSuccess, let dst = out else { return nil }
         let r = VTPixelTransferSessionTransferImage(s, from: src, to: dst)
         if r != noErr { return nil }
@@ -51,13 +63,25 @@ final class FrameDownscaler {
     }
 }
 
-/// iPhone 側の高画質録画 (HEVC / AAC, .mov)。書き込みはすべて recordQueue 上で行う。
+/// iPhone 側の高画質録画 (HEVC / AAC, 既定 .mp4)。書き込みはすべて recordQueue 上で行う。
 final class Recorder {
     struct Settings {
         var resolution = "same"     // same / 4k
-        var bitrate = 50            // Mbps
+        var preset = "standard"     // standard / high / max
+        var container = "mp4"       // mp4 / mov
+        var explicitBitrate: Int?   // Mbps。指定があるときだけプリセットより優先
         var includeAudio = true
         var saveToPhotos = true
+
+        /// 実際に使うビットレート (Mbps)。highRes は 4K クラスの解像度か。
+        func effectiveBitrate(highRes: Bool) -> Int {
+            if let b = explicitBitrate { return b }
+            switch preset {
+            case "high": return highRes ? 40 : 16
+            case "max": return highRes ? 60 : 25
+            default: return highRes ? 25 : 10
+            }
+        }
     }
 
     /// 録画が自動で止まったとき (空き容量不足など。任意のスレッド)
@@ -82,6 +106,7 @@ final class Recorder {
     private var currentURL: URL?
     private var pendingVideo = 0
     private var pendingAudio = 0
+    private var droppedFrames = 0
     private var lastAudioRate = 0
     private var sessionSettings = Settings()
     private var sessionFps = 30
@@ -99,9 +124,15 @@ final class Recorder {
     private var expectedLongSide = 0
     private var armedAt = Date()
     private var lastSpaceCheck = Date.distantPast
+    /// カメラのバッファを長く持たないよう、書き込み用にコピーしたフレームを使う (recordQueue 上のみ)
+    private let copier = FrameDownscaler(maxBuffers: 8)
 
     init() {
-        if let d = UserDefaults.standard.dictionary(forKey: Recorder.defaultsKey) {
+        if var d = UserDefaults.standard.dictionary(forKey: Recorder.defaultsKey) {
+            // 旧形式 (preset なし) は bitrate 50 固定が保存されているので引き継がない
+            if d["preset"] == nil {
+                d.removeValue(forKey: "bitrate")
+            }
             Recorder.merge(d, into: &settings)
         }
     }
@@ -112,8 +143,19 @@ final class Recorder {
         if let r = json["resolution"] as? String, (r == "same" || r == "4k") {
             s.resolution = r
         }
+        var sawPreset = false
+        if let p = json["preset"] as? String, (p == "standard" || p == "high" || p == "max") {
+            s.preset = p
+            sawPreset = true
+        }
+        if let c = json["container"] as? String, (c == "mp4" || c == "mov") {
+            s.container = c
+        }
         if let b = json["bitrate"] as? NSNumber {
-            s.bitrate = min(max(b.intValue, 10), 100)
+            s.explicitBitrate = min(max(b.intValue, 10), 100)
+        } else if sawPreset {
+            // bitrate なしで preset が来たらプリセットに従う
+            s.explicitBitrate = nil
         }
         if let a = json["includeAudio"] as? NSNumber {
             s.includeAudio = a.boolValue
@@ -128,12 +170,16 @@ final class Recorder {
         Recorder.merge(json, into: &settings)
         let s = settings
         lk.unlock()
-        let dict: [String: Any] = [
+        var dict: [String: Any] = [
             "resolution": s.resolution,
-            "bitrate": s.bitrate,
+            "preset": s.preset,
+            "container": s.container,
             "includeAudio": s.includeAudio,
             "saveToPhotos": s.saveToPhotos
         ]
+        if let b = s.explicitBitrate {
+            dict["bitrate"] = b
+        }
         UserDefaults.standard.set(dict, forKey: Recorder.defaultsKey)
     }
 
@@ -147,7 +193,9 @@ final class Recorder {
         let s = currentSettings()
         return [
             "resolution": s.resolution,
-            "bitrate": s.bitrate,
+            "preset": s.preset,
+            "container": s.container,
+            "bitrate": s.effectiveBitrate(highRes: s.resolution == "4k"),
             "includeAudio": s.includeAudio,
             "saveToPhotos": s.saveToPhotos
         ]
@@ -195,6 +243,7 @@ final class Recorder {
         let url = currentURL
         let res = settings.resolution
         let sessionRes = sessionSettings.resolution
+        let drops = droppedFrames
         lk.unlock()
 
         var seconds = 0.0
@@ -214,7 +263,8 @@ final class Recorder {
             "bytes": Int(bytes),
             "freeBytes": Int(Recorder.freeBytes()),
             "resolution": isActive ? sessionRes : res,
-            "error": err
+            "error": err,
+            "droppedFrames": drops
         ]
     }
 
@@ -241,6 +291,7 @@ final class Recorder {
         endDate = nil
         finishedBytes = 0
         currentURL = nil
+        droppedFrames = 0
         sessionSettings = settings
         lk.unlock()
 
@@ -308,8 +359,14 @@ final class Recorder {
     // MARK: - フレーム入力
 
     func appendVideo(_ pixelBuffer: CVPixelBuffer, pts: CMTime) {
+        // カメラのバッファを長く持たないため、書き込み待ちは 2 枚まで。超えたら捨てる (カメラのキューは待たせない)
         lk.lock()
-        guard active && armed, pendingVideo < 5 else {
+        guard active && armed else {
+            lk.unlock()
+            return
+        }
+        if pendingVideo >= 2 {
+            droppedFrames += 1
             lk.unlock()
             return
         }
@@ -390,9 +447,24 @@ final class Recorder {
         }
         guard wr.status == .writing else { return }
         guard CMTimeCompare(pts, sessionStart) >= 0 else { return }
-        if vi.isReadyForMoreMediaData {
-            _ = ad.append(pb, withPresentationTime: pts)
+        guard vi.isReadyForMoreMediaData else {
+            noteDroppedFrame()
+            return
         }
+        // カメラのバッファをここで手放すため、書き込み用の自前バッファへコピーしてから渡す
+        guard let frame = copier.scale(pb, width: w, height: h) else {
+            noteDroppedFrame()
+            return
+        }
+        if !ad.append(frame, withPresentationTime: pts) {
+            noteDroppedFrame()
+        }
+    }
+
+    private func noteDroppedFrame() {
+        lk.lock()
+        droppedFrames += 1
+        lk.unlock()
     }
 
     private func handleAudio(_ sb: CMSampleBuffer) {
@@ -405,11 +477,11 @@ final class Recorder {
         }
     }
 
-    private func nextURL() -> URL {
+    private func nextURL(ext: String) -> URL {
         let dir = Recorder.documentsURL()
         var seg = segmentIndex
         while true {
-            let name = seg <= 1 ? "\(baseName).mov" : "\(baseName)_\(seg).mov"
+            let name = seg <= 1 ? "\(baseName).\(ext)" : "\(baseName)_\(seg).\(ext)"
             let url = dir.appendingPathComponent(name)
             if !FileManager.default.fileExists(atPath: url.path) {
                 segmentIndex = seg
@@ -426,16 +498,23 @@ final class Recorder {
         let rate = lastAudioRate > 0 ? lastAudioRate : 48000
         lk.unlock()
 
-        let url = nextURL()
+        let useMov = (s.container == "mov")
+        let fileType: AVFileType = useMov ? .mov : .mp4
+        let url = nextURL(ext: useMov ? "mov" : "mp4")
+        // 4K クラスか (プリセットのビットレート表を切り替える)
+        let mbps = s.effectiveBitrate(highRes: max(width, height) >= 3000)
         do {
-            let wr = try AVAssetWriter(outputURL: url, fileType: .mov)
+            let wr = try AVAssetWriter(outputURL: url, fileType: fileType)
+            // 録画は低遅延が不要なので B フレームを使い、同じ画質で小さいファイルにする (HEVC は hvc1 で書かれる)
             let videoSettings: [String: Any] = [
                 AVVideoCodecKey: AVVideoCodecType.hevc,
                 AVVideoWidthKey: width,
                 AVVideoHeightKey: height,
                 AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: s.bitrate * 1_000_000,
-                    AVVideoExpectedSourceFrameRateKey: fps
+                    AVVideoAverageBitRateKey: mbps * 1_000_000,
+                    AVVideoExpectedSourceFrameRateKey: fps,
+                    AVVideoAllowFrameReorderingKey: true,
+                    AVVideoMaxKeyFrameIntervalDurationKey: 2
                 ] as [String: Any]
             ]
             let vi = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)

@@ -3,8 +3,13 @@ import Network
 import CoreMedia
 
 /// TCP サーバ。メイン (5555) と音声専用チャンネル (5556) の両方にこのクラスを使う。
-/// USB (usbmux 経由のループバック) と Wi-Fi の両方を受け付ける。
+/// USB (usbmux 経由のループバック) は信頼する。Wi-Fi は SecurityManager の許可とペアリングコードが必要。
 final class StreamServer {
+    enum Role {
+        case main
+        case audio
+    }
+
     static let port: UInt16 = 5555
     static let audioPort: UInt16 = 5556
 
@@ -13,11 +18,16 @@ final class StreamServer {
     private let ignoreIncoming: Bool
     /// 未送信の音声をこの時間 (ms) 分までに制限する
     private let audioCapMs: Int
+    private let role: Role
+    private let security: SecurityManager
 
-    init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200) {
+    init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200,
+         role: Role = .main, security: SecurityManager) {
         self.port = port
         self.ignoreIncoming = ignoreIncoming
         self.audioCapMs = max(10, audioCapMs)
+        self.role = role
+        self.security = security
     }
 
     var onControl: (([String: Any]) -> Void)?
@@ -26,7 +36,9 @@ final class StreamServer {
 
     private let queue = DispatchQueue(label: "phonecam.server")
     private var listener: NWListener?
+    private var listenerStartedAt = Date.distantPast
     private var running = false
+    private var healthTimer: DispatchSourceTimer?
 
     // 以下は lock で保護 (どのスレッドからも送信できるようにする)
     private let lock = NSLock()
@@ -38,8 +50,30 @@ final class StreamServer {
     private var networkDropped = 0
     private var audioDropped = 0
 
-    // 受信パーサは queue 上でのみ触る
-    private var parser = PacketParser()
+    /// 1 本の接続 (queue 上でのみ触る)
+    private final class Session {
+        let conn: NWConnection
+        let ip: String
+        let loopback: Bool
+        var authorized: Bool
+        var ready = false
+        var closed = false
+        var isClient = false
+        var gen = 0
+        var parser = PacketParser()
+        var timeout: DispatchWorkItem?
+
+        init(conn: NWConnection, ip: String, loopback: Bool, authorized: Bool) {
+            self.conn = conn
+            self.ip = ip
+            self.loopback = loopback
+            self.authorized = authorized
+        }
+    }
+
+    // queue 上でのみ触る
+    private var activeSession: Session?
+    private var pendings: [Session] = []     // 認証待ちの Wi-Fi 接続 (クライアントにはまだならない)
 
     // MARK: - 開始 / 停止
 
@@ -48,6 +82,7 @@ final class StreamServer {
             guard let self = self else { return }
             self.running = true
             self.startListener()
+            self.startHealthTimer()
         }
     }
 
@@ -55,10 +90,47 @@ final class StreamServer {
         queue.async { [weak self] in
             guard let self = self else { return }
             self.running = false
+            self.healthTimer?.cancel()
+            self.healthTimer = nil
             self.listener?.cancel()
             self.listener = nil
+            let ps = self.pendings
+            for p in ps { self.closeSession(p) }
             self.dropClient(generation: nil)
         }
+    }
+
+    /// 前面に戻ったときなどに、リスナーが死んでいれば作り直す。どのスレッドからでも可。
+    func ensureListening() {
+        queue.async { [weak self] in
+            self?.checkListenerHealth()
+        }
+    }
+
+    private func startHealthTimer() {
+        guard healthTimer == nil else { return }
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 5.0, repeating: 5.0)
+        t.setEventHandler { [weak self] in
+            self?.checkListenerHealth()
+        }
+        t.resume()
+        healthTimer = t
+    }
+
+    /// queue 上: リスナーが .ready でなければ作り直す
+    private func checkListenerHealth() {
+        guard running else { return }
+        guard let l = listener else {
+            startListener()
+            return
+        }
+        if case .ready = l.state { return }
+        // 作った直後は準備中なので少し待つ
+        if Date().timeIntervalSince(listenerStartedAt) < 3.0 { return }
+        l.cancel()
+        listener = nil
+        startListener()
     }
 
     private func startListener() {
@@ -80,7 +152,7 @@ final class StreamServer {
         newListener.stateUpdateHandler = { [weak self, weak newListener] state in
             guard let self = self else { return }
             switch state {
-            case .failed(_):
+            case .failed(_), .cancelled:
                 newListener?.cancel()
                 self.queue.async {
                     if self.listener === newListener {
@@ -96,6 +168,7 @@ final class StreamServer {
             self?.handleNewConnection(conn)
         }
         listener = newListener
+        listenerStartedAt = Date()
         newListener.start(queue: queue)
     }
 
@@ -106,15 +179,64 @@ final class StreamServer {
         }
     }
 
-    // MARK: - クライアント管理 (queue 上)
+    // MARK: - 接続の受け入れ (queue 上)
 
     private func handleNewConnection(_ conn: NWConnection) {
-        // 新しい接続が古い接続を置き換える
+        let info = StreamServer.remoteInfo(conn.endpoint)
+
+        if !info.loopback {
+            // Wi-Fi: 許可が無い / ロックアウト中 / 音声チャンネルで認証済み IP 以外 は即切断。
+            // 既存のクライアントは置き換えない。
+            if !security.wifiAllowed || security.isLockedOut(info.ip) {
+                conn.cancel()
+                return
+            }
+            if role == .audio && !security.isAuthorizedIP(info.ip) {
+                conn.cancel()
+                return
+            }
+        }
+
+        let needsAuth = (role == .main && !info.loopback)
+        let s = Session(conn: conn, ip: info.ip, loopback: info.loopback, authorized: !needsAuth)
+
+        conn.stateUpdateHandler = { [weak self, weak s] state in
+            guard let self = self, let s = s else { return }
+            switch state {
+            case .ready:
+                self.queue.async { self.sessionReady(s) }
+            case .failed(_), .cancelled:
+                self.queue.async { self.closeSession(s) }
+            default:
+                break
+            }
+        }
+
+        if s.authorized {
+            activate(s)
+        } else {
+            pendings.append(s)
+            if pendings.count > 4 {
+                let oldest = pendings.removeFirst()
+                closeSession(oldest)
+            }
+        }
+
+        // 接続確立が終わらないまま止まった接続を捨てる
+        queue.asyncAfter(deadline: .now() + 10.0) { [weak self, weak s] in
+            guard let self = self, let s = s, !s.ready, !s.closed else { return }
+            self.closeSession(s)
+        }
+        conn.start(queue: queue)
+    }
+
+    /// 認可済みの接続を現在のクライアントにする (古いクライアントは置き換える)
+    private func activate(_ s: Session) {
         lock.lock()
         let old = client
         generation += 1
-        let gen = generation
-        client = conn
+        s.gen = generation
+        client = s.conn
         clientReady = false
         pendingVideoFrames = 0
         pendingAudioBytes = 0
@@ -122,36 +244,79 @@ final class StreamServer {
         audioDropped = 0
         lock.unlock()
 
-        old?.cancel()
-        parser.reset()
-
-        let kind = StreamServer.describe(conn.endpoint)
-
-        conn.stateUpdateHandler = { [weak self, weak conn] state in
-            guard let self = self, let conn = conn else { return }
-            switch state {
-            case .ready:
-                self.queue.async {
-                    self.lock.lock()
-                    let current = (self.generation == gen)
-                    if current { self.clientReady = true }
-                    self.lock.unlock()
-                    guard current else { return }
-                    self.receiveLoop(conn, generation: gen)
-                    self.onClientConnected?(kind)
-                }
-            case .failed(_), .cancelled:
-                self.queue.async {
-                    self.dropClient(generation: gen)
-                }
-            default:
-                break
-            }
+        if let prev = activeSession {
+            prev.closed = true
+            prev.timeout?.cancel()
+            prev.timeout = nil
         }
-        conn.start(queue: queue)
+        activeSession = s
+        s.isClient = true
+        old?.cancel()
+
+        if role == .main {
+            security.setAuthorizedIP(s.loopback ? nil : s.ip)
+        }
+        if s.ready {
+            markClientReady(s)
+        }
     }
 
-    /// generation が nil なら無条件、それ以外は一致した場合のみ切断扱いにする
+    private func markClientReady(_ s: Session) {
+        lock.lock()
+        let current = (generation == s.gen)
+        if current { clientReady = true }
+        lock.unlock()
+        guard current else { return }
+        onClientConnected?(s.loopback ? "USB" : "Wi-Fi")
+    }
+
+    private func sessionReady(_ s: Session) {
+        guard !s.closed, !s.ready else { return }
+        s.ready = true
+        receiveLoop(s)
+        if s.isClient {
+            markClientReady(s)
+        } else if !s.authorized {
+            // 認証前: authRequired の status を 1 つだけ送り、5 秒以内の auth を待つ
+            sendRaw(s, status: ["authRequired": true, "authOk": false])
+            let item = DispatchWorkItem { [weak self, weak s] in
+                guard let self = self, let s = s, !s.authorized, !s.closed else { return }
+                self.authFailed(s)
+            }
+            s.timeout = item
+            queue.asyncAfter(deadline: .now() + 5.0, execute: item)
+        }
+    }
+
+    private func authFailed(_ s: Session) {
+        security.noteFailure(s.ip)
+        closeSession(s)
+    }
+
+    private func authSucceeded(_ s: Session) {
+        security.noteSuccess(s.ip)
+        s.authorized = true
+        s.timeout?.cancel()
+        s.timeout = nil
+        pendings.removeAll { $0 === s }
+        activate(s)
+    }
+
+    /// 接続を閉じて後始末する (冪等)
+    private func closeSession(_ s: Session) {
+        if s.closed { return }
+        s.closed = true
+        s.timeout?.cancel()
+        s.timeout = nil
+        pendings.removeAll { $0 === s }
+        if s.isClient && activeSession === s {
+            dropClient(generation: s.gen)
+        } else {
+            s.conn.cancel()
+        }
+    }
+
+    /// generation が nil なら無条件、それ以外は一致した場合のみ切断扱いにする (queue 上)
     private func dropClient(generation gen: Int?) {
         lock.lock()
         if let g = gen, g != generation {
@@ -166,49 +331,114 @@ final class StreamServer {
         pendingAudioBytes = 0
         lock.unlock()
 
+        if let a = activeSession {
+            a.closed = true
+            a.timeout?.cancel()
+            a.timeout = nil
+            activeSession = nil
+        }
+        if role == .main {
+            security.setAuthorizedIP(nil)
+        }
         conn?.cancel()
         if wasConnected {
             onClientDisconnected?()
         }
     }
 
-    private func receiveLoop(_ conn: NWConnection, generation gen: Int) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            guard let self = self else { return }
-            self.lock.lock()
-            let current = (self.generation == gen)
-            self.lock.unlock()
-            guard current else { return }
-
+    private func receiveLoop(_ s: Session) {
+        s.conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            guard let self = self, !s.closed else { return }
             if let data = data, !data.isEmpty, !self.ignoreIncoming {
-                self.parser.append(data)
-                while let msg = self.parser.next() {
-                    if msg.type == PacketType.control {
-                        if let obj = try? JSONSerialization.jsonObject(with: msg.payload) as? [String: Any] {
-                            if let ping = obj["ping"] as? NSNumber {
-                                self.sendPong(ping)
-                            }
-                            self.onControl?(obj)
-                        }
-                    }
+                s.parser.append(data)
+                while let msg = s.parser.next() {
+                    self.handleMessage(s, msg)
+                    if s.closed { break }
                 }
             }
+            if s.closed { return }
             if error != nil || isComplete {
-                self.dropClient(generation: gen)
+                self.closeSession(s)
                 return
             }
-            self.receiveLoop(conn, generation: gen)
+            self.receiveLoop(s)
         }
     }
 
-    private static func describe(_ endpoint: NWEndpoint) -> String {
-        if case let .hostPort(host, _) = endpoint {
-            let s = "\(host)"
-            if s.hasPrefix("127.") || s == "::1" || s.hasPrefix("::ffff:127.") || s == "localhost" {
-                return "USB"
+    private func handleMessage(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard msg.type == PacketType.control,
+              let obj = try? JSONSerialization.jsonObject(with: msg.payload) as? [String: Any] else { return }
+
+        if !s.authorized {
+            // 認証前は auth 以外を無視する (pong も返さない)
+            guard let a = obj["auth"] as? [String: Any] else { return }
+            let code = (a["code"] as? String) ?? ""
+            if security.verify(code) {
+                authSucceeded(s)
+            } else {
+                authFailed(s)
+            }
+            return
+        }
+        // 認可済みクライアントが送る auth は無視する (他のキーは通常どおり処理)
+        if let ping = obj["ping"] as? NSNumber {
+            sendPong(ping)
+        }
+        onControl?(obj)
+    }
+
+    /// 認証前の接続へ status を直接送る
+    private func sendRaw(_ s: Session, status: [String: Any]) {
+        guard JSONSerialization.isValidJSONObject(status),
+              let json = try? JSONSerialization.data(withJSONObject: status) else { return }
+        s.conn.send(content: Packet.encode(type: PacketType.status, payload: json),
+                    completion: .contentProcessed({ _ in }))
+    }
+
+    /// Wi-Fi 側の接続 (認証待ちも含む) をすべて切る。Wi-Fi 許可をオフにしたときやコード変更時。
+    func disconnectNonLoopback() {
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            let ps = self.pendings
+            for p in ps where !p.loopback {
+                self.closeSession(p)
+            }
+            if let a = self.activeSession, !a.loopback {
+                self.dropClient(generation: nil)
             }
         }
-        return "Wi-Fi"
+    }
+
+    /// 接続元のアドレス文字列とループバックかどうか。ループバック以外 (不明を含む) は Wi-Fi 扱い。
+    private static func remoteInfo(_ endpoint: NWEndpoint) -> (ip: String, loopback: Bool) {
+        guard case let .hostPort(host, _) = endpoint else {
+            return ("unknown", false)
+        }
+        switch host {
+        case .ipv4(let addr):
+            return ipv4Info([UInt8](addr.rawValue))
+        case .ipv6(let addr):
+            let b = [UInt8](addr.rawValue)
+            guard b.count == 16 else { return ("\(addr)", false) }
+            let mapped = b[0..<10].allSatisfy { $0 == 0 } && b[10] == 0xFF && b[11] == 0xFF
+            if mapped {
+                // ::ffff:a.b.c.d (IPv4 射影アドレス)
+                return ipv4Info(Array(b[12..<16]))
+            }
+            let loop = b[0..<15].allSatisfy { $0 == 0 } && b[15] == 1
+            let text = b.map { String(format: "%02x", $0) }.joined()
+            return (text, loop)
+        case .name(let name, _):
+            return (name, name == "localhost")
+        @unknown default:
+            return ("\(host)", false)
+        }
+    }
+
+    private static func ipv4Info(_ b: [UInt8]) -> (ip: String, loopback: Bool) {
+        guard b.count == 4 else { return ("unknown", false) }
+        let text = "\(b[0]).\(b[1]).\(b[2]).\(b[3])"
+        return (text, b[0] == 127)
     }
 
     // MARK: - 送信 (どのスレッドからでも可)

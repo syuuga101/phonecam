@@ -65,6 +65,7 @@ AUDIO_RCVBUF = 64 * 1024
 AUDIO_RETRY_SEC = 2.0
 USBMUX_ADDR = ("127.0.0.1", 27015)
 RECONNECT_SEC = 2.0
+AUTH_REFUSED_RETRY_SEC = 10.0   # Wi-Fi 接続を断られたときの再試行間隔 (締め出しを避けるため長めに)
 
 MSG_VIDEO = 1        # H.264 アクセスユニット
 MSG_VIDEO_HEVC = 2   # HEVC アクセスユニット (Annex B)
@@ -621,9 +622,14 @@ DEFAULT_SETTINGS = {
     "screen_auto": 0,
     # iPhone側の録画
     "rec_resolution": "same",
-    "rec_bitrate": 50,
+    "rec_bitrate": 50,           # 詳細設定でビットレートを直接指定したときの値 (Mbps)
+    "rec_custom_bitrate": False, # True のときだけ rec_bitrate を送る (False は画質プリセットに任せる)
+    "rec_preset": "standard",    # 画質プリセット: standard / high / max
+    "rec_container": "mp4",      # mp4 / mov
     "rec_audio": True,
     "rec_photos": True,
+    # Wi-Fi 接続のペアリングコード (iPhoneの画面に出る6桁。LAN内だけで使う。設定に保存してよい唯一の秘密)
+    "pair_code": "",
     # iPhoneのマイク
     "mic_enabled": False,
     "mic_device": "",
@@ -664,6 +670,13 @@ COLOR_DEFAULTS = {"brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "sharpn
 LENSES = ("wide", "ultrawide", "front")
 SCREEN_AUTO_VALUES = (0, 10, 30, 60)
 REC_RESOLUTIONS = ("same", "4k")
+REC_PRESETS = ("standard", "high", "max")
+REC_CONTAINERS = ("mp4", "mov")
+# 画質プリセット別のビットレート (Mbps)。iPhone側の対応表と同じ (HEVC)
+REC_PRESET_MBPS = {"1080p": {"standard": 10, "high": 16, "max": 25},
+                   "4k": {"standard": 25, "high": 40, "max": 60}}
+REC_AUDIO_KBPS = 128             # AAC
+PAIR_CODE_LEN = 6
 RUN_MODES = ("auto", "always", "manual")
 IDLE_STOP_VALUES = (10, 30, 60)
 # 整数の設定 (キー: (最小, 最大))
@@ -672,8 +685,91 @@ INT_RANGES = {
     "mic_volume": (0, 200),
     "mic_delay_ms": (0, 500),
 }
-BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "mic_enabled", "mic_mute", "setup_done", "hw_decode")
+BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "setup_done", "hw_decode")
 AUDIO_AVAILABLE = sd is not None and np is not None
+
+
+def normalize_pair_code(value):
+    """ペアリングコードを数字だけ・最大6桁にそろえる (全角数字も半角に直す)。"""
+    if not isinstance(value, str):
+        return ""
+    digits = "".join(str(int(ch)) for ch in value if ch.isdecimal())  # 全角数字は半角に直す
+    return digits[:PAIR_CODE_LEN]
+
+
+def valid_pair_code(value):
+    return isinstance(value, str) and len(value) == PAIR_CODE_LEN and value.isascii() and value.isdigit()
+
+
+def build_auth_control(settings):
+    """接続直後に最初に送る認証メッセージ。USB (ループバック) では iPhone が無視するので送っても無害。"""
+    return {"auth": {"code": normalize_pair_code(settings.get("pair_code"))}}
+
+
+AUTH_FAIL_TEXT = "ペアリングコードが違います。iPhoneの画面に表示されている6桁のコードを入力してください"
+AUTH_REFUSED_TEXT = ("iPhoneに接続を断られました。iPhoneアプリで「Wi-Fiからの接続を許可」がオンになっているか確認してください"
+                     "（コードを何度も間違えた場合は1分ほど待ってください）")
+
+
+def auth_status_effect(st):
+    """iPhone のステータスから認証の状態を読む: "required" (認証待ち) / "ok" (認証済み・認証不要) / None。
+    authRequired を出さない古いiPhoneアプリは認証不要として扱う。"""
+    if not isinstance(st, dict):
+        return None
+    if st.get("authRequired") and not st.get("authOk"):
+        return "required"
+    return "ok"
+
+
+def auth_failure_kind(mode, authed, saw_required):
+    """接続が閉じたときの原因: "code" (コード違い) / "refused" (Wi-Fi拒否など) / None (認証とは無関係)。"""
+    if mode != "wifi" or authed:
+        return None
+    return "code" if saw_required else "refused"
+
+
+def rec_effective_resolution(settings):
+    """録画の実解像度クラス: "4k" か "1080p" (配信と同じ設定のときは配信の解像度に従う。720p は 1080p 扱い)。"""
+    if settings.get("rec_resolution") == "4k":
+        return "4k"
+    if settings.get("rec_resolution") == "same" and settings.get("resolution") == "4K":
+        return "4k"
+    return "1080p"
+
+
+def rec_video_mbps(settings):
+    """録画の映像ビットレート (Mbps)。詳細設定で指定していればその値、なければ画質プリセットの値。"""
+    if settings.get("rec_custom_bitrate"):
+        return int(settings.get("rec_bitrate", DEFAULT_SETTINGS["rec_bitrate"]))
+    table = REC_PRESET_MBPS[rec_effective_resolution(settings)]
+    return table.get(settings.get("rec_preset"), table["standard"])
+
+
+def rec_mb_per_min(video_mbps, audio=True):
+    """1分あたりの録画サイズ (MB)。映像 Mbps × 7.5 MB/分 + 音声 AAC 128 kbps (約1 MB/分)。"""
+    bits = video_mbps * 1_000_000 + (REC_AUDIO_KBPS * 1000 if audio else 0)
+    return bits / 8.0 * 60.0 / 1_000_000
+
+
+def rec_estimate_text(settings):
+    mbps = rec_video_mbps(settings)
+    audio = bool(settings.get("rec_audio", True))
+    per_min = rec_mb_per_min(mbps, audio)
+    per_hour_gb = per_min * 60.0 / 1000.0
+    res = "4K" if rec_effective_resolution(settings) == "4k" else "フルHD"
+    detail = "映像 %d Mbps" % mbps + (" + 音声 AAC %d kbps" % REC_AUDIO_KBPS if audio else "")
+    return "%s・目安 約 %d MB/分（%s）、1時間で約 %.1f GB" % (res, round(per_min), detail, per_hour_gb)
+
+
+def format_drop_reasons(reasons):
+    """カメラのドロップ理由 (遅延 / バッファ不足 / 不連続) を「遅延 2 / バッファ不足 0 / 不連続 1」の形にする。"""
+    if not isinstance(reasons, dict):
+        return "-"
+    parts = []
+    for key, label in CAMERA_DROP_LABELS:
+        v = reasons.get(key)
+        parts.append("%s %d" % (label, v) if isinstance(v, (int, float)) and not isinstance(v, bool) else "%s -" % label)
+    return " / ".join(parts)
 
 
 def mirror_key(settings):
@@ -710,6 +806,11 @@ def sanitize_settings(s):
     s["screen_auto"] = auto if auto in SCREEN_AUTO_VALUES else DEFAULT_SETTINGS["screen_auto"]
     if s.get("rec_resolution") not in REC_RESOLUTIONS:
         s["rec_resolution"] = DEFAULT_SETTINGS["rec_resolution"]
+    if s.get("rec_preset") not in REC_PRESETS:
+        s["rec_preset"] = DEFAULT_SETTINGS["rec_preset"]
+    if s.get("rec_container") not in REC_CONTAINERS:
+        s["rec_container"] = DEFAULT_SETTINGS["rec_container"]
+    s["pair_code"] = normalize_pair_code(s.get("pair_code"))
     for key, (lo, hi) in INT_RANGES.items():
         try:
             v = int(round(float(s.get(key))))
@@ -839,10 +940,14 @@ def build_control(settings, group):
     if group in ("all", "recordSettings"):
         c["recordSettings"] = {
             "resolution": settings["rec_resolution"],
-            "bitrate": int(settings["rec_bitrate"]),
+            "preset": settings.get("rec_preset", "standard"),
+            "container": settings.get("rec_container", "mp4"),
             "includeAudio": bool(settings["rec_audio"]),
             "saveToPhotos": bool(settings["rec_photos"]),
         }
+        if settings.get("rec_custom_bitrate"):
+            # 詳細設定で直接指定したときだけ送る (iPhone側は bitrate があればプリセットより優先する)
+            c["recordSettings"]["bitrate"] = int(settings["rec_bitrate"])
     if group in ("all", "mic"):
         # sounddevice が無いと再生できないので、iPhone側でも有効にしない
         c["mic"] = {"enabled": bool(settings["mic_enabled"]) and AUDIO_AVAILABLE}
@@ -1717,6 +1822,7 @@ class SharedState:
         self.audio_path = "-"        # "dedicated" (専用チャンネル) / "shared" (映像と共用) / "-"
         self.thin_total = 0          # PCの処理が追いつかず間引いたフレーム数 (デコード省略 + 出力で上書き)
         self.thin_last = 0.0         # 最後に間引いた時刻 (time.monotonic)
+        self.auth_state = ""         # "" / "required" (認証待ち) / "failed" (コード違い) / "refused" (拒否)
 
     def update(self, **kw):
         with self._lock:
@@ -1739,6 +1845,7 @@ class SharedState:
                 "audio_path": self.audio_path,
                 "thin_total": self.thin_total,
                 "thin_last": self.thin_last,
+                "auth_state": self.auth_state,
             }
 
 
@@ -2584,6 +2691,12 @@ class Link:
         self._decoder_key = None
         self._device_id = None     # USB 接続した iPhone の usbmux デバイスID (音声チャンネルも同じ iPhone へ)
         self._audio_sock = None
+        # 認証 (v1.5): Wi-Fi ではペアリングコードが通るまで音声チャンネルを開かない
+        self._auth_ok = threading.Event()
+        self._auth_wake = threading.Event()   # 認証失敗で止まっているとき、再試行の合図
+        self._authed = False
+        self._saw_required = False
+        self._auth_blocked = False
         self._kf_lock = threading.Lock()
         self._last_kf_req = 0.0    # 最後にキーフレームを要求した時刻 (monotonic)
         self._out_error = None
@@ -2603,6 +2716,7 @@ class Link:
     def stop(self):
         t = self._thread
         self._stop.set()
+        self._auth_wake.set()
         for sock in (self._sock, self._audio_sock):
             if sock is not None:
                 try:
@@ -2618,7 +2732,7 @@ class Link:
         self._thread = None
         self.vcam.park()
         self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-",
-                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-")
+                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="")
         self._decoder_key = None
         self.latency.reset()
 
@@ -2633,6 +2747,10 @@ class Link:
             return True
         except Exception:
             return False
+
+    def retry_auth(self):
+        """認証に失敗して自動再接続を止めているとき、もう一度つなぐ (コードを直したとき・接続ボタン)。"""
+        self._auth_wake.set()
 
     # -- 内部 -------------------------------------------------------------
     def _connect(self, port=PHONE_PORT, info=None):
@@ -2685,6 +2803,10 @@ class Link:
             sock.settimeout(1.0)
             self._tune_socket(sock, MAIN_RCVBUF)
             self._sock = sock
+            self._authed = False
+            self._saw_required = False
+            self._auth_ok.clear()
+            session_t0 = time.monotonic()
             try:
                 self._session(sock, stop)
             except Exception as e:
@@ -2699,6 +2821,25 @@ class Link:
             self.state.update(connected=False, recv_fps=0.0)
             if stop.is_set():
                 break
+            kind = auth_failure_kind(self.get_mode_ip()[0], self._authed, self._saw_required)
+            if kind == "code":
+                # コード違い: 何度も再接続すると iPhone に締め出されるので、コードを直す/接続を押すまで待つ
+                self.state.update(status_text="認証できません（ペアリングコードを確認してください）",
+                                  error_text=AUTH_FAIL_TEXT, auth_state="failed")
+                self._auth_blocked = True
+                self._auth_wake.clear()
+                while not stop.is_set() and not self._auth_wake.wait(0.3):
+                    pass
+                self._auth_blocked = False
+                if stop.is_set():
+                    break
+                self.state.update(auth_state="")
+                continue
+            if kind == "refused":
+                self.state.update(status_text="iPhoneに接続を断られました。しばらくしてから再接続します…",
+                                  error_text=AUTH_REFUSED_TEXT, auth_state="refused")
+                stop.wait(max(RECONNECT_SEC, AUTH_REFUSED_RETRY_SEC - (time.monotonic() - session_t0)))
+                continue
             self.state.update(status_text="切断されました。再接続します…")
             stop.wait(RECONNECT_SEC)
         self.vcam.park()
@@ -2711,14 +2852,16 @@ class Link:
         self.state.update(status_text="接続済み", connected=True, error_text="", audio_path="shared",
                           thin_total=0, thin_last=0.0)
 
+        # 最初にペアリングコードを送る (Wi-Fi で必須。USB では iPhone が無視する)。USB は認証不要なので音声チャンネルもすぐ開く
+        mode = self.get_mode_ip()[0]
+        if mode == "wifi" or valid_pair_code(self.settings.get("pair_code", "")):
+            with self._send_lock:
+                sock.sendall(encode_msg(MSG_CONTROL, json.dumps(build_auth_control(self.settings)).encode("utf-8")))
+        if mode == "usb":
+            self._authed = True
+            self._auth_ok.set()
         # 保存済み設定を全部送る + キーフレーム要求
-        full = build_control(self.settings, "all")
-        full["keyframe"] = True
-        if self.stream is not None:
-            # 新しい接続では iPhone は既定で動作中として扱うので、PC側の希望をすぐ伝える
-            full["stream"] = {"active": self.stream.on_connect(time.monotonic())}
-        with self._send_lock:
-            sock.sendall(encode_msg(MSG_CONTROL, json.dumps(full).encode("utf-8")))
+        self._send_full(sock)
 
         last_kf = 0.0
         frame_count = 0
@@ -2745,12 +2888,45 @@ class Link:
                 except Exception:
                     pass
 
+    def _send_full(self, sock=None):
+        """保存済みの設定を全部 + キーフレーム要求を送る。"""
+        sock = sock or self._sock
+        if sock is None:
+            return
+        full = build_control(self.settings, "all")
+        full["keyframe"] = True
+        if self.stream is not None:
+            # 新しい接続では iPhone は既定で動作中として扱うので、PC側の希望をすぐ伝える
+            full["stream"] = {"active": self.stream.on_connect(time.monotonic())}
+        with self._send_lock:
+            sock.sendall(encode_msg(MSG_CONTROL, json.dumps(full).encode("utf-8")))
+
+    def _note_auth_status(self, st):
+        """iPhone のステータスから認証の進み具合を記録する。認証待ち → 認証済みになったら設定を送り直す。"""
+        effect = auth_status_effect(st)
+        if effect == "required":
+            self._saw_required = True
+            self.state.update(auth_state="required", status_text="ペアリングコードを確認中…")
+        elif effect == "ok":
+            was_waiting = self._saw_required and not self._authed
+            self._authed = True
+            if self.state.auth_state:
+                self.state.update(auth_state="", status_text="接続済み")
+            self._auth_ok.set()
+            if was_waiting:
+                try:
+                    self._send_full()  # 認証前に送った分は無視されている可能性があるので送り直す
+                except Exception:
+                    pass
+
     # -- 音声チャンネル (ポート 5556) -------------------------------------
     def _audio_channel_loop(self, sess_stop, stop):
         """映像の接続が続く間、音声専用チャンネルを 2 秒ごとに繋ぎ直す。繋がらなければ (古いiPhoneアプリ)
         何も表示せず、映像チャンネルで届く音声をそのまま使う。"""
         while not sess_stop.is_set() and not stop.is_set():
             asock = None
+            if not self._auth_ok.wait(0.2):
+                continue  # 認証が通るまで (Wi-Fi) 音声チャンネルは開かない
             try:
                 asock = self._connect(port=AUDIO_PORT)
                 asock.settimeout(1.0)
@@ -2936,7 +3112,9 @@ class Link:
                     try:
                         st = json.loads(payload.decode("utf-8"))
                         if isinstance(st, dict):
-                            self.state.update(phone_status=st)
+                            self._note_auth_status(st)
+                            if self._authed:
+                                self.state.update(phone_status=st)
                     except Exception:
                         pass
                     # カメラ停止中は映像が来ない (タイムアウトにはしない)。表示だけ 0 に戻す
@@ -2993,6 +3171,9 @@ THERMAL_LABELS = {"nominal": "正常", "fair": "やや高い", "serious": "高�
 BATTERY_STATE_LABELS = {"charging": "充電中", "full": "満充電", "unplugged": "放電中", "unknown": "不明"}
 SCREEN_AUTO_LABELS = [(0, "しない"), (10, "10秒"), (30, "30秒"), (60, "60秒")]
 REC_RES_LABELS = [("same", "配信と同じ"), ("4k", "4K")]
+REC_PRESET_LABELS = [("standard", "標準"), ("high", "高画質"), ("max", "最高")]
+REC_CONTAINER_LABELS = [("mp4", "MP4（おすすめ・どこでも再生できます）"), ("mov", "MOV（編集ソフト向け）")]
+CAMERA_DROP_LABELS = [("late", "遅延"), ("outOfBuffers", "バッファ不足"), ("discontinuity", "不連続")]
 STATUS_TAB_INDEX = 5
 METER_MIN_DB = -60.0
 THERMAL_WARNING = "iPhoneが熱くなっています。fpsを30に下げるか、エフェクトをオフにしてください"
@@ -3136,6 +3317,23 @@ class App:
 
         self._pending[group] = self.root.after(THROTTLE_MS, fire)
 
+    def _mode_changed(self):
+        self._changed("mode", self.mode_var.get(), None)
+        self.link.retry_auth()  # 認証失敗で止まっていた場合、つなぎ方を変えたらもう一度試す
+
+    def _pair_code_edited(self):
+        """ペアリングコード欄の編集: 数字だけ6桁にそろえて保存し、認証失敗で止まっていた接続を再開する。"""
+        raw = self.pair_var.get()
+        code = normalize_pair_code(raw)
+        if code != raw:
+            self.pair_var.set(code)  # 再度 trace が呼ばれるので、ここで終わる
+            return
+        if code == self.settings.get("pair_code", ""):
+            return
+        self._changed("pair_code", code, None)
+        if valid_pair_code(code):
+            self.link.retry_auth()
+
     def _lens_changed(self):
         """レンズ変更。左右反転チェックはレンズごとに記憶した値へ切り替える。"""
         self._changed("lens", self._label_to_value(LENS_LABELS, self.lens_var.get()), "video")
@@ -3262,9 +3460,9 @@ class App:
         row = ttk.Frame(f)
         row.grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Radiobutton(row, text="USB", value="usb", variable=self.mode_var,
-                        command=lambda: self._changed("mode", self.mode_var.get(), None)).pack(side="left")
+                        command=self._mode_changed).pack(side="left")
         ttk.Radiobutton(row, text="Wi-Fi", value="wifi", variable=self.mode_var,
-                        command=lambda: self._changed("mode", self.mode_var.get(), None)).pack(side="left", padx=(12, 0))
+                        command=self._mode_changed).pack(side="left", padx=(12, 0))
 
         ttk.Label(f, text="iPhoneのIP").grid(row=1, column=0, sticky="w", pady=4)
         self.ip_var = tk.StringVar(value=self.settings["ip"])
@@ -3274,17 +3472,24 @@ class App:
         self.connect_btn = ttk.Button(f, text="接続", command=self.toggle_connect)
         self.connect_btn.grid(row=1, column=2, sticky="e")
 
+        ttk.Label(f, text="ペアリングコード").grid(row=2, column=0, sticky="w", pady=4)
+        self.pair_var = tk.StringVar(value=self.settings.get("pair_code", ""))
+        self.pair_var.trace_add("write", lambda *_: self._pair_code_edited())
+        ttk.Entry(f, textvariable=self.pair_var, width=10).grid(row=2, column=1, sticky="w", padx=6)
+        self._hint(f, 3, "Wi-Fiで接続するときだけ必要です。iPhoneアプリの画面に出る6桁の数字を入力してください"
+                         "（USBでは不要）", pady=(0, 4))
+
         self.status_var = tk.StringVar(value="停止中")
         self.fps_var = tk.StringVar(value="-")
         self.dec_var = tk.StringVar(value="-")
         self.res_var = tk.StringVar(value="-")
         for i, (name, var) in enumerate([("状態", self.status_var), ("受信fps", self.fps_var),
                                          ("デコード時間", self.dec_var), ("映像サイズ", self.res_var)]):
-            ttk.Label(f, text=name).grid(row=2 + i, column=0, sticky="w")
-            ttk.Label(f, textvariable=var, wraplength=px(380), justify="left").grid(row=2 + i, column=1, columnspan=2, sticky="w", padx=6)
+            ttk.Label(f, text=name).grid(row=4 + i, column=0, sticky="w")
+            ttk.Label(f, textvariable=var, wraplength=px(380), justify="left").grid(row=4 + i, column=1, columnspan=2, sticky="w", padx=6)
         self.error_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.error_var, foreground="#c0392b", wraplength=px(480), justify="left").grid(
-            row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+            row=8, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
     def _build_run_control(self, parent):
         f = self._section(parent, "iPhoneのカメラの動作")
@@ -3989,7 +4194,8 @@ class App:
         self.st_labels = {}
         for row, (key, name) in enumerate([("thermal", "温度"), ("pressure", "カメラの負荷"), ("factors", "原因"),
                                            ("hot", "「高い」以上だった時間"), ("sentfps", "送信fps"),
-                                           ("dropped", "落ちたフレーム"), ("encode", "エンコード時間"),
+                                           ("dropped", "落ちたフレーム"), ("dropreasons", "カメラで落ちた理由"),
+                                           ("recdropped", "録画で落ちたフレーム"), ("encode", "エンコード時間"),
                                            ("battery", "バッテリー"), ("lowpower", "低電力モード"),
                                            ("processing", "エフェクト処理時間")]):
             ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=3)
@@ -3998,7 +4204,7 @@ class App:
             lbl.grid(row=row, column=1, sticky="w", padx=6)
             self.st_vars[key] = var
             self.st_labels[key] = lbl
-        self._hint(f, 10, "接続中のiPhoneから約1秒ごとに更新されます", pady=(6, 0))
+        self._hint(f, 12, "接続中のiPhoneから約1秒ごとに更新されます", pady=(6, 0))
 
     def _build_record(self, parent):
         f = self._section(parent, "録画の設定（iPhone側で高画質に録画）")
@@ -4007,21 +4213,46 @@ class App:
         cb = ttk.Combobox(f, textvariable=self.rec_res_var, values=[l for _, l in REC_RES_LABELS],
                           state="readonly", width=14)
         cb.grid(row=0, column=1, sticky="w", padx=6)
-        cb.bind("<<ComboboxSelected>>", lambda e: self._changed(
-            "rec_resolution", self._label_to_value(REC_RES_LABELS, self.rec_res_var.get()), "recordSettings"))
-        self._slider(f, 1, "画質 (Mbps)", "rec_bitrate", 10, 100, "recordSettings",
-                     lambda v: "%d Mbps" % round(v), 5, as_int=True)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._rec_option_changed(
+            "rec_resolution", self._label_to_value(REC_RES_LABELS, self.rec_res_var.get())))
+        ttk.Label(f, text="画質").grid(row=1, column=0, sticky="w", pady=2)
+        self.rec_preset_var = tk.StringVar(value=self._value_to_label(REC_PRESET_LABELS, self.settings["rec_preset"]))
+        cb = ttk.Combobox(f, textvariable=self.rec_preset_var, values=[l for _, l in REC_PRESET_LABELS],
+                          state="readonly", width=14)
+        cb.grid(row=1, column=1, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._rec_option_changed(
+            "rec_preset", self._label_to_value(REC_PRESET_LABELS, self.rec_preset_var.get())))
+        ttk.Label(f, text="ファイル形式").grid(row=2, column=0, sticky="w", pady=2)
+        self.rec_container_var = tk.StringVar(
+            value=self._value_to_label(REC_CONTAINER_LABELS, self.settings["rec_container"]))
+        cb = ttk.Combobox(f, textvariable=self.rec_container_var, values=[l for _, l in REC_CONTAINER_LABELS],
+                          state="readonly", width=24)
+        cb.grid(row=2, column=1, columnspan=2, sticky="w", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._rec_option_changed(
+            "rec_container", self._label_to_value(REC_CONTAINER_LABELS, self.rec_container_var.get())))
+        self.rec_estimate_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self.rec_estimate_var, wraplength=px(480), justify="left").grid(
+            row=3, column=0, columnspan=3, sticky="w", pady=(2, 4))
+        self.rec_custom_var = tk.BooleanVar(value=bool(self.settings["rec_custom_bitrate"]))
+        ttk.Checkbutton(f, text="詳細設定: ビットレートを自分で指定する", variable=self.rec_custom_var,
+                        command=self._rec_custom_toggled).grid(row=4, column=0, columnspan=3, sticky="w")
+        self.rec_bitrate_scale, self.rec_bitrate_label, _ = self._slider(
+            f, 5, "ビットレート (Mbps)", "rec_bitrate", 10, 100, "recordSettings",
+            lambda v: "%d Mbps" % round(v), 5, as_int=True)
+        self.rec_bitrate_widgets = f.grid_slaves(row=5)
         self.rec_audio_var = tk.BooleanVar(value=bool(self.settings["rec_audio"]))
         ttk.Checkbutton(f, text="音声を入れる", variable=self.rec_audio_var,
-                        command=lambda: self._changed("rec_audio", bool(self.rec_audio_var.get()), "recordSettings")
-                        ).grid(row=2, column=0, columnspan=3, sticky="w")
+                        command=lambda: self._rec_option_changed("rec_audio", bool(self.rec_audio_var.get()))
+                        ).grid(row=6, column=0, columnspan=3, sticky="w")
         self.rec_photos_var = tk.BooleanVar(value=bool(self.settings["rec_photos"]))
         ttk.Checkbutton(f, text="写真アプリにも保存", variable=self.rec_photos_var,
                         command=lambda: self._changed("rec_photos", bool(self.rec_photos_var.get()), "recordSettings")
-                        ).grid(row=3, column=0, columnspan=3, sticky="w")
-        self._hint(f, 4, "4K録画中は配信用の映像を縮小して送ります。発熱が増えるので30fpsがおすすめです", pady=(6, 0))
-        self._hint(f, 5, "録画ファイルはiPhoneの「ファイル」アプリ（このiPhone内 > PhoneCam）にも残ります")
-        self._hint(f, 6, "初めて使うときは、iPhoneでマイクと写真への保存の許可が必要です")
+                        ).grid(row=7, column=0, columnspan=3, sticky="w")
+        self._hint(f, 8, "4K録画中は配信用の映像を縮小して送ります。発熱が増えるので30fpsがおすすめです", pady=(6, 0))
+        self._hint(f, 9, "録画ファイルはiPhoneの「ファイル」アプリ（このiPhone内 > PhoneCam）にも残ります")
+        self._hint(f, 10, "初めて使うときは、iPhoneでマイクと写真への保存の許可が必要です")
+        self._hint(f, 11, "MP4は多くのソフトでそのまま開けます。MOVは編集ソフト向けです。サイズの目安は実際の映像によって前後します")
+        self._refresh_rec_estimate()
 
         g = self._section(parent, "録画")
         ttk.Style().configure("Rec.TButton", font=("", 12, "bold"), padding=(24, 10))
@@ -4041,6 +4272,22 @@ class App:
         ttk.Label(g, textvariable=self.rec_error_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
             row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self.rec_btn.state(["disabled"])
+
+    def _rec_option_changed(self, key, value):
+        self._changed(key, value, "recordSettings")
+        self._refresh_rec_estimate()
+
+    def _rec_custom_toggled(self):
+        self._rec_option_changed("rec_custom_bitrate", bool(self.rec_custom_var.get()))
+
+    def _refresh_rec_estimate(self):
+        """録画サイズの目安と、詳細設定 (ビットレートのスライダー) の表示切り替え。"""
+        self.rec_estimate_var.set(rec_estimate_text(self.settings))
+        for w in self.rec_bitrate_widgets:
+            try:
+                (w.grid if self.settings.get("rec_custom_bitrate") else w.grid_remove)()
+            except Exception:
+                pass
 
     def _rec_clicked(self):
         rec = self.state.snapshot()["phone_status"].get("recording")
@@ -4455,13 +4702,17 @@ class App:
             if self.settings["mode"] == "wifi" and not self.settings["ip"].strip():
                 messagebox.showerror("PhoneCam", "iPhoneのIPアドレスを入力してください（iPhoneのアプリ画面に表示されています）")
                 return
+            if self.settings["mode"] == "wifi" and not valid_pair_code(self.settings.get("pair_code", "")):
+                messagebox.showerror("PhoneCam", "ペアリングコードを入力してください。iPhoneアプリの画面に表示されている6桁の数字です"
+                                                 "（iPhoneで「Wi-Fiからの接続を許可」をオンにすると表示されます）")
+                return
             need_pv = self.settings.get("backend") != "phonecam"
             if av is None or np is None or (need_pv and pyvirtualcam is None):
                 messagebox.showerror("PhoneCam", "必要なライブラリ(av, numpy, pyvirtualcam)が見つかりません。install.bat を実行してください")
                 return
             self.wanted = True
             self.connect_btn.config(text="切断")
-            self.link.start()
+            self.link.start()  # 認証失敗で止まっていた場合も、新しく始めるので再試行になる
         else:
             self.wanted = False
             self.connect_btn.config(text="接続")
@@ -4624,6 +4875,10 @@ class App:
         self.st_vars["dropped"].set(
             "カメラ %d / 通信 %d" % (cam_d, net_d)
             if isinstance(cam_d, (int, float)) and isinstance(net_d, (int, float)) else "-")
+        self.st_vars["dropreasons"].set(format_drop_reasons(st.get("cameraDropReasons")))
+        rec = st.get("recording")
+        rd = rec.get("droppedFrames") if isinstance(rec, dict) else None
+        self.st_vars["recdropped"].set("%d" % rd if isinstance(rd, (int, float)) and not isinstance(rd, bool) else "-")
         enc = st.get("encodeMs")
         self.st_vars["encode"].set("%.1f ms" % enc if isinstance(enc, (int, float)) else "-")
         color = {"fair": "#b7791f", "serious": "#d9730d", "critical": "#c0392b"}.get(thermal, self._default_fg)

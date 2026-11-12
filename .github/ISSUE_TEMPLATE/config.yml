@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使い方・トラブルの解決方法（Wiki）
+    url: https://github.com/syuuga101/phonecam/wiki
+    about: まずは Wiki の「よくある質問とトラブル」を見てください。多くの問題はここで解決します。
+  - name: 質問・相談（Discussions）
+    url: https://github.com/syuuga101/phonecam/discussions
+    about: 使い方の質問や相談はこちらへ。
+  - name: セキュリティの問題の報告
+    url: https://github.com/syuuga101/phonecam/security/advisories/new
+    about: 脆弱性は公開の Issue に書かず、こちらから非公開で報告してください。

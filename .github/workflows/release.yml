@@ -51,11 +51,48 @@ jobs:
             --ipa out/PhoneCam.ipa \
             --out out/altstore-source.json
 
+      # CHANGELOG.md から今回のバージョンの項目（"## v<ver>" から次の "## " の手前まで）を取り出す。
+      # 見つからないときは既定の文章にする（リリース自体は止めない）
+      - name: Prepare release notes
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          awk -v ver="v${VERSION}" '
+            /^## / {
+              if (found) exit
+              h = $2
+              if (h == ver) { found = 1; next }
+            }
+            found && (started || $0 !~ /^[[:space:]]*$/) { started = 1; print }
+          ' CHANGELOG.md > changes.md 2>/dev/null || true
+          # 前後の空行を削る
+          sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' changes.md || true
+          if ! grep -q '[^[:space:]]' changes.md; then
+            echo "CHANGELOG.md に v${VERSION} の項目が見つかりませんでした。変更内容は下の「What's Changed」を見てください。" > changes.md
+          fi
+          {
+            echo "## v${VERSION} の変更点"
+            echo
+            cat changes.md
+            echo
+            echo "---"
+            echo
+            echo "### インストール・アップデート"
+            echo
+            echo "- **Windows**: \`PhoneCamReceiver.exe\` をダウンロードして、古い exe と置き換えるだけです（初めての方はそのまま起動するとセットアップが始まります）。"
+            echo "- **iPhone**: AltStore の「My Apps」で PhoneCam を更新します（AltStore のソースは自動で最新になります）。"
+            echo "- くわしい手順は [Wiki](https://github.com/${{ github.repository }}/wiki) を見てください。"
+            echo
+            echo "---"
+            echo
+          } > release_body.md
+
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           name: PhoneCam v${{ steps.ver.outputs.version }}
+          body_path: release_body.md
           generate_release_notes: true
           make_latest: true
           files: |

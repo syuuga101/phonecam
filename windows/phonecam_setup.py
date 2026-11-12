@@ -146,6 +146,7 @@ MANUAL_TEXT = {
 }
 
 DEFAULT_MIN_BYTES = 100 * 1024
+MAX_UNZIPPED_BYTES = 1024 * 1024 * 1024   # zip 爆弾対策 (展開後の合計)
 SIGNATURES = {"exe": (b"MZ",), "zip": (b"PK\x03\x04",), "msi": (b"\xd0\xcf\x11\xe0",)}
 _CREATE_NO_WINDOW = 0x08000000
 
@@ -401,12 +402,17 @@ def validate_download(path, kind, min_bytes=DEFAULT_MIN_BYTES, expected_size=Non
 def download_file(url, dest, kind, progress=None, cancel=None, opener=None, timeout=30, min_bytes=DEFAULT_MIN_BYTES):
     """url を dest へ保存して検証する。progress(done, total) を随時呼ぶ (total 不明なら 0)。"""
     opener = opener or urllib.request.urlopen
+    if not str(url).lower().startswith("https://"):
+        raise DownloadError("安全でないURL (https以外) からはダウンロードしません")
     os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
     part = dest + ".part"
     req = urllib.request.Request(url, headers={"User-Agent": "PhoneCamSetup/%s" % APP_VERSION})
     expected = 0
     try:
         with opener(req, timeout=timeout) as resp:
+            final_url = getattr(resp, "geturl", lambda: url)()
+            if isinstance(final_url, str) and not final_url.lower().startswith("https://"):
+                raise DownloadError("ダウンロード先が安全でないURL (https以外) に転送されたため中止しました")
             try:
                 expected = int(resp.headers.get("Content-Length") or 0)
             except Exception:
@@ -451,11 +457,18 @@ def safe_extract_zip(zip_path, dest):
         shutil.rmtree(dest, ignore_errors=True)
     os.makedirs(dest, exist_ok=True)
     root = os.path.abspath(dest)
+    total = 0
     with zipfile.ZipFile(zip_path) as z:
         for info in z.infolist():
+            name = info.filename.replace("\\", "/")
             target = os.path.abspath(os.path.join(root, info.filename))
-            if target != root and not target.startswith(root + os.sep):
+            # dest の外へ出るパス (../ や絶対パス・ドライブ指定) は拒否
+            if (target != root and not target.startswith(root + os.sep)) or name.startswith("/") \
+                    or ".." in name.split("/") or (len(name) > 1 and name[1] == ":"):
                 raise DownloadError("zipの中身が不正です")
+            total += info.file_size
+        if total > MAX_UNZIPPED_BYTES:
+            raise DownloadError("zipの展開後のサイズが大きすぎます")
         z.extractall(root)
     return root
 
@@ -484,6 +497,167 @@ def sha256_file(path):
 
 
 # ---------------------------------------------------------------------------
+# インストーラーの署名確認 (Authenticode)
+# ---------------------------------------------------------------------------
+# 管理者権限で実行する前に、ダウンロードしたインストーラーの電子署名が有効で、
+# 署名者が想定どおりの発行元かを確認する。署名者の判定ロジック (evaluate_signature) は
+# 実際の確認処理 (verify_authenticode) と切り離してあり、確認処理を差し替えてテストできる。
+
+# コンポーネントごとの想定する発行元。match: "exact" = 証明書の名前 (CN または O) と完全一致 (大文字小文字は無視) /
+# "contains" = 部分一致。unsigned_ok: 署名のないファイルを許すか (許さない既定)
+SIGNER_POLICY = {
+    "vcredist": {"publisher": "Microsoft Corporation", "names": ["Microsoft Corporation"], "match": "exact", "unsigned_ok": False},
+    "itunes": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
+    "icloud": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
+    "vbcable": {"publisher": "VB-Audio Software", "names": ["VB-Audio", "Vincent Burel"], "match": "contains", "unsigned_ok": False},
+    # AltServer は公式の配布物が署名されているか確認できていない。署名されていれば発行元を確認し、
+    # 署名が無いときだけは「ジョブファイルのSHA-256による改ざん検知」(従来の保護) に頼って実行する。
+    "altserver": {"publisher": "Riley Testut / AltStore", "names": ["Riley", "Testut", "AltStore"], "match": "contains",
+                  "unsigned_ok": True},
+}
+
+# WinVerifyTrust の戻り値 (HRESULT)
+TRUST_E_NOSIGNATURE = 0x800B0100
+TRUST_E_SUBJECT_FORM_UNKNOWN = 0x800B0003
+TRUST_E_PROVIDER_UNKNOWN = 0x800B0001
+_UNSIGNED_CODES = (TRUST_E_NOSIGNATURE, TRUST_E_SUBJECT_FORM_UNKNOWN, TRUST_E_PROVIDER_UNKNOWN, 0x80070002, 0x80070003)
+
+
+def classify_trust_result(ret, last_error):
+    """WinVerifyTrust の結果 → "valid" / "unsigned" (署名なし) / "invalid" (署名はあるが無効・改ざん・失効など)。"""
+    if (ret & 0xFFFFFFFF) == 0:
+        return "valid"
+    if (last_error & 0xFFFFFFFF) in _UNSIGNED_CODES or (ret & 0xFFFFFFFF) in _UNSIGNED_CODES:
+        return "unsigned"
+    return "invalid"
+
+
+def _signer_matches(policy, signers):
+    names = [n.strip().casefold() for n in signers if isinstance(n, str) and n.strip()]
+    for want in policy["names"]:
+        w = want.casefold()
+        for n in names:
+            if (n == w) if policy["match"] == "exact" else (w in n):
+                return True
+    return False
+
+
+def evaluate_signature(cid, info):
+    """署名確認の結果 info = {"result": "valid"/"unsigned"/"invalid"/"error", "signers": [名前...], "code": int}
+    から実行してよいかを決める。戻り値: (許可するか, 日本語メッセージ, 署名なしで許可したか)"""
+    policy = SIGNER_POLICY.get(cid)
+    if policy is None:
+        return False, "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした", False
+    result = (info or {}).get("result")
+    if result == "valid":
+        if _signer_matches(policy, (info or {}).get("signers") or []):
+            return True, "署名を確認しました（%s）" % policy["publisher"], False
+        found = ", ".join(n for n in (info.get("signers") or []) if n) or "不明"
+        return False, ("インストーラーの署名者が想定と違うため、実行しませんでした（想定: %s / 実際: %s）。"
+                       "ダウンロードをやり直してください" % (policy["publisher"], found)), False
+    if result == "unsigned":
+        if policy["unsigned_ok"]:
+            return True, "署名のないファイルです（%s は署名なしで配布されています）。ファイルの改ざん検知のみで実行します" % policy["publisher"], True
+        return False, "インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）" % policy["publisher"], False
+    if result == "invalid":
+        return False, "インストーラーの電子署名が無効です（改ざんされているか、証明書を確認できません）。実行しませんでした", False
+    return False, "インストーラーの署名を確認できなかったため、実行しませんでした (%s)" % ((info or {}).get("detail") or "不明なエラー"), False
+
+
+def _wintrust():
+    """ctypes で WinVerifyTrust 周りの定義を作る (Windows のみ)。"""
+    import ctypes
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", ctypes.c_uint32), ("Data2", ctypes.c_uint16), ("Data3", ctypes.c_uint16),
+                    ("Data4", ctypes.c_ubyte * 8)]
+
+    class WINTRUST_FILE_INFO(ctypes.Structure):
+        _fields_ = [("cbStruct", ctypes.c_uint32), ("pcwszFilePath", ctypes.c_wchar_p),
+                    ("hFile", ctypes.c_void_p), ("pgKnownSubject", ctypes.c_void_p)]
+
+    class WINTRUST_DATA(ctypes.Structure):
+        _fields_ = [("cbStruct", ctypes.c_uint32), ("pPolicyCallbackData", ctypes.c_void_p),
+                    ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", ctypes.c_uint32),
+                    ("fdwRevocationChecks", ctypes.c_uint32), ("dwUnionChoice", ctypes.c_uint32),
+                    ("pFile", ctypes.c_void_p), ("dwStateAction", ctypes.c_uint32),
+                    ("hWVTStateData", ctypes.c_void_p), ("pwszURLReference", ctypes.c_wchar_p),
+                    ("dwProvFlags", ctypes.c_uint32), ("dwUIContext", ctypes.c_uint32),
+                    ("pSignatureSettings", ctypes.c_void_p)]
+
+    class CRYPT_PROVIDER_CERT(ctypes.Structure):
+        _fields_ = [("cbStruct", ctypes.c_uint32), ("pCert", ctypes.c_void_p)]
+
+    return ctypes, wintypes, GUID, WINTRUST_FILE_INFO, WINTRUST_DATA, CRYPT_PROVIDER_CERT
+
+
+def verify_authenticode(path):
+    """WinVerifyTrust (WINTRUST_ACTION_GENERIC_VERIFY_V2 / 失効確認なし / UI なし) で署名を検証し、署名者名を読む。
+    戻り値: {"result": "valid"/"unsigned"/"invalid"/"error", "code": 戻り値, "signers": [CN, O], "detail": str}。
+    Windows 以外・例外のときは "error" (呼び出し側は実行しない)。"""
+    if os.name != "nt":
+        return {"result": "error", "code": 0, "signers": [], "detail": "Windows 以外では確認できません"}
+    try:
+        ctypes, wintypes, GUID, FILE_INFO, WT_DATA, PROV_CERT = _wintrust()
+        wintrust = ctypes.WinDLL("wintrust", use_last_error=True)
+        crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+        wintrust.WinVerifyTrust.argtypes = [ctypes.c_void_p, ctypes.POINTER(GUID), ctypes.c_void_p]
+        wintrust.WinVerifyTrust.restype = ctypes.c_int32
+        wintrust.WTHelperProvDataFromStateData.argtypes = [ctypes.c_void_p]
+        wintrust.WTHelperProvDataFromStateData.restype = ctypes.c_void_p
+        wintrust.WTHelperGetProvSignerFromChain.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        wintrust.WTHelperGetProvSignerFromChain.restype = ctypes.c_void_p
+        wintrust.WTHelperGetProvCertFromChain.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        wintrust.WTHelperGetProvCertFromChain.restype = ctypes.POINTER(PROV_CERT)
+        crypt32.CertGetNameStringW.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+                                               ctypes.c_wchar_p, ctypes.c_uint32]
+        crypt32.CertGetNameStringW.restype = ctypes.c_uint32
+
+        action = GUID(0x00AAC56B, 0xCD44, 0x11D0, (ctypes.c_ubyte * 8)(0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE))
+        fi = FILE_INFO(ctypes.sizeof(FILE_INFO), os.path.abspath(path), None, None)
+        data = WT_DATA()
+        data.cbStruct = ctypes.sizeof(WT_DATA)
+        data.dwUIChoice = 2            # WTD_UI_NONE
+        data.fdwRevocationChecks = 0   # WTD_REVOKE_NONE
+        data.dwUnionChoice = 1         # WTD_CHOICE_FILE
+        data.pFile = ctypes.cast(ctypes.pointer(fi), ctypes.c_void_p)
+        data.dwStateAction = 1         # WTD_STATEACTION_VERIFY (署名者を読むため、状態を残す)
+        INVALID = ctypes.c_void_p(-1)  # INVALID_HANDLE_VALUE (デスクトップのウィンドウを使わない)
+        ctypes.set_last_error(0)
+        ret = wintrust.WinVerifyTrust(INVALID, ctypes.byref(action), ctypes.byref(data))
+        last = ctypes.get_last_error()
+        signers = []
+        try:
+            if data.hWVTStateData:
+                prov = wintrust.WTHelperProvDataFromStateData(data.hWVTStateData)
+                sgnr = wintrust.WTHelperGetProvSignerFromChain(prov, 0, 0, 0) if prov else None
+                cert = wintrust.WTHelperGetProvCertFromChain(sgnr, 0) if sgnr else None
+                ctx = cert.contents.pCert if cert else None
+                if ctx:
+                    for kind, para in ((4, None), (3, ctypes.cast(ctypes.c_char_p(b"2.5.4.10"), ctypes.c_void_p))):
+                        buf = ctypes.create_unicode_buffer(512)
+                        n = crypt32.CertGetNameStringW(ctx, kind, 0, para, buf, 512)
+                        if n > 1 and buf.value:
+                            signers.append(buf.value)
+        finally:
+            data.dwStateAction = 2     # WTD_STATEACTION_CLOSE
+            wintrust.WinVerifyTrust(INVALID, ctypes.byref(action), ctypes.byref(data))
+        return {"result": classify_trust_result(ret, last), "code": ret & 0xFFFFFFFF, "signers": signers, "detail": ""}
+    except Exception as e:
+        return {"result": "error", "code": 0, "signers": [], "detail": str(e)}
+
+
+def check_installer_signature(cid, path, verifier=None):
+    """実行前の署名確認。戻り値: (許可するか, 日本語メッセージ, 署名なしで許可したか)。verifier は差し替え用。"""
+    try:
+        info = (verifier or verify_authenticode)(path)
+    except Exception as e:
+        info = {"result": "error", "detail": str(e), "signers": []}
+    return evaluate_signature(cid, info)
+
+
+# ---------------------------------------------------------------------------
 # ジョブ (管理者権限のヘルパーが実行する内容)
 # ---------------------------------------------------------------------------
 
@@ -491,14 +665,17 @@ def step_register_camera():
     return {"id": "camera", "type": "register_camera", "title": "PhoneCamカメラを登録"}
 
 
-def step_exe(cid, title, path, args, ok_codes=(0, 3010, 1641), timeout=900, retry_args=None, lenient=False, reboot=False):
+def step_exe(cid, title, path, args, ok_codes=(0, 3010, 1641), timeout=900, retry_args=None, lenient=False, reboot=False,
+             stage_dir=None):
+    # stage_dir: 同じフォルダのほかのファイル (ドライバなど) も必要なインストーラーは、フォルダごと安全な場所へコピーして実行する
     return {"id": cid, "type": "exe", "title": title, "path": path, "args": list(args), "sha256": sha256_file(path),
-            "ok_codes": list(ok_codes), "timeout": timeout, "retry_args": retry_args, "lenient": lenient, "reboot": reboot}
+            "ok_codes": list(ok_codes), "timeout": timeout, "retry_args": retry_args, "lenient": lenient, "reboot": reboot,
+            "stage_dir": stage_dir}
 
 
-def step_msi(cid, title, path, ok_codes=(0, 3010, 1641), timeout=900):
+def step_msi(cid, title, path, ok_codes=(0, 3010, 1641), timeout=900, stage_dir=None):
     return {"id": cid, "type": "msi", "title": title, "path": path, "sha256": sha256_file(path),
-            "ok_codes": list(ok_codes), "timeout": timeout}
+            "ok_codes": list(ok_codes), "timeout": timeout, "stage_dir": stage_dir}
 
 
 def step_winget(cid, title, pkg_id, timeout=900):
@@ -542,7 +719,67 @@ def _run_cmd(runner, args, timeout):
     return runner(args, **kw).returncode
 
 
-def execute_step(step, runner=None):
+def _stage_for_run(path, stage_dir=None):
+    """管理者権限で実行するファイルを、一般ユーザーが書き換えられない場所 (ProgramData 以下に管理者が作った
+    フォルダ) へコピーする。確認 (SHA-256・署名) と実行の間に差し替えられるのを防ぐため。
+    戻り値: (実行するパス, 後始末する関数)。Windows 以外 (テスト) ではそのまま使う。"""
+    if os.name != "nt":
+        return path, (lambda: None)
+    import uuid
+    base = os.path.join(os.environ.get("ProgramData") or r"C:\ProgramData", "PhoneCam", "run-" + uuid.uuid4().hex)
+    os.makedirs(base)
+    if stage_dir and os.path.isdir(stage_dir):
+        src_root = os.path.abspath(stage_dir)
+        dst_root = os.path.join(base, "pkg")
+        shutil.copytree(src_root, dst_root)
+        rel = os.path.relpath(os.path.abspath(path), src_root)
+        if rel.startswith(".."):
+            raise RuntimeError("インストーラーの場所が不正です")
+        run_path = os.path.join(dst_root, rel)
+    else:
+        run_path = os.path.join(base, os.path.basename(path))
+        shutil.copy2(path, run_path)
+    return run_path, (lambda: shutil.rmtree(base, ignore_errors=True))
+
+
+def _msiexec_path():
+    if os.name == "nt":
+        return os.path.join(os.environ.get("SystemRoot") or r"C:\Windows", "System32", "msiexec.exe")
+    return "msiexec"
+
+
+# winget で入れてよいパッケージ (ジョブファイルに別のIDが書かれていても実行しない)
+ALLOWED_WINGET = frozenset(v["winget"] for v in SOURCES.values() if v.get("winget"))
+
+
+def _run_installer(step, kind, path, res, runner, verifier):
+    """コピー済みのインストーラー (path) を、SHA-256 → 電子署名の順に確認して実行する。"""
+    if sha256_file(path) != step["sha256"]:
+        res["detail"] = "インストーラーが変更されていたため実行しませんでした"
+        return res
+    allowed, message, unsigned = check_installer_signature(step.get("id"), path, verifier)
+    res["signature"] = message
+    res["unsigned"] = unsigned
+    if not allowed:
+        res["detail"] = message
+        return res
+    if kind == "msi":
+        cmd = [_msiexec_path(), "/i", path, "/qn", "/norestart"]
+    else:
+        cmd = [path] + list(step.get("args") or [])
+    code = _run_cmd(runner, cmd, step.get("timeout", 900))
+    ok_codes = [c & 0xFFFFFFFF for c in step.get("ok_codes", [0])]
+    if (code & 0xFFFFFFFF) not in ok_codes and kind == "exe" and step.get("retry_args") is not None:
+        code = _run_cmd(runner, [path] + list(step["retry_args"]), step.get("timeout", 900))
+    res["code"] = code
+    res["ok"] = (code & 0xFFFFFFFF) in ok_codes or bool(step.get("lenient"))
+    res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
+    if not res["ok"]:
+        res["detail"] = "インストーラーが失敗しました (終了コード %s)" % code
+    return res
+
+
+def execute_step(step, runner=None, verifier=None):
     """1ステップを実行して結果 dict を返す (例外は失敗として返す)。"""
     runner = runner or subprocess.run
     res = {"id": step.get("id"), "title": step.get("title", ""), "ok": False, "code": None, "reboot": False, "detail": ""}
@@ -560,24 +797,19 @@ def execute_step(step, runner=None):
             if not os.path.isfile(path):
                 res["detail"] = "インストーラーが見つかりません"
                 return res
-            if step.get("sha256") and sha256_file(path) != step["sha256"]:
-                res["detail"] = "インストーラーが変更されていたため実行しませんでした"
+            if not step.get("sha256"):
+                res["detail"] = "インストーラーの検証情報がないため実行しませんでした"
                 return res
-            if kind == "msi":
-                cmd = ["msiexec", "/i", path, "/qn", "/norestart"]
-            else:
-                cmd = [path] + list(step.get("args") or [])
-            code = _run_cmd(runner, cmd, step.get("timeout", 900))
-            ok_codes = [c & 0xFFFFFFFF for c in step.get("ok_codes", [0])]
-            if (code & 0xFFFFFFFF) not in ok_codes and kind == "exe" and step.get("retry_args") is not None:
-                code = _run_cmd(runner, [path] + list(step["retry_args"]), step.get("timeout", 900))
-            res["code"] = code
-            res["ok"] = (code & 0xFFFFFFFF) in ok_codes or bool(step.get("lenient"))
-            res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
-            if not res["ok"]:
-                res["detail"] = "インストーラーが失敗しました (終了コード %s)" % code
-            return res
+            # 一般ユーザーが触れない場所へコピーしてから、その実物を確認して実行する
+            path, cleanup = _stage_for_run(path, step.get("stage_dir"))
+            try:
+                return _run_installer(step, kind, path, res, runner, verifier)
+            finally:
+                cleanup()
         if kind == "winget":
+            if step.get("pkg") not in ALLOWED_WINGET:
+                res["detail"] = "許可されていないwingetパッケージのため実行しませんでした"
+                return res
             code = _run_cmd(runner, winget_args(step["pkg"]), step.get("timeout", 900))
             res["code"] = code
             res["ok"] = (code & 0xFFFFFFFF) in WINGET_OK_CODES
@@ -593,13 +825,17 @@ def execute_step(step, runner=None):
     return res
 
 
-def run_job(job_path, expected_sha=None, runner=None):
+def run_job(job_path, expected_sha=None, runner=None, verifier=None):
     """管理者権限で実行される --setup。結果を result.json へ書き、終了コードを返す。
     0 = 全て成功 / 3010 = 成功・要再起動 / 1 = 失敗あり。"""
     result = {"steps": [], "error": ""}
     result_path = None
     try:
-        if expected_sha and sha256_file(job_path) != expected_sha:
+        # 管理者権限で何を実行するかは job.json で決まるので、呼び出し側が渡したハッシュと一致するものだけ実行する
+        # (ハッシュが渡されていない場合も実行しない)
+        if not expected_sha:
+            raise RuntimeError("ジョブファイルの検証情報がないため実行しませんでした")
+        if sha256_file(job_path).lower() != str(expected_sha).strip().lower():
             raise RuntimeError("ジョブファイルが変更されています")
         with open(job_path, "r", encoding="utf-8") as f:
             job = json.load(f)
@@ -610,7 +846,7 @@ def run_job(job_path, expected_sha=None, runner=None):
         for i, step in enumerate(steps):
             if progress:
                 _append_progress(progress, "%d|%d|%s" % (i + 1, total, step.get("title", "")))
-            result["steps"].append(execute_step(step, runner=runner))
+            result["steps"].append(execute_step(step, runner=runner, verifier=verifier))
             if progress:
                 _append_progress(progress, "%d|%d|done" % (i + 1, total))
     except Exception as e:
@@ -695,11 +931,11 @@ class SetupEngine:
             root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
             msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
             if msi:
-                return step_msi(cid, title, msi)
+                return step_msi(cid, title, msi, stage_dir=root)
             exe = find_file(root, ["setup.exe"])
             if exe:
                 # 無人インストールが効かない場合は、通常のウィンドウ付きでもう一度実行する
-                return step_exe(cid, title, exe, ["/quiet", "/norestart"], retry_args=[])
+                return step_exe(cid, title, exe, ["/quiet", "/norestart"], retry_args=[], stage_dir=root)
             raise DownloadError("zipの中にインストーラーが見つかりませんでした")
         if cid == "vbcable":
             root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
@@ -707,7 +943,7 @@ class SetupEngine:
             if not exe:
                 raise DownloadError("zipの中にインストーラーが見つかりませんでした")
             # VB-CABLE は終了コードがあてにならないので、導入後の再検出で判定する
-            return step_exe(cid, title, exe, ["-i", "-h"], timeout=300, lenient=True, reboot=True)
+            return step_exe(cid, title, exe, ["-i", "-h"], timeout=300, lenient=True, reboot=True, stage_dir=root)
         return step_exe(cid, title, dest, src["args"], ok_codes=src.get("ok_codes", (0, 3010, 1641)))
 
     def run(self, ids, emit=None, cancel=None):

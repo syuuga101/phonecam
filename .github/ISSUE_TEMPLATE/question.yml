@@ -1,0 +1,29 @@
+name: 質問
+description: 使い方がわからないとき
+title: "[質問] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先に [Wiki](https://github.com/syuuga101/phonecam/wiki) を見てもらえると早く解決することがあります。
+        （[Discussions](https://github.com/syuuga101/phonecam/discussions) が使える場合は、そちらでも質問できます）
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問の内容
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: ためしたこと
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: 環境（任意）
+      placeholder: "例: Windows 11 / iPhone 13 iOS 17.5 / PhoneCam 1.3.9 / USB"
+    validations:
+      required: false

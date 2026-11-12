@@ -47,6 +47,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var micSendFlag = false
     private var audioRate = 0
     private var droppedCount = 0
+    private var droppedLate = 0
+    private var droppedOutOfBuffers = 0
+    private var droppedDiscontinuity = 0
     private var streamReqW = 1920
     private var streamReqH = 1080
 
@@ -58,6 +61,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     private var device: AVCaptureDevice?
     private var input: AVCaptureDeviceInput?
+    // 最後に sessionQueue 上で作ったステータス (どのスレッドからでも読める。sessionQueue を待たない)
+    private let statusLock = NSLock()
+    private var cachedStatus: [String: Any] = [:]
+
     private var started = false
     private var runWanted = false          // AppModel が求めるカメラの起動状態 (sessionQueue 上)
 
@@ -162,16 +169,53 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     // MARK: - ステータス
 
-    /// 現在のステータス。sessionQueue 上以外から呼ぶこと。
+    /// 最後に作ったステータス (キャッシュ)。どのスレッドからでも呼べ、sessionQueue を待たない。
+    /// カメラ構成の変更中に呼び出し側 (ネットワーク / タイマー) が止まらないよう、sync は使わない。
+    /// 最新化は refreshStatus() で非同期に行う。
     func status() -> [String: Any] {
-        return sessionQueue.sync { buildStatus() }
+        statusLock.lock()
+        var s = cachedStatus
+        statusLock.unlock()
+        flagLock.lock()
+        s["cameraDroppedFrames"] = droppedCount
+        s["cameraDropReasons"] = [
+            "late": droppedLate,
+            "outOfBuffers": droppedOutOfBuffers,
+            "discontinuity": droppedDiscontinuity
+        ] as [String: Any]
+        flagLock.unlock()
+        return s
+    }
+
+    /// ステータスのキャッシュを sessionQueue 上で作り直す (非同期)
+    func refreshStatus() {
+        sessionQueue.async { [weak self] in
+            _ = self?.buildStatus()
+        }
+    }
+
+    /// sessionQueue 上でステータスを作って onApplied で配信する (非同期)
+    func requestPublish() {
+        sessionQueue.async { [weak self] in
+            guard let self = self, self.started else { return }
+            self.publishState()
+        }
     }
 
     private func fin(_ v: Double) -> Double {
         return v.isFinite ? v : 0
     }
 
+    /// sessionQueue 上: ステータスを作ってキャッシュも更新する
     private func buildStatus() -> [String: Any] {
+        let s = buildStatusUncached()
+        statusLock.lock()
+        cachedStatus = s
+        statusLock.unlock()
+        return s
+    }
+
+    private func buildStatusUncached() -> [String: Any] {
         var s: [String: Any] = [:]
         var lenses = ["wide"]
         if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
@@ -199,8 +243,16 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         flagLock.lock()
         let dropped = droppedCount
         let rate = audioRate
+        let dLate = droppedLate
+        let dBuf = droppedOutOfBuffers
+        let dDisc = droppedDiscontinuity
         flagLock.unlock()
         s["cameraDroppedFrames"] = dropped
+        s["cameraDropReasons"] = [
+            "late": dLate,
+            "outOfBuffers": dBuf,
+            "discontinuity": dDisc
+        ] as [String: Any]
         let auth = AVCaptureDevice.authorizationStatus(for: .audio)
         let micAvailable = (auth != .denied && auth != .restricted)
             && AVCaptureDevice.default(for: .audio) != nil
@@ -713,6 +765,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     func resetCounters() {
         flagLock.lock()
         droppedCount = 0
+        droppedLate = 0
+        droppedOutOfBuffers = 0
+        droppedDiscontinuity = 0
         flagLock.unlock()
     }
 
@@ -925,8 +980,23 @@ extension CameraController {
 
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if output === audioOutput { return }
+        // 落とした理由 (kCMSampleBufferAttachmentKey_DroppedFrameReason の値は文字列)
+        var reasonText = ""
+        if let raw = CMGetAttachment(sampleBuffer,
+                                     key: kCMSampleBufferAttachmentKey_DroppedFrameReason,
+                                     attachmentModeOut: nil) {
+            reasonText = String(describing: raw)
+        }
         flagLock.lock()
         droppedCount += 1
+        if reasonText.contains("OutOfBuffers") {
+            droppedOutOfBuffers += 1
+        } else if reasonText.contains("Discontinuity") {
+            droppedDiscontinuity += 1
+        } else {
+            // FrameWasLate (理由が取れないときも late 扱い)
+            droppedLate += 1
+        }
         flagLock.unlock()
     }
 

@@ -48,15 +48,30 @@ final class AppModel: ObservableObject {
     @Published var recSeconds = 0.0
     @Published var recError = ""
     @Published var micText = "オフ"
+    @Published var wifiAllowed = false
+    @Published var pairingCode = ""
 
     let camera = CameraController()
     private let encoder = H264Encoder()
-    private let server = StreamServer()
+    private let security: SecurityManager
+    private let server: StreamServer
     /// 低遅延の音声専用チャンネル (5556)。映像の滞留に巻き込まれない
-    private let audioServer = StreamServer(port: StreamServer.audioPort, ignoreIncoming: true, audioCapMs: 60)
+    private let audioServer: StreamServer
     private let effects = EffectsProcessor()
     private let recorder = Recorder()
-    private let scaler = FrameDownscaler()   // videoQueue 上でのみ使う
+    private let scaler = FrameDownscaler(maxBuffers: 6)   // videoQueue 上でのみ使う
+    /// エンコーダの破棄 (VT の完了待ちで止まりうる) をネットワークのキューから切り離す
+    private let encoderStopQueue = DispatchQueue(label: "phonecam.encoderstop")
+
+    init() {
+        let sec = SecurityManager()
+        security = sec
+        server = StreamServer(security: sec)
+        audioServer = StreamServer(port: StreamServer.audioPort, ignoreIncoming: true, audioCapMs: 60,
+                                   role: .audio, security: sec)
+        wifiAllowed = sec.wifiAllowed
+        pairingCode = sec.pairingCode
+    }
 
     // encoder のコールバックは任意のスレッドから来るため lock で保護する
     private let stateLock = NSLock()
@@ -99,6 +114,16 @@ final class AppModel: ObservableObject {
             self.sendFullStatus()
         }
 
+        // 前面に戻ったとき (写真の許可ダイアログのあとなど) にリスナーが死んでいれば作り直す
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.server.ensureListening()
+            self?.audioServer.ensureListening()
+        }
+
         // カメラ
         camera.onFrame = { [weak self] pixelBuffer, pts, duration in
             guard let self = self else { return }
@@ -121,6 +146,7 @@ final class AppModel: ObservableObject {
                 self.encoderLive = true
                 self.stateLock.unlock()
                 var source = pixelBuffer
+                var skipStream = false
                 if hiRes {
                     // 4K 録画中: ストリームは PC が要求した解像度へ縮小してからエフェクトへ渡す
                     let req = self.camera.streamRequestSize()
@@ -129,13 +155,19 @@ final class AppModel: ObservableObject {
                     let portrait = bh > bw
                     let tw = portrait ? req.1 : req.0
                     let th = portrait ? req.0 : req.1
-                    if bw > tw || bh > th,
-                       let scaled = self.scaler.scale(pixelBuffer, width: tw, height: th) {
-                        source = scaled
+                    if bw > tw || bh > th {
+                        if let scaled = self.scaler.scale(pixelBuffer, width: tw, height: th) {
+                            source = scaled
+                        } else {
+                            // 縮小できないときは 4K のままエンコーダへ渡さない (エンコーダの作り直しで止まるため)
+                            skipStream = true
+                        }
                     }
                 }
-                let toEncode = self.effects.process(source)
-                self.encoder.encode(pixelBuffer: toEncode, pts: pts, duration: duration)
+                if !skipStream {
+                    let toEncode = self.effects.process(source)
+                    self.encoder.encode(pixelBuffer: toEncode, pts: pts, duration: duration)
+                }
             }
         }
         camera.onAudio = { [weak self] captureTime, sampleRate, pcm in
@@ -222,6 +254,7 @@ final class AppModel: ObservableObject {
             self.encoder.requestKeyframe()
             self.updateCameraRunning()
             self.sendFullStatus()
+            self.camera.requestPublish()   // 最新のカメラ状態は sessionQueue で作って onApplied で届く
             DispatchQueue.main.async {
                 self.streamActiveUI = true
                 self.isConnected = true
@@ -244,7 +277,7 @@ final class AppModel: ObservableObject {
             self.stateLock.lock()
             self.active = false
             self.stateLock.unlock()
-            self.encoder.stop()
+            self.stopEncoderAsync()
             self.updateCameraRunning()
             DispatchQueue.main.async {
                 self.isConnected = false
@@ -350,10 +383,11 @@ final class AppModel: ObservableObject {
                 self.sendFullStatus()
             }
             DispatchQueue.main.async { self.refreshDeviceInfo() }
-            let ip = AppModel.wifiIPv4()
+            let wifiOn = self.security.wifiAllowed
+            let ip = wifiOn ? AppModel.wifiIPv4() : nil
             DispatchQueue.main.async {
                 self.sentFps = max(0, delta)
-                self.wifiAddress = ip.map { "\($0):5555" } ?? "未接続"
+                self.wifiAddress = wifiOn ? (ip.map { "\($0):5555" } ?? "未接続") : "オフ"
             }
         }
         t.resume()
@@ -416,6 +450,8 @@ final class AppModel: ObservableObject {
         let streamOn = streamActive
         stateLock.unlock()
         s["streamActive"] = streamOn
+        s["wifiAllowed"] = security.wifiAllowed
+        s["authOk"] = true   // 認証前の接続にはここまで届かない (StreamServer が authRequired だけ返す)
         s["audioChannel"] = audioServer.hasClient
         s["sentFps"] = fpsOut
         s["networkDroppedFrames"] = server.networkDroppedFrames()
@@ -460,7 +496,7 @@ final class AppModel: ObservableObject {
         if on {
             encoder.requestKeyframe()
         } else if changed {
-            encoder.stop()   // ハードウェアエンコーダを解放 (TCP / ステータス / ping は継続)
+            stopEncoderAsync()   // ハードウェアエンコーダを解放 (TCP / ステータス / ping は継続)
         }
         updateCameraRunning()
         if changed {
@@ -469,8 +505,44 @@ final class AppModel: ObservableObject {
         timerQueue.async { [weak self] in self?.sendFullStatus() }
     }
 
+    /// キャッシュ済みのカメラ状態で即送信し、次回用にキャッシュを非同期で更新する (sessionQueue を待たない)
     private func sendFullStatus() {
+        camera.refreshStatus()
         server.sendStatus(withExtras(camera.status()))
+    }
+
+    private func stopEncoderAsync() {
+        encoderStopQueue.async { [weak self] in
+            self?.encoder.stop()
+        }
+    }
+
+    /// 録画の開始 / 終了でカメラ構成が変わったあと、配信側を新しいキーフレームから再開させる
+    private func resyncStream() {
+        stateLock.lock()
+        waitingForKeyframe = true
+        stateLock.unlock()
+        encoder.requestKeyframe()
+    }
+
+    // MARK: Wi-Fi の許可 / ペアリングコード (メインスレッドで呼ぶ)
+
+    func setWifiAllowed(_ on: Bool) {
+        security.setWifiAllowed(on)
+        wifiAllowed = on
+        if !on {
+            wifiAddress = "オフ"
+            server.disconnectNonLoopback()
+            audioServer.disconnectNonLoopback()
+        }
+        timerQueue.async { [weak self] in self?.sendFullStatus() }
+    }
+
+    func regeneratePairingCode() {
+        pairingCode = security.regenerateCode()
+        // 古いコードで認証済みの Wi-Fi 接続は切る (USB はそのまま)
+        server.disconnectNonLoopback()
+        audioServer.disconnectNonLoopback()
     }
 
     // MARK: 画面を暗くする
@@ -578,6 +650,7 @@ final class AppModel: ObservableObject {
         stateLock.unlock()
         camera.setRecording(highRes: hiRes, audio: s.includeAudio) { [weak self] longSide, fps in
             self?.recorder.arm(expectedLongSide: hiRes ? longSide : 0, fps: fps)
+            self?.resyncStream()
         }
         updateCameraRunning()
         refreshRecordingUI()
@@ -599,6 +672,7 @@ final class AppModel: ObservableObject {
                 self.recHighRes = false
                 self.stateLock.unlock()
             }
+            self.resyncStream()
         }
     }
 
@@ -714,7 +788,8 @@ struct ContentView: View {
                     }
 
                     VStack(spacing: 0) {
-                        InfoRow(title: "Wi-Fi アドレス", value: model.wifiAddress)
+                        InfoRow(title: model.wifiAllowed ? "Wi-Fi アドレス" : "Wi-Fi接続",
+                                value: model.wifiAllowed ? model.wifiAddress : "オフ")
                         Divider().background(Color(white: 0.2))
                         InfoRow(title: "映像", value: model.formatText)
                         Divider().background(Color(white: 0.2))
@@ -758,6 +833,47 @@ struct ContentView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 10)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .background(cardColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(spacing: 0) {
+                        Toggle("Wi-Fiからの接続を許可", isOn: Binding(
+                            get: { model.wifiAllowed },
+                            set: { model.setWifiAllowed($0) }
+                        ))
+                        .tint(.green)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        if model.wifiAllowed {
+                            Divider().background(Color(white: 0.2))
+                            VStack(spacing: 6) {
+                                Text("ペアリングコード")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color(white: 0.55))
+                                Text(model.pairingCode)
+                                    .font(.system(size: 44, weight: .semibold, design: .monospaced))
+                                    .kerning(6)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .foregroundColor(.white)
+                                Button(action: { model.regeneratePairingCode() }) {
+                                    Text("コードを変更")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(Color.blue)
+                                }
+                                .padding(.top, 2)
+                                Text("PCの「ペアリングコード」欄に入力してください。USB接続では不要です。")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color(white: 0.55))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
                         }
                     }
                     .foregroundColor(.white)

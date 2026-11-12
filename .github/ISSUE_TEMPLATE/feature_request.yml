@@ -1,0 +1,31 @@
+name: 機能の要望
+description: こんな機能がほしい、こうなると便利、というアイデア
+title: "[要望] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 困っていること・やりたいこと
+      description: どんな場面で、何ができなくて困っていますか？
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: こうなってほしい（アイデア）
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 今やっている回避策・ほかの方法
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: 使っている環境（任意）
+      placeholder: "例: Windows 11 / iPhone 13 / OBS 30"
+    validations:
+      required: false

@@ -1,0 +1,92 @@
+name: 不具合の報告
+description: 映像が出ない、つながらない、アプリが落ちるなど、うまく動かないとき
+title: "[不具合] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。先に [Wiki の「よくある質問とトラブル」](https://github.com/syuuga101/phonecam/wiki/よくある質問とトラブル) を見てもらえると、すぐ解決することがあります。
+        わかる範囲で大丈夫です。
+  - type: input
+    id: phonecam-version
+    attributes:
+      label: PhoneCam のバージョン
+      description: 受信アプリのタイトルバー、または iPhone アプリの画面で確認できます。
+      placeholder: "例: 1.3.9"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows のバージョン
+      placeholder: "例: Windows 11 23H2"
+    validations:
+      required: true
+  - type: input
+    id: iphone
+    attributes:
+      label: iPhone の機種と iOS のバージョン
+      placeholder: "例: iPhone 13 / iOS 17.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: 接続のしかた
+      options:
+        - USB
+        - Wi-Fi
+        - 両方で起きる
+        - わからない
+    validations:
+      required: true
+  - type: dropdown
+    id: output
+    attributes:
+      label: 出力先（受信アプリの「接続・映像」タブ）
+      options:
+        - PhoneCam（専用カメラ）
+        - OBS Virtual Camera
+        - Unity Capture
+        - わからない
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 何が起きましたか？
+      description: 表示されたメッセージがあれば、そのまま書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順
+      placeholder: |
+        1. iPhone で PhoneCam を開く
+        2. 受信アプリで「接続」を押す
+        3. ...
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: 本来はどうなるはずでしたか？
+    validations:
+      required: false
+  - type: textarea
+    id: status-tab
+    attributes:
+      label: 「状態」タブの内容
+      description: 受信アプリの「状態」タブに出ている文字を、コピーして貼り付けてください（原因の手がかりになります）。
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: スクリーンショット
+      description: ここに画像をドラッグ＆ドロップできます。
+    validations:
+      required: false
