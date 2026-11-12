@@ -1637,8 +1637,8 @@ def parse_softcam_header(raw):
     """共有メモリ先頭 16 byte → {"width","height","active","ver","hb"}。不正なら None。"""
     if raw is None or len(raw) < SHMEM_HEADER_BYTES:
         return None
-    _off, w, h, _fr, active, ver, _sender_hb, hb = struct.unpack("<IHHfBBBB", bytes(raw[:SHMEM_HEADER_BYTES]))
-    return {"width": w, "height": h, "active": bool(active), "ver": ver, "hb": hb}
+    _off, w, h, _fr, active, ver, sender_hb, hb = struct.unpack("<IHHfBBBB", bytes(raw[:SHMEM_HEADER_BYTES]))
+    return {"width": w, "height": h, "active": bool(active), "ver": ver, "hb": hb, "shb": sender_hb}
 
 
 class Win32Mapping:
@@ -1789,6 +1789,8 @@ class ConsumerWatcher:
         parts = ["共有メモリ %dx%d" % (i.get("width", 0), i.get("height", 0))]
         if i.get("ver") is not None:
             parts.append("アプリの接続履歴あり" if i["ver"] else "アプリの接続履歴なし")
+            # 原因調査用の生の値 (受信hbが動いていれば、アプリがカメラを開いている)
+            parts.append("ver=%s 送信hb=%s 受信hb=%s" % (i.get("ver"), i.get("shb", "-"), i.get("hb")))
         return "、".join(parts)
 
 
@@ -2882,6 +2884,9 @@ def watch_text(watcher, now):
     """状態タブの「使用中の検出」: 使用中 / 未使用 / 共有メモリなし (+補足)。"""
     label = WATCH_STATE_LABELS.get(watcher.state(now), "-")
     detail = watcher.detail()
+    err = getattr(watcher, "last_error", "")
+    if err:
+        detail = (detail + "、" if detail else "") + "エラー: " + err[:120]
     return "%s（%s）" % (label, detail) if detail else label
 
 
@@ -3191,8 +3196,10 @@ class App:
         """0.5秒ごと: 待機フレーム送出 → 使用中の検出 → iPhoneのカメラの起動/停止指示 → 表示。"""
         try:
             self._stream_tick_once()
-        except Exception:
-            pass
+            self.watcher.last_error = ""
+        except Exception as e:
+            # 握りつぶすと「使用中の検出」が止まったまま原因が分からないので、診断表示に出す
+            self.watcher.last_error = "%s: %s" % (type(e).__name__, e)
         if not self._closing:
             self.root.after(WATCH_INTERVAL_MS, self._stream_tick)
 
