@@ -29,6 +29,11 @@ except Exception:  # pragma: no cover
     phonecam_setup = None
 
 try:
+    import phonecam_audio  # VB-CABLE 導入で既定の音声デバイスが変わるのを戻す
+except Exception:  # pragma: no cover
+    phonecam_audio = None
+
+try:
     import numpy as np
 except Exception:  # pragma: no cover
     np = None
@@ -67,6 +72,69 @@ MSG_CONTROL = 10
 
 def _is_frozen():
     return bool(getattr(sys, "frozen", False))
+
+
+# --- 画面の拡大率 (高DPI対応) -------------------------------------------------
+UI_SCALE = 1.0  # DPI / 96。ピクセル指定の幅・余白は px() で拡大する
+
+
+def enable_dpi_awareness():
+    """Tk を作る前に呼ぶ。Windows にウィンドウを勝手に拡大 (ぼやけ・切れ) させず、実際のDPIで描画する。"""
+    if os.name != "nt":
+        return False
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+        return True
+    except Exception:
+        pass
+    try:
+        return bool(ctypes.windll.user32.SetProcessDPIAware())
+    except Exception:
+        return False
+
+
+def system_dpi(root=None):
+    """実際のDPI (取れなければ 96)。"""
+    if os.name == "nt":
+        try:
+            return int(ctypes.windll.user32.GetDpiForSystem())
+        except Exception:
+            pass
+        try:
+            hdc = ctypes.windll.user32.GetDC(0)
+            dpi = int(ctypes.windll.gdi32.GetDeviceCaps(hdc, 88))  # LOGPIXELSX
+            ctypes.windll.user32.ReleaseDC(0, hdc)
+            if dpi > 0:
+                return dpi
+        except Exception:
+            pass
+    if root is not None:
+        try:
+            return int(round(root.winfo_fpixels("1i")))
+        except Exception:
+            pass
+    return 96
+
+
+def apply_ui_scale(root):
+    """tk の scaling を実際のDPIに合わせ (フォントの大きさがそろう)、UI_SCALE を設定する。"""
+    global UI_SCALE
+    dpi = system_dpi(root)
+    try:
+        root.tk.call("tk", "scaling", dpi / 72.0)
+    except Exception:
+        pass
+    UI_SCALE = max(1.0, min(3.0, dpi / 96.0))
+    if phonecam_setup is not None:
+        try:
+            phonecam_setup.set_scale(UI_SCALE)
+        except Exception:
+            pass
+    return UI_SCALE
+
+
+def px(n):
+    return max(1, int(round(n * UI_SCALE)))
 
 
 def _app_dir():
@@ -553,6 +621,9 @@ DEFAULT_SETTINGS = {
     "idle_stop_sec": 10,
     # 初回セットアップ (ウィザード) を終えたか
     "setup_done": False,
+    # VB-CABLE 導入前の既定の音声デバイス (導入後に CABLE へ切り替わったら戻すため。戻したら消す)
+    "audio_defaults_backup": None,
+    "vbcable_restore_pending": 0,
 }
 
 RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
@@ -639,6 +710,15 @@ def sanitize_settings(s):
     except Exception:
         idle = None
     s["idle_stop_sec"] = idle if idle in IDLE_STOP_VALUES else DEFAULT_SETTINGS["idle_stop_sec"]
+    # 音声デバイスの控え
+    try:
+        pend = int(s.get("vbcable_restore_pending"))
+    except Exception:
+        pend = 0
+    s["vbcable_restore_pending"] = min(5, max(0, pend))
+    if phonecam_audio is None or not phonecam_audio.valid_backup(s.get("audio_defaults_backup")):
+        s["audio_defaults_backup"] = None
+        s["vbcable_restore_pending"] = 0
     return s
 
 
@@ -667,13 +747,17 @@ def settings_has_key(key, path=None):
         return None
 
 
+_SAVE_LOCK = threading.Lock()  # 設定は UI スレッドと音声デバイスの復元スレッドの両方から保存される
+
+
 def save_settings(settings, path=SETTINGS_PATH):
     try:
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
+        with _SAVE_LOCK:
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
     except Exception:
         pass
 
@@ -2188,14 +2272,15 @@ class App:
             try:
                 self.setup = phonecam_setup.SetupController(
                     root, can_start=lambda: not self._elev_busy, on_busy=self._setup_busy,
-                    on_changed=self._setup_changed)
+                    on_changed=self._setup_changed, audio_guard=self._make_audio_guard())
             except Exception:
                 self.setup = None
 
         root.title("PhoneCam 受信 v%s" % APP_VERSION)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
-        root.minsize(560, 560)
-        root.geometry("640x720")
+        root.minsize(px(560), px(560))
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+        root.geometry("%dx%d" % (min(px(640), int(sw * 0.92)), min(px(720), int(sh * 0.9))))
         self._build_ui()
         self._update_enabled()
         self._apply_audio()
@@ -2203,6 +2288,7 @@ class App:
         self._meter_tick()
         self._stream_tick()
         root.after(600, self._first_run_check)
+        root.after(2500, self._audio_startup_check)
 
     # -- 補助 -------------------------------------------------------------
     def _get_mode_ip(self):
@@ -2265,7 +2351,7 @@ class App:
         # 熱警告バナー (どのタブを開いていても見えるよう下部に表示)
         self.warn_var = tk.StringVar(value="")
         self.warn_label = ttk.Label(outer, textvariable=self.warn_var, foreground="#c0392b",
-                                    font=("", 9, "bold"), wraplength=560, justify="left", padding=(14, 6))
+                                    font=("", 9, "bold"), wraplength=px(560), justify="left", padding=(14, 6))
         self.nb = ttk.Notebook(outer)
         self.nb.pack(fill="both", expand=True, padx=4, pady=(6, 4))
         self._canvases = []
@@ -2325,7 +2411,7 @@ class App:
             pass
 
     def _hint(self, parent, row, text, **grid):
-        lbl = ttk.Label(parent, text=text, foreground=HINT_FG, wraplength=480, justify="left")
+        lbl = ttk.Label(parent, text=text, foreground=HINT_FG, wraplength=px(480), justify="left")
         lbl.grid(row=row, column=0, columnspan=3, sticky="w", **grid)
         return lbl
 
@@ -2384,9 +2470,9 @@ class App:
         for i, (name, var) in enumerate([("状態", self.status_var), ("受信fps", self.fps_var),
                                          ("デコード時間", self.dec_var), ("解像度", self.res_var)]):
             ttk.Label(f, text=name).grid(row=2 + i, column=0, sticky="w")
-            ttk.Label(f, textvariable=var, wraplength=380, justify="left").grid(row=2 + i, column=1, columnspan=2, sticky="w", padx=6)
+            ttk.Label(f, textvariable=var, wraplength=px(380), justify="left").grid(row=2 + i, column=1, columnspan=2, sticky="w", padx=6)
         self.error_var = tk.StringVar(value="")
-        ttk.Label(f, textvariable=self.error_var, foreground="#c0392b", wraplength=480, justify="left").grid(
+        ttk.Label(f, textvariable=self.error_var, foreground="#c0392b", wraplength=px(480), justify="left").grid(
             row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
     def _build_run_control(self, parent):
@@ -2417,7 +2503,7 @@ class App:
         self.camera_state_var = tk.StringVar(value="-")
         ttk.Label(f, textvariable=self.camera_state_var).grid(row=3, column=1, sticky="w", padx=6)
         self.run_note_var = tk.StringVar(value="")
-        ttk.Label(f, textvariable=self.run_note_var, foreground="#b7791f", wraplength=480, justify="left").grid(
+        ttk.Label(f, textvariable=self.run_note_var, foreground="#b7791f", wraplength=px(480), justify="left").grid(
             row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._hint(f, 5, "自動: OBSやDiscordなどがPhoneCamカメラを開いている間だけ、iPhoneのカメラを動かします。"
                          "使っていないときはカメラが止まり、発熱とバッテリー消費を抑えられます", pady=(4, 0))
@@ -2577,7 +2663,7 @@ class App:
         self.cam_unreg_btn = ttk.Button(box, text="登録を解除", command=lambda: self._start_elevated("unregister"))
         self.cam_unreg_btn.pack(side="left", padx=2)
         self.cam_note_var = tk.StringVar(value="")
-        ttk.Label(f, textvariable=self.cam_note_var, foreground="#c0392b", wraplength=480,
+        ttk.Label(f, textvariable=self.cam_note_var, foreground="#c0392b", wraplength=px(480),
                   justify="left").grid(row=row + 1, column=0, columnspan=3, sticky="w")
         if not _is_frozen():
             self.cam_status_var.set("exe 版のみ（ソース実行では register.bat を使います）")
@@ -2675,18 +2761,22 @@ class App:
         self.setup_all_btn.pack(side="left", padx=(10, 0))
         self.setup_note_var = tk.StringVar(value="")
         tk.Label(inner, textvariable=self.setup_note_var, bg=ps.BG, fg=ps.WARN, font=(ps.FONT, 10), justify="left",
-                 wraplength=480).pack(anchor="w", pady=(10, 0))
+                 wraplength=px(480)).pack(anchor="w", pady=(10, 0))
         self.setup_manual_box = tk.Frame(inner, bg=ps.BG)
         self.setup_manual_box.pack(anchor="w")
         tk.Frame(inner, bg=ps.LINE, height=1).pack(fill="x", pady=(14, 10))
         tk.Label(inner, text="iPhoneへのインストール", bg=ps.BG, fg=ps.FG, font=(ps.FONT, 11, "bold")).pack(anchor="w")
         row = tk.Frame(inner, bg=ps.BG)
         row.pack(anchor="w", pady=(8, 0))
-        self.setup_ipa_btn = ps.make_button(row, "iPhone用アプリをダウンロード", self._setup_open_ipa)
+        self.setup_iphone_btn = ps.make_button(row, "iPhoneのセットアップ", self._setup_iphone, primary=True)
+        self.setup_iphone_btn.pack(side="left")
+        row2 = tk.Frame(inner, bg=ps.BG)
+        row2.pack(anchor="w", pady=(px(8), 0))
+        self.setup_ipa_btn = ps.make_button(row2, "PhoneCam.ipaを開く", self._setup_open_ipa)
         if ps.ipa_url():
             self.setup_ipa_btn.pack(side="left")
-        self.setup_alt_btn = ps.make_button(row, "AltServerを起動", self._setup_launch_altserver)
-        self.setup_alt_btn.pack(side="left", padx=(10, 0))
+        self.setup_alt_btn = ps.make_button(row2, "AltServerを起動", self._setup_launch_altserver)
+        self.setup_alt_btn.pack(side="left", padx=(px(10), 0))
         self.setup_alt_btn.pack_forget()
         rerun = ps.make_link(inner, "初期セットアップをやり直す", self._setup_rerun)
         rerun.pack(anchor="w", pady=(16, 0))
@@ -2733,7 +2823,7 @@ class App:
             except Exception:
                 pass
         if ps.find_altserver():
-            self.setup_alt_btn.pack(side="left", padx=(10, 0))
+            self.setup_alt_btn.pack(side="left", padx=(px(10), 0))
         else:
             self.setup_alt_btn.pack_forget()
 
@@ -2797,10 +2887,74 @@ class App:
     def _setup_rerun(self):
         self.open_setup_wizard(rerun=True)
 
-    def open_setup_wizard(self, rerun=False):
+    def _setup_iphone(self):
+        """セットアップタブの「iPhoneのセットアップ」: iPhone の手順だけを開く。"""
+        self.open_setup_wizard(iphone_only=True)
+
+    def _iphone_wizard_closed(self):
+        self._wizard = None
+        try:
+            self.setup.recheck()
+        except Exception:
+            pass
+
+    # -- VB-CABLE 導入時の既定の音声デバイス保護 ------------------------------
+    def _audio_get(self, key):
+        return self.settings.get(key)
+
+    def _audio_set(self, key, value):
+        self.settings[key] = value
+        save_settings(self.settings)
+
+    def _make_audio_guard(self):
+        if phonecam_audio is None or os.name != "nt":
+            return None
+        try:
+            return phonecam_audio.RestoreGuard(self._audio_get, self._audio_set)
+        except Exception:
+            return None
+
+    def _audio_startup_check(self):
+        """起動時: VB-CABLE を入れた直後 (あと2回の起動まで) は、既定が CABLE に変わっていないか見て元に戻す。"""
+        if self._closing or phonecam_audio is None:
+            return
+        guard = self._make_audio_guard()
+        if guard is None or guard.pending() <= 0:
+            return
+        box = []
+        phonecam_audio.run_in_thread(guard.startup_check, box.append)
+
+        def poll():
+            if self._closing:
+                return
+            if not box:
+                self.root.after(500, poll)
+                return
+            res = box[0]
+            if res and res.get("message"):
+                try:
+                    self.setup_note_var.set(res["message"])
+                except Exception:
+                    pass
+                try:
+                    messagebox.showinfo("PhoneCam", res["message"])
+                except Exception:
+                    pass
+
+        self.root.after(500, poll)
+
+    def open_setup_wizard(self, rerun=False, iphone_only=False):
         if self.setup is None or self._wizard is not None or tk is None:
             return
         if self.setup.busy:
+            return
+        if iphone_only:
+            try:
+                self._wizard = phonecam_setup.SetupWizard(self.root, self.setup, on_finish=self._iphone_wizard_closed,
+                                                          on_skip=self._iphone_wizard_closed, open_url=webbrowser_open,
+                                                          start="iphone")
+            except Exception:
+                self._wizard = None
             return
         if rerun:
             self.settings["setup_done"] = False
@@ -2915,7 +3069,7 @@ class App:
 
         self.shutter_cb.bind("<<ComboboxSelected>>", on_shutter)
         ttk.Label(f, text="東日本(50Hz)は1/50か1/100、西日本(60Hz)は1/60か1/120でちらつき防止",
-                  foreground="#666666", wraplength=480, justify="left").grid(row=4, column=0, columnspan=3, sticky="w")
+                  foreground="#666666", wraplength=px(480), justify="left").grid(row=4, column=0, columnspan=3, sticky="w")
         self.cur_exp_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.cur_exp_var, foreground="#666666", font=("", 8)).grid(row=5, column=0, columnspan=3, sticky="w")
 
@@ -3035,12 +3189,12 @@ class App:
                                            ("size", "サイズ"), ("free", "iPhoneの空き容量")], start=1):
             ttk.Label(g, text=name).grid(row=row, column=0, sticky="w", pady=2)
             var = tk.StringVar(value="-")
-            lbl = ttk.Label(g, textvariable=var, wraplength=380, justify="left")
+            lbl = ttk.Label(g, textvariable=var, wraplength=px(380), justify="left")
             lbl.grid(row=row, column=1, columnspan=2, sticky="w", padx=6)
             self.rec_vars[key] = var
             self.rec_labels[key] = lbl
         self.rec_error_var = tk.StringVar(value="")
-        ttk.Label(g, textvariable=self.rec_error_var, foreground="#c0392b", wraplength=520, justify="left").grid(
+        ttk.Label(g, textvariable=self.rec_error_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
             row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self.rec_btn.state(["disabled"])
 
@@ -3088,10 +3242,10 @@ class App:
                                               lambda v: "%d ms" % round(v), 10, as_int=True)
         self._hint(f, 6, "映像より音が早いときに増やして、映像に合わせます", pady=(0, 4))
         self.audio_info_var = tk.StringVar(value="")
-        ttk.Label(f, textvariable=self.audio_info_var, foreground=HINT_FG, wraplength=520, justify="left").grid(
+        ttk.Label(f, textvariable=self.audio_info_var, foreground=HINT_FG, wraplength=px(520), justify="left").grid(
             row=7, column=0, columnspan=3, sticky="w")
         self.audio_err_var = tk.StringVar(value="")
-        ttk.Label(f, textvariable=self.audio_err_var, foreground="#c0392b", wraplength=520, justify="left").grid(
+        ttk.Label(f, textvariable=self.audio_err_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
             row=8, column=0, columnspan=3, sticky="w", pady=(2, 0))
         self._hint(f, 9, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
                          "OBSやDiscordでマイクとして「CABLE Output」を選べます", pady=(6, 0))
@@ -3173,7 +3327,7 @@ class App:
         label.pack()
         tk.Label(win, text="カメラをこのタイマーに向け、OBSのプレビューに映るタイマーと実物のタイマーを"
                            "一緒にスクリーンショットすると、合計の遅延が分かります",
-                 font=("", 10), background="#ffffff", foreground="#666666", wraplength=560,
+                 font=("", 10), background="#ffffff", foreground="#666666", wraplength=px(560),
                  justify="center", padx=20, pady=(0)).pack(pady=(0, 16))
         job = {"id": None}
 
@@ -3527,7 +3681,18 @@ def _bind_setup():
         register_camera=lambda: helper_register(),
         run_elevated=lambda params, timeout_ms=ELEVATED_TIMEOUT_MS: run_elevated(params, timeout_ms),
         script_path=lambda: os.path.abspath(__file__),
+        link_connected=lambda: _link_connected(),
     )
+
+
+_APP_REF = []  # 起動中の App (セットアップ画面から接続状態を参照するため)
+
+
+def _link_connected():
+    try:
+        return bool(_APP_REF and _APP_REF[0].state.connected)
+    except Exception:
+        return False
 
 
 _bind_setup()
@@ -3540,12 +3705,14 @@ def main():
     if tk is None:
         print("tkinter が使用できません。Python を公式インストーラーで再インストールしてください。")
         return 1
+    enable_dpi_awareness()  # Tk を作る前に (作ったあとでは効かない)
     root = tk.Tk()
+    apply_ui_scale(root)
     try:
         ttk.Style().theme_use("vista")
     except Exception:
         pass
-    App(root)
+    _APP_REF.append(App(root))
     root.mainloop()
     return 0
 

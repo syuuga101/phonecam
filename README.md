@@ -48,21 +48,49 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 ## iPhoneへのインストール（AltStore Classic 推奨）
 
-1. Apple の公式サイトから **iTunes** と **iCloud** をインストールします。**Microsoft Store 版は不可**です（AltServer が動きません）。
-2. **AltServer** をインストールして起動します（タスクトレイに常駐します）。
+**Windows の受信アプリ（exe 版）の「iPhoneのセットアップ」ウィザードが、手順を1つずつ案内します**（初回セットアップの最後に自動で開きます。あとから開くときは「セットアップ」タブの **iPhoneのセットアップ** ボタン）。各ステップには状態表示（✓ / 待機中）があり、2秒ごとに自動で更新されます。
 
-   > 1〜2 は、Windows 側の受信アプリ（exe 版）の**セットアップウィザード**で自動インストールできます。手動で入れる場合は https://www.apple.com/itunes/ と https://altstore.io/ からどうぞ。
+| # | ステップ | 自動で確認できること |
+|---|---|---|
+| 1 | iPhoneをUSBで接続 | iPhone が USB で見つかったら ✓（見つかっていて、すでに信頼済みなら自動で次へ） |
+| 2 | 「このコンピュータを信頼」 | 信頼済み（ペアリング済み）なら ✓。まだならロックを解除して「信頼」を押す |
+| 3 | iTunesでWi-Fi同期をオン | 手動で確認（**iTunesを開く** ボタンあり）。7日ごとの自動更新に使うもので、手動で更新するなら省略可 |
+| 4 | AltStoreをiPhoneに入れる | 手動で確認（**AltServerを起動** ボタンあり）。タスクトレイの AltServer アイコン → **Install AltStore** → このiPhone → Apple ID。サブの Apple ID で構いません |
+| 5 | iPhone側の設定 | 手動で確認。**設定 > プライバシーとセキュリティ > デベロッパモード** をオンにして再起動、**設定 > 一般 > VPNとデバイス管理** で自分の Apple ID を「信頼」 |
+| 6 | PhoneCamを入れる | 画面の **QRコード** を iPhone で読み取り、AltStore に PhoneCam のソースを追加して「PhoneCam」を入手（下記） |
+| 7 | 接続テスト | iPhone で PhoneCam を開くと、USB 経由でつながったことを自動で確認して ✓。**完了** を押せるようになります |
+
+どの画面でも **戻る / 次へ**、**あとで**（iPhone の準備をあとに回す）が使えます。
+
+### PhoneCam の入れ方（AltStore のソース。アプリの更新もここから）
+
+PhoneCam は **AltStore のソース** として配布しています。ウィザードの QR コード（ `altstore://source?url=…` ）を iPhone のカメラで読み取ると AltStore が開き、ソースを追加できます。追加後、AltStore で **PhoneCam** を入手します。新しいバージョンが出たときも、AltStore の画面から更新できます。
+
+- ソースの URL（QR を使わず、AltStore の「Sources」に貼り付けて追加することもできます）:
+  `https://github.com/syuuga101/phonecam/releases/latest/download/altstore-source.json`
+- ソースは Release のたびに `altstore-source.json` として自動で作られ（`.github/scripts/make_altstore_source.py`）、常に最新の `PhoneCam.ipa` を指します。
+
+### 別の入れ方（QR が使えないとき）
+
+- **AltServer で直接入れる**: PC で `PhoneCam.ipa`（ウィザードの **PhoneCam.ipaをダウンロード** で「ダウンロード」フォルダに保存されます）を用意し、**Shift キーを押しながら** タスクトレイの AltServer アイコンをクリック → **Sideload .ipa…** → `PhoneCam.ipa` を選びます。この方法だと、新しいバージョンは自分で入れ直します（AltStore が入っていれば、7日の期限は AltStore が自動で更新します）。
+- **iPhone に保存して AltStore で開く**: iPhone の Safari などで `PhoneCam.ipa`（Release の添付ファイル）を保存し、AltStore の **My Apps > ＋** から選びます。
+- **Sideloadly**（https://sideloadly.io/）でも入れられます。PC で `PhoneCam.ipa` をドラッグして Apple ID を入力し Start するだけですが、7日ごとに自分で再インストールが必要です。
+
+### 手動で行う場合の手順（ウィザードを使わないとき）
+
+1. Apple の公式サイトから **iTunes** と **iCloud** をインストールします。**Microsoft Store 版は不可**です（AltServer が動きません）。
+2. **AltServer** をインストールして起動します（タスクトレイに常駐します。動かないときは「管理者として実行」）。
+
+   > 1〜2 は、受信アプリ（exe 版）の**セットアップウィザード**で自動インストールできます。手動で入れる場合は https://www.apple.com/itunes/ と https://altstore.io/ からどうぞ。
 3. iPhone を USB で接続して「このコンピュータを信頼」し、iTunes で iPhone を開いて **「Wi-Fi経由でこのiPhoneと同期」** を ON にします。
 4. タスクトレイの AltServer アイコン > **Install AltStore** > 自分の iPhone を選び、Apple ID を入力します。
 5. iPhone の **設定 > プライバシーとセキュリティ > デベロッパモード** を ON にして再起動します。
 6. iPhone の **設定 > 一般 > VPNとデバイス管理** で自分の Apple ID のアプリを開き、「信頼」します。
-7. iPhone で **AltStore** を開き、**My Apps** > 左上の **＋** > `PhoneCam.ipa`（iPhone に保存しておく）を選びます。
+7. 上の「PhoneCam の入れ方」のいずれかで PhoneCam を入れます。
 8. PhoneCam を起動し、カメラとローカルネットワークの許可を「許可」にします。マイクと写真（録画の保存）は、使う機能を初めて操作したときに許可を求められます。
 
 - 7日の期限は、PC で AltServer が動いていて同じ Wi-Fi につながっている間、AltStore が自動で更新します。
 - 無料の Apple ID では、AltStore を含めて同時に有効にできるサイドロードアプリは **3つまで**です。
-
-> 代わりに Sideloadly（https://sideloadly.io/）でも入れられます。PC で `PhoneCam.ipa` をドラッグして Apple ID を入力し Start するだけですが、7日ごとに自分で再インストールが必要です。
 
 ## Windows側（exe 版・おすすめ）
 
@@ -72,7 +100,7 @@ iPhone (PhoneCam アプリ)                         Windows PC
    1. **ようこそ**: 内容の説明です。
    2. **必要なソフトの確認**: 入っているものは自動で「スキップ」になり、足りないものだけにチェックが付きます。**インストール** を押します。
    3. **インストール中**: ダウンロードとインストールが進みます。管理者の確認（UAC）が **1回だけ** 表示されるので **「はい」** を押します。
-   4. **iPhoneの準備**: AltServer で AltStore を入れ、PhoneCam.ipa を追加する手順を案内します（「iPhone用アプリをダウンロード」ボタンあり）。
+   4. **iPhoneの準備**: USB 接続・信頼・AltStore のインストール・PhoneCam の追加・接続テストを、7ステップで案内します（上の「iPhoneへのインストール」）。
 4. 以上で完了です。OBS や Discord のカメラ一覧に「PhoneCam」が表示されます。
 
 ウィザードが入れるもの（足りないものだけ）:
@@ -84,12 +112,13 @@ iPhone (PhoneCam アプリ)                         Windows PC
 | Apple USBドライバ（iTunes・Apple 公式サイト版） | USB 接続に必要。Wi-Fi だけなら不要 | USB 接続に必須 |
 | iCloud（Apple 公式サイト版） | AltServer の動作に必要 | 任意（AltServer を入れるなら必要） |
 | AltServer | iPhone へアプリを入れて自動更新する | 任意（おすすめ） |
-| VB-CABLE | iPhone のマイクを OBS で使う | 任意（「iPhoneのマイクを使う」を選んだとき） |
+| VB-CABLE | iPhone のマイクを OBS で使う（今のスピーカー／マイクは既定のまま） | 任意（「iPhoneのマイクを使う」を選んだとき） |
 
 - ダウンロードは公式の配布元から行い、無人インストールに対応しているものは確認画面なしで入れます。VB-CABLE はドライバーの確認が Windows から表示されることがあります（「インストール」を選んでください）。
 - **iTunes・iCloud・VB-CABLE などは、インストール後に PC の再起動が必要になることがあります**。その場合は完了画面に「再起動が必要です」と表示されます。
+- **VB-CABLE を入れても、今のスピーカー（出力）とマイク（入力）は既定のままです。** VB-CABLE のインストーラーは Windows の「既定の音の出力先」を CABLE に切り替えてしまうことがあるため、PhoneCam は入れる前に現在の既定デバイスを控え、入れたあと（約20秒間と、次の2回の起動時）に CABLE へ切り替わっていたら元に戻します（戻したときは画面に案内を出します）。PhoneCam の受信アプリだけが「CABLE Input」へ音を出します。自動で戻せなかったときは、タスクバーのスピーカーのアイコンから出力先を元のデバイスに選び直してください。
 - 自動で入れられないもの（ネットワークの問題など）は、公式ページを開いて手順を案内します。
-- 後から **「セットアップ」タブ** でいつでも確認・インストールできます（**再チェック** / 行ごとの **インストール** / **初期セットアップをやり直す** / iPhone用アプリのダウンロード）。
+- 後から **「セットアップ」タブ** でいつでも確認・インストールできます（**再チェック** / 行ごとの **インストール** / **初期セットアップをやり直す** / **iPhoneのセットアップ**）。
 - 専用カメラの DLL は exe に内蔵されていて、登録時に `C:\ProgramData\PhoneCam\softcam` にコピーされます。登録は「接続・映像」タブの「PhoneCamカメラ」欄（**登録する（更新）** / **登録を解除**）からもやり直せます。
 - 設定は `%APPDATA%\PhoneCam\phonecam_settings.json` に保存されます（旧バージョンの exe と同じフォルダにあった設定は、初回起動時に自動で引き継ぎます）。以前のバージョンから使っていて専用カメラも登録済みの場合は、ウィザードは表示されません（「セットアップ」タブから開けます）。
 - **更新**: 新しい exe に置き換えるだけです。専用カメラの更新が必要なときは、起動時に案内が出ます。
@@ -187,7 +216,7 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 iPhoneのマイクの音を PC で鳴らし、OBS や Discord のマイクとして使えます。
 
-1. **VB-CABLE（無料）** https://vb-audio.com/Cable/ をインストールして PC を再起動します。
+1. **VB-CABLE（無料）** https://vb-audio.com/Cable/ をインストールして PC を再起動します（Windows の既定のスピーカー／マイクは変わりません。変わってしまったときは PhoneCam が元に戻します）。
 2. 受信アプリの「音声」タブで **iPhoneのマイクを使う** をオンにし、出力先を **CABLE Input** にします（CABLE Input があれば最初から選ばれます）。初めて使うときは iPhone でマイクの許可が必要です。
 3. OBS では **ソース追加 > 音声入力キャプチャ** で **CABLE Output** を選びます。Discord などでもマイクに「CABLE Output」を選びます。
 4. 映像より音が早いときは **音声の遅延** を増やして合わせます。音量は 0〜200%、ミュートとレベルメーターもあります。
@@ -225,6 +254,8 @@ iPhoneのマイクの音を PC で鳴らし、OBS や Discord のマイクとし
 | 映像が固まる／乱れる | 受信アプリが自動でキーフレームを再要求します。改善しない場合はビットレートを下げるか USB を使ってください。 |
 | 映像が暗い／ちらつく | 露出をマニュアルにし、シャッター速度を地域に合わせてください（上記参照）。 |
 | 数日後にアプリが開かなくなった | 無料 Apple ID は7日で期限切れです。AltStore なら PC の AltServer を起動して同じ Wi-Fi につなぎ、My Apps で更新してください（Sideloadly の場合は再インストール）。 |
+| 画面の文字や行が切れる（高DPI） | 受信アプリは高DPIに対応しています。ウィザードは大きさを変えられ、中身はスクロールできます。それでも切れる場合は、ウィンドウを広げてください。 |
+| VB-CABLE を入れたら音が出なくなった | タスクバーのスピーカーのアイコンから、出力先を元のスピーカー／ヘッドホンに戻してください（PhoneCam も自動で戻します）。 |
 | 画面が消えて止まる | iPhone をロックするとカメラが止まります。アプリを前面に表示したままにしてください。 |
 | `py` コマンドが見つからない | Python 3.12 を公式サイトからインストールし、「Add python.exe to PATH」と「py launcher」にチェックを入れてください。 |
 

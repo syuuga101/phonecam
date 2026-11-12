@@ -41,6 +41,16 @@ except Exception:  # pragma: no cover
     tk = None
     ttk = None
 
+try:
+    import phonecam_iphone as iphone  # iPhone のセットアップ案内 (usbmux への問い合わせ・手順の判定)
+except Exception:  # pragma: no cover
+    iphone = None
+
+try:
+    import phonecam_qr  # 依存なしの QR コード生成
+except Exception:  # pragma: no cover
+    phonecam_qr = None
+
 
 # ---------------------------------------------------------------------------
 # 本体との連携
@@ -50,7 +60,8 @@ _host = {}
 
 
 def bind(**fns):
-    """本体から関数を受け取る: is_frozen / registration_status / register_camera / run_elevated / script_path"""
+    """本体から関数を受け取る: is_frozen / registration_status / register_camera / run_elevated / script_path
+    (任意: link_connected = 受信アプリが iPhone につながっているか)"""
     _host.update(fns)
 
 
@@ -91,7 +102,7 @@ COMPONENTS = [
     {"id": "itunes", "name": "Apple USBドライバ（iTunes）", "purpose": "USBケーブルでの接続に必要（Wi-Fiだけなら不要）", "required": True},
     {"id": "icloud", "name": "iCloud", "purpose": "AltServerの動作に必要", "required": False},
     {"id": "altserver", "name": "AltServer", "purpose": "iPhoneにアプリを入れて自動更新する", "required": False, "default_on": True},
-    {"id": "vbcable", "name": "VB-CABLE", "purpose": "iPhoneのマイクをOBSで使う（任意）", "required": False},
+    {"id": "vbcable", "name": "VB-CABLE", "purpose": "iPhoneのマイクをOBSで使う（任意）。今のスピーカーとマイクは既定のまま変わりません", "required": False},
 ]
 COMPONENT_BY_ID = {c["id"]: c for c in COMPONENTS}
 # インストールする順番
@@ -849,8 +860,12 @@ class SetupEngine:
 class SetupController:
     """検出結果・選択状態・実行状態を持つ。UI は listeners に登録して更新を受ける。"""
 
-    def __init__(self, root, engine=None, detector=None, can_start=None, on_busy=None, on_changed=None):
+    def __init__(self, root, engine=None, detector=None, can_start=None, on_busy=None, on_changed=None,
+                 audio_guard=None):
         self.root = root
+        self.audio_guard = audio_guard  # VB-CABLE の導入で既定の音声デバイスが変わるのを戻す (phonecam_audio.RestoreGuard)
+        self.audio_message = ""
+        self.audio_polling = False
         self.engine = engine or SetupEngine()
         self.detector = detector or detect_all
         self.can_start = can_start or (lambda: True)
@@ -901,7 +916,7 @@ class SetupController:
     def _tick(self):
         self._pumping = False
         self.pump()
-        if (self.busy or self.checking) and not self.closed:
+        if (self.busy or self.checking or self.audio_polling) and not self.closed:
             self._arm()
 
     def pump(self):
@@ -933,6 +948,10 @@ class SetupController:
             self.apply_defaults()
             self._notify("statuses")
             self.on_changed()
+        elif kind == "audio":
+            self.audio_polling = False
+            self.audio_message = (payload or {}).get("message", "")
+            self._notify("audio")
         elif kind == "done":
             self.busy = False
             self.outcome = payload
@@ -990,6 +1009,13 @@ class SetupController:
         if self.busy or not ids or not self.can_start():
             return False
         ids = expand_selection(ids, self.statuses)
+        guard = self.audio_guard if "vbcable" in ids else None
+        if guard is not None:
+            try:
+                guard.before_install()  # 通常権限のこのプロセスで、現在の既定の音声デバイスを控える
+            except Exception:
+                guard = None
+        self.audio_message = ""
         self.busy = True
         self.outcome = None
         self.log_lines = []
@@ -1008,7 +1034,15 @@ class SetupController:
             except Exception as e:
                 out = {"results": {}, "manual": [], "reboot": False, "statuses": {}, "ids": ids,
                        "error": "セットアップ中にエラーが発生しました (%s)" % e}
+            if guard is not None:
+                self.audio_polling = True  # "done" より先に立てる (UI の更新ループを止めないため)
             self._q.put(("done", out))
+            if guard is not None:
+                try:
+                    res = guard.after_install()
+                except Exception:
+                    res = {"message": ""}
+                self._q.put(("audio", res))
 
         threading.Thread(target=work, name="setup-run", daemon=True).start()
         self._arm()
@@ -1036,31 +1070,82 @@ FONT = "Yu Gothic UI"
 
 ICONS = {STATE_OK: ("✓", GOOD, "導入済み"), STATE_MISSING: ("●", SUB, "未導入"), STATE_WARN: ("!", WARN, "要確認")}
 
+# 画面の拡大率 (DPI / 96)。フォントは tk の scaling でそろうが、ピクセル指定の余白・幅は px() で拡大する
+SCALE = 1.0
+
+
+def set_scale(f):
+    global SCALE
+    try:
+        SCALE = max(1.0, min(3.0, float(f)))
+    except Exception:
+        SCALE = 1.0
+
+
+def px(n):
+    return max(1, int(round(n * SCALE)))
+
+
+def detect_scale(root):
+    """tk の実際の DPI から拡大率を求める (取れなければ 1.0)。"""
+    try:
+        return float(root.winfo_fpixels("1i")) / 96.0
+    except Exception:
+        return 1.0
+
 
 def make_button(parent, text, command, primary=False, state="normal"):
     """角のない平らなボタン。"""
     if primary:
         b = tk.Button(parent, text=text, command=command, bg=ACCENT, fg="#ffffff", activebackground="#0077ed",
-                      activeforeground="#ffffff", relief="flat", bd=0, padx=22, pady=7, cursor="hand2",
+                      activeforeground="#ffffff", relief="flat", bd=0, padx=px(22), pady=px(7), cursor="hand2",
                       font=(FONT, 10, "bold"), disabledforeground="#c7c7cc", state=state)
     else:
         b = tk.Button(parent, text=text, command=command, bg=PANEL, fg=FG, activebackground="#e8e8ed",
-                      activeforeground=FG, relief="flat", bd=0, padx=16, pady=6, cursor="hand2",
+                      activeforeground=FG, relief="flat", bd=0, padx=px(16), pady=px(6), cursor="hand2",
                       font=(FONT, 10), disabledforeground="#c7c7cc", state=state)
     return b
 
 
 def make_link(parent, text, command, bg=BG):
     b = tk.Button(parent, text=text, command=command, bg=bg, fg=SUB, activebackground=bg, activeforeground=FG,
-                  relief="flat", bd=0, cursor="hand2", font=(FONT, 9), padx=4, pady=2)
+                  relief="flat", bd=0, cursor="hand2", font=(FONT, 9), padx=px(4), pady=px(2))
     return b
+
+
+def bind_wrap(label, container, reserve=0, minimum=140):
+    """label の wraplength を container の実際の幅に合わせる (固定ピクセルにしない)。
+    reserve はほかの列が使う幅 (数値、または呼ぶと数値を返す関数)。"""
+    def fit(_e=None):
+        try:
+            w = container.winfo_width()
+            if w > 1:
+                r = reserve() if callable(reserve) else reserve
+                label.configure(wraplength=max(px(minimum), int(w - r)))
+        except Exception:
+            pass
+    container.bind("<Configure>", fit, add="+")
+    return fit
+
+
+def wrapped_label(parent, text, container=None, reserve=0, **kw):
+    """折り返すラベル。初期の wraplength を持たせ、container の幅に追従させる。"""
+    kw.setdefault("bg", BG)
+    kw.setdefault("fg", SUB)
+    kw.setdefault("font", (FONT, 10))
+    kw.setdefault("justify", "left")
+    kw.setdefault("anchor", "w")
+    lbl = tk.Label(parent, text=text, wraplength=px(440), **kw)
+    if container is not None:
+        bind_wrap(lbl, container, reserve)
+    return lbl
 
 
 class ThinProgress:
     """細い直線のプログレスバー。"""
 
     def __init__(self, parent):
-        self.canvas = tk.Canvas(parent, height=4, bg=PANEL, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(parent, height=px(4), bg=PANEL, highlightthickness=0, bd=0)
         self.value = 0.0
         self.canvas.bind("<Configure>", lambda e: self._draw())
 
@@ -1075,7 +1160,61 @@ class ThinProgress:
         try:
             w = self.canvas.winfo_width()
             self.canvas.delete("all")
-            self.canvas.create_rectangle(0, 0, int(w * self.value), 4, fill=ACCENT, width=0)
+            self.canvas.create_rectangle(0, 0, int(w * self.value), px(4), fill=ACCENT, width=0)
+        except Exception:
+            pass
+
+
+class ScrollFrame:
+    """縦にスクロールできる領域 (Canvas + 内側の Frame)。中身が収まるときはスクロールバーを隠す。"""
+
+    def __init__(self, parent, bg=BG):
+        self.outer = tk.Frame(parent, bg=bg)
+        self.canvas = tk.Canvas(self.outer, bg=bg, highlightthickness=0, bd=0, yscrollincrement=px(24))
+        self.vsb = tk.Scrollbar(self.outer, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self._on_yscroll)
+        self.inner = tk.Frame(self.canvas, bg=bg)
+        self._win = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.bar_visible = False
+        self.inner.bind("<Configure>", self._on_inner)
+        self.canvas.bind("<Configure>", self._on_canvas)
+
+    def _on_inner(self, _e=None):
+        try:
+            self.canvas.configure(scrollregion=(0, 0, self.inner.winfo_reqwidth(), self.inner.winfo_reqheight()))
+        except Exception:
+            pass
+
+    def _on_canvas(self, e):
+        try:
+            self.canvas.itemconfigure(self._win, width=e.width)
+        except Exception:
+            pass
+
+    def _on_yscroll(self, lo, hi):
+        try:
+            self.vsb.set(lo, hi)
+            need = not (float(lo) <= 0.0 and float(hi) >= 1.0)
+            if need and not self.bar_visible:
+                self.vsb.pack(side="right", fill="y")
+                self.bar_visible = True
+            elif not need and self.bar_visible:
+                self.vsb.pack_forget()
+                self.bar_visible = False
+        except Exception:
+            pass
+
+    def wheel(self, e):
+        try:
+            if self.bar_visible:
+                self.canvas.yview_scroll(int(-e.delta / 120) or (-1 if e.delta > 0 else 1), "units")
+        except Exception:
+            pass
+
+    def to_top(self):
+        try:
+            self.canvas.yview_moveto(0)
         except Exception:
             pass
 
@@ -1105,7 +1244,7 @@ class SetupPanel:
         self.install_buttons = {}
         c = self.controller
         if not c.checked:
-            tk.Label(self.frame, text="確認しています…", bg=BG, fg=SUB, font=(FONT, 10)).pack(anchor="w", pady=20)
+            tk.Label(self.frame, text="確認しています…", bg=BG, fg=SUB, font=(FONT, 10)).pack(anchor="w", pady=px(20))
             return
         for comp in COMPONENTS:
             self._row(comp)
@@ -1119,27 +1258,34 @@ class SetupPanel:
         row = tk.Frame(self.frame, bg=BG)
         row.pack(fill="x")
         inner = tk.Frame(row, bg=BG)
-        inner.pack(fill="x", padx=2, pady=9)
+        inner.pack(fill="x", padx=px(2), pady=px(9))
+        # 列: 0 = 状態アイコン (固定) / 1 = 文章 (伸びる) / 2 = チェックやボタン (固定)
+        inner.columnconfigure(0, minsize=px(34))
         inner.columnconfigure(1, weight=1)
 
         if res is not None:
             icon, color, word = ("✓", GOOD, "完了") if res.get("ok") else ("✗", BAD, "失敗")
         else:
             icon, color, word = ICONS.get(state, ICONS[STATE_WARN])
-        tk.Label(inner, text=icon, fg=color, bg=BG, font=(FONT, 12, "bold"), width=3).grid(row=0, column=0, rowspan=2, sticky="n")
-        head = tk.Frame(inner, bg=BG)
-        head.grid(row=0, column=1, sticky="w")
+        icon_lbl = tk.Label(inner, text=icon, fg=color, bg=BG, font=(FONT, 12, "bold"))
+        icon_lbl.grid(row=0, column=0, sticky="nw")
+        action = tk.Frame(inner, bg=BG)
+        action.grid(row=0, column=2, sticky="ne", padx=(px(10), 0))
+        text_col = tk.Frame(inner, bg=BG)
+        text_col.grid(row=0, column=1, sticky="ew")
+        head = tk.Frame(text_col, bg=BG)
+        head.pack(anchor="w")
         tk.Label(head, text=comp["name"], fg=FG, bg=BG, font=(FONT, 10, "bold")).pack(side="left")
         tk.Label(head, text="  " + word, fg=color, bg=BG, font=(FONT, 9)).pack(side="left")
         detail = (res or {}).get("detail") if res is not None else st.get("detail", "")
-        sub = tk.Frame(inner, bg=BG)
-        sub.grid(row=1, column=1, sticky="w")
-        tk.Label(sub, text=comp["purpose"], fg=SUB, bg=BG, font=(FONT, 9), justify="left", wraplength=330).pack(anchor="w")
+
+        def reserve():
+            return px(34) + action.winfo_reqwidth() + px(24)
+
+        wrapped_label(text_col, comp["purpose"], inner, reserve, font=(FONT, 9)).pack(fill="x")
         if detail:
-            tk.Label(sub, text=detail, fg=(BAD if res is not None else WARN), bg=BG, font=(FONT, 9), justify="left",
-                     wraplength=330).pack(anchor="w")
-        action = tk.Frame(inner, bg=BG)
-        action.grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
+            wrapped_label(text_col, detail, inner, reserve, font=(FONT, 9),
+                          fg=(BAD if res is not None else WARN)).pack(fill="x")
         if self.mode == "wizard" and res is None:
             self._wizard_action(action, comp, state)
         elif self.mode == "tab" and res is None:
@@ -1177,44 +1323,93 @@ class SetupPanel:
         self.install_buttons[cid] = b
 
 
+def find_itunes():
+    return _any_file([os.path.join("iTunes", "iTunes.exe")])
+
+
+def downloads_dir():
+    d = os.path.join(os.path.expanduser("~"), "Downloads")
+    return d if os.path.isdir(d) else tempfile.gettempdir()
+
+
+def _open_folder_select(path):
+    """エクスプローラーでファイルの場所を開く (失敗したらフォルダだけ開く)。"""
+    try:
+        if os.name == "nt":
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+            return
+    except Exception:
+        pass
+    _startfile(os.path.dirname(path))
+
+
+# 画面ページの番号: 0 ようこそ / 1 確認 / 2 インストール / 3〜9 iPhone の手順 (7つ)
+PAGE_WELCOME, PAGE_CHECK, PAGE_INSTALL, PAGE_IPHONE = 0, 1, 2, 3
+POLL_MS = 2000
+
+
 class SetupWizard:
-    """初回セットアップ / やり直し用のウィザード (ほぼモーダルな Toplevel)。"""
+    """初回セットアップ / やり直し用のウィザード (リサイズ可能な Toplevel)。
+    start="iphone" のときは iPhone の手順だけを開く (セットアップタブの「iPhoneのセットアップ」)。"""
 
     TITLES = ["ようこそ", "必要なソフトの確認", "インストール中", "iPhoneの準備"]
 
-    def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None):
+    def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None, start="setup"):
         self.root = root
         self.controller = controller
         self.on_finish = on_finish
         self.on_skip = on_skip or on_finish
         self.open_url = open_url or webbrowser.open
         self.launch = launch or _startfile
+        self.mode = start
         self.page = 0
         self.finished = False
+        self._placed = False
+        set_scale(detect_scale(root))
         self.top = tk.Toplevel(root)
         self.top.title("PhoneCam セットアップ")
         self.top.configure(bg=BG)
         try:
-            self.top.geometry("560x520")
-            self.top.resizable(False, False)
+            self.top.minsize(px(520), px(440))
+            self.top.resizable(True, True)
             self.top.transient(root)
             self.top.protocol("WM_DELETE_WINDOW", self._close)
-            self.top.update_idletasks()
-            x = root.winfo_rootx() + max(0, (root.winfo_width() - 560) // 2)
-            y = root.winfo_rooty() + max(0, (root.winfo_height() - 520) // 3)
-            self.top.geometry("560x520+%d+%d" % (x, y))
+        except Exception:
+            pass
+        # フッター (ボタン) は一番下に固定。本文だけがスクロールする
+        self.footer_wrap = tk.Frame(self.top, bg=BG)
+        self.footer_wrap.pack(side="bottom", fill="x")
+        tk.Frame(self.footer_wrap, bg=LINE, height=1).pack(fill="x")
+        self.footer = tk.Frame(self.footer_wrap, bg=BG)
+        self.footer.pack(fill="x", padx=px(28), pady=px(14))
+        self.scroll = ScrollFrame(self.top)
+        self.scroll.outer.pack(side="top", fill="both", expand=True)
+        self.body = tk.Frame(self.scroll.inner, bg=BG)
+        self.body.pack(fill="both", expand=True, padx=px(28), pady=(px(24), px(10)))
+        try:
+            self.top.bind("<MouseWheel>", self.scroll.wheel)
+        except Exception:
+            pass
+        self.panel = None
+        self.log_visible = False
+        self.log_text = None
+        self._listener = self._on_controller
+        controller.listen(self._listener)
+        # iPhone ページの状態
+        self.snap = {}
+        self.app_ok = False
+        self._visited = set()
+        self._first = False
+        self._probing = False
+        self._probe_result = None
+        self._next_probe = 0.0
+        self._pump_job = None
+        self._dl_state = None
+        self.show(PAGE_IPHONE if start == "iphone" else PAGE_WELCOME)
+        try:
             self.top.grab_set()
         except Exception:
             pass
-        self.footer = tk.Frame(self.top, bg=BG)
-        self.footer.pack(side="bottom", fill="x", padx=28, pady=(0, 22))
-        self.body = tk.Frame(self.top, bg=BG)
-        self.body.pack(side="top", fill="both", expand=True, padx=28, pady=(26, 8))
-        self.panel = None
-        self.log_visible = False
-        self._listener = self._on_controller
-        controller.listen(self._listener)
-        self.show(0)
 
     # -- 共通 -------------------------------------------------------------
     def _clear(self):
@@ -1230,26 +1425,67 @@ class SetupWizard:
         self.retry_btn = None
         self.result_holder = None
         self.note_label = None
+        self.audio_label = None
+        self.chip = None
+        self.dl_label = None
+        self.dl_btn = None
 
     def _title(self, text, sub=None):
-        tk.Label(self.body, text=text, bg=BG, fg=FG, font=(FONT, 20, "bold")).pack(anchor="w")
+        tk.Label(self.body, text=text, bg=BG, fg=FG, font=(FONT, 20, "bold"), anchor="w").pack(anchor="w")
         if sub:
-            tk.Label(self.body, text=sub, bg=BG, fg=SUB, font=(FONT, 10), justify="left", wraplength=500).pack(anchor="w", pady=(6, 14))
+            wrapped_label(self.body, sub, self.body).pack(fill="x", pady=(px(6), px(14)))
 
     def show(self, index):
         self.page = index
         self._clear()
-        [self._page_welcome, self._page_check, self._page_install, self._page_iphone][index]()
+        if index >= PAGE_IPHONE:
+            self._page_step(index - PAGE_IPHONE)
+        else:
+            [self._page_welcome, self._page_check, self._page_install][index]()
+        self.scroll.to_top()
+        self._fit_window()
+        if index >= PAGE_IPHONE:
+            self._start_pump()
+
+    def _fit_window(self):
+        """中身の大きさに合わせてウィンドウを大きくする (画面の85%まで。小さくはしない)。"""
+        try:
+            self.top.update_idletasks()
+            pad_w = 2 * px(28) + px(24)
+            need_w = max(self.body.winfo_reqwidth() + pad_w, self.footer_wrap.winfo_reqwidth(), px(560))
+            need_h = (self.body.winfo_reqheight() + px(24) + px(10) + self.footer_wrap.winfo_reqheight())
+            sw, sh = self.top.winfo_screenwidth(), self.top.winfo_screenheight()
+            cur_w, cur_h = self.top.winfo_width(), self.top.winfo_height()
+            if not self._placed:
+                cur_w = cur_h = 1
+            w = min(max(cur_w, need_w), int(sw * 0.85))
+            h = min(max(cur_h, need_h), int(sh * 0.85))
+            if not self._placed:
+                try:
+                    rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
+                    rw, rh = self.root.winfo_width(), self.root.winfo_height()
+                except Exception:
+                    rx = ry = 0
+                    rw, rh = sw, sh
+                x = max(0, min(sw - w, rx + (rw - w) // 2))
+                y = max(0, min(sh - h - px(40), ry + max(0, (rh - h) // 3)))
+                self.top.geometry("%dx%d+%d+%d" % (w, h, x, y))
+                self._placed = True
+            elif (w, h) != (cur_w, cur_h):
+                self.top.geometry("%dx%d" % (w, h))
+        except Exception:
+            pass
 
     # -- ページ1 ----------------------------------------------------------
     def _page_welcome(self):
-        tk.Label(self.body, text="PhoneCam へようこそ", bg=BG, fg=FG, font=(FONT, 22, "bold")).pack(anchor="w", pady=(40, 0))
-        tk.Label(self.body, justify="left", wraplength=500, bg=BG, fg=SUB, font=(FONT, 11),
-                 text="iPhoneをOBSのカメラにするために必要なソフトを確認して、足りないものをまとめて入れます。\n"
-                      "すでに入っているものは飛ばします。管理者の確認は最初に1回だけ表示されます。"
-                 ).pack(anchor="w", pady=(16, 0))
+        tk.Label(self.body, text="PhoneCam へようこそ", bg=BG, fg=FG, font=(FONT, 22, "bold"), anchor="w").pack(
+            anchor="w", pady=(px(36), 0))
+        wrapped_label(self.body, "iPhoneをOBSのカメラにするために必要なソフトを確認して、足りないものをまとめて入れます。\n"
+                                 "すでに入っているものは飛ばします。管理者の確認は最初に1回だけ表示されます。\n"
+                                 "そのあと、iPhoneにPhoneCamを入れる手順もご案内します。",
+                      self.body, font=(FONT, 11)).pack(fill="x", pady=(px(16), 0))
         make_link(self.footer, "スキップ", self._skip).pack(side="left")
-        make_button(self.footer, "次へ", lambda: self.show(1), primary=True).pack(side="right")
+        make_button(self.footer, "次へ", lambda: self.show(PAGE_CHECK), primary=True).pack(side="right")
 
     # -- ページ2 ----------------------------------------------------------
     def _page_check(self):
@@ -1260,11 +1496,11 @@ class SetupWizard:
         mic = tk.Checkbutton(self.body, text="iPhoneのマイクを使う（VB-CABLEを入れます）", variable=self.mic_var, bg=BG,
                              activebackground=BG, fg=FG, font=(FONT, 10), bd=0, highlightthickness=0,
                              command=self._mic_changed)
-        mic.pack(anchor="w", pady=(12, 0))
+        mic.pack(anchor="w", pady=(px(12), 0))
         make_link(self.footer, "スキップ", self._skip).pack(side="left")
         self.next_btn = make_button(self.footer, "インストール", self._start_install, primary=True)
         self.next_btn.pack(side="right")
-        make_button(self.footer, "再チェック", self.controller.recheck).pack(side="right", padx=(0, 10))
+        make_button(self.footer, "再チェック", self.controller.recheck).pack(side="right", padx=(0, px(10)))
         self.panel.render()
         self._update_next_label()
         if not self.controller.checked:
@@ -1274,6 +1510,7 @@ class SetupWizard:
         self.controller.set_mic(self.mic_var.get())
         self.panel.render()
         self._update_next_label()
+        self._fit_window()
 
     def _update_next_label(self):
         if self.next_btn is None:
@@ -1287,25 +1524,24 @@ class SetupWizard:
     def _start_install(self):
         ids = self.controller.selected_ids()
         if not ids:
-            self.show(3)
+            self.show(PAGE_IPHONE)
             return
         if self.controller.start(ids):
-            self.show(2)
+            self.show(PAGE_INSTALL)
 
     # -- ページ3 ----------------------------------------------------------
     def _page_install(self):
         self._title("インストール中")
-        self.stage_label = tk.Label(self.body, text=self.controller.stage, bg=BG, fg=FG, font=(FONT, 10), anchor="w",
-                                    justify="left", wraplength=500)
+        self.stage_label = wrapped_label(self.body, self.controller.stage, self.body, fg=FG)
         self.stage_label.pack(fill="x")
         self.bar = ThinProgress(self.body)
-        self.bar.pack(fill="x", pady=(8, 6))
+        self.bar.pack(fill="x", pady=(px(8), px(6)))
         self.bar.set(self.controller.progress)
         self.detail_btn = make_link(self.body, "詳細 ▸", self._toggle_log)
         self.detail_btn.pack(anchor="w")
         self.log_frame = tk.Frame(self.body, bg=BG)
         self.log_text = tk.Text(self.log_frame, height=7, bg=PANEL, fg=SUB, relief="flat", bd=0, font=(FONT, 8),
-                                wrap="word", highlightthickness=0, padx=8, pady=6)
+                                wrap="word", highlightthickness=0, padx=px(8), pady=px(6))
         sb = tk.Scrollbar(self.log_frame, command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
@@ -1313,21 +1549,24 @@ class SetupWizard:
         self.log_visible = False
         self._refill_log()
         self.result_holder = tk.Frame(self.body, bg=BG)
-        self.note_label = tk.Label(self.body, text="", bg=BG, fg=WARN, font=(FONT, 10), justify="left", wraplength=500)
-        self.next_btn = make_button(self.footer, "次へ", lambda: self.show(3), primary=True, state="disabled")
+        self.note_label = wrapped_label(self.body, "", self.body, fg=WARN)
+        self.audio_label = wrapped_label(self.body, "", self.body, fg=SUB, font=(FONT, 9))
+        self.next_btn = make_button(self.footer, "次へ", lambda: self.show(PAGE_IPHONE), primary=True, state="disabled")
         self.next_btn.pack(side="right")
         self.retry_btn = make_button(self.footer, "もう一度試す", self._retry)
         if not self.controller.busy and self.controller.outcome is not None:
             self._show_outcome()
+        self._show_audio_note()
 
     def _toggle_log(self):
         self.log_visible = not self.log_visible
         if self.log_visible:
-            self.log_frame.pack(fill="both", expand=True, pady=(4, 0))
+            self.log_frame.pack(fill="both", expand=True, pady=(px(4), 0))
             self.detail_btn.config(text="詳細 ▾")
         else:
             self.log_frame.pack_forget()
             self.detail_btn.config(text="詳細 ▸")
+        self._fit_window()
 
     def _refill_log(self):
         if self.log_text is None:
@@ -1343,7 +1582,19 @@ class SetupWizard:
 
     def _retry(self):
         self.controller.recheck()
-        self.show(1)
+        self.show(PAGE_CHECK)
+
+    def _show_audio_note(self):
+        """VB-CABLE を入れたあとの、音の出力先に関する案内 (戻した / 戻せなかった)。"""
+        msg = getattr(self.controller, "audio_message", "")
+        if self.audio_label is None or not msg:
+            return
+        try:
+            self.audio_label.config(text=msg)
+            self.audio_label.pack(fill="x", pady=(px(8), 0))
+            self._fit_window()
+        except Exception:
+            pass
 
     def _show_outcome(self):
         out = self.controller.outcome or {}
@@ -1353,7 +1604,7 @@ class SetupWizard:
         if self.bar is not None:
             self.bar.set(1.0)
         self._render_results(out)
-        self.result_holder.pack(fill="x", pady=(8, 0))
+        self.result_holder.pack(fill="x", pady=(px(8), 0))
         notes = []
         if out.get("error"):
             notes.append(out["error"])
@@ -1363,7 +1614,7 @@ class SetupWizard:
             notes.append("%s は自動で入れられませんでした。「%s」" % (m["name"], m["text"]))
         if notes:
             self.note_label.config(text="\n".join(notes))
-            self.note_label.pack(anchor="w", pady=(8, 0))
+            self.note_label.pack(fill="x", pady=(px(8), 0))
         for m in out.get("manual", []):
             url = m["url"]
             make_link(self.body, "%s の公式ページを開く" % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
@@ -1371,7 +1622,8 @@ class SetupWizard:
             self.next_btn.config(state="normal")
         failed = [cid for cid, r in out.get("results", {}).items() if not r.get("ok")]
         if failed and self.retry_btn is not None:
-            self.retry_btn.pack(side="right", padx=(0, 10))
+            self.retry_btn.pack(side="right", padx=(0, px(10)))
+        self._fit_window()
 
     def _render_results(self, out):
         """結果の行 (インストールした項目だけ) を描画する。"""
@@ -1380,38 +1632,249 @@ class SetupWizard:
             comp = COMPONENT_BY_ID[cid]
             r = out["results"].get(cid, {"ok": False, "detail": ""})
             row = tk.Frame(self.result_holder, bg=BG)
-            row.pack(fill="x", pady=3)
+            row.pack(fill="x", pady=px(3))
+            row.columnconfigure(1, weight=1)
             icon, color = ("✓", GOOD) if r.get("ok") else ("✗", BAD)
-            tk.Label(row, text=icon, fg=color, bg=BG, font=(FONT, 11, "bold"), width=3).pack(side="left", anchor="n")
+            tk.Label(row, text=icon, fg=color, bg=BG, font=(FONT, 11, "bold")).grid(row=0, column=0, sticky="nw",
+                                                                                   padx=(0, px(10)))
             col = tk.Frame(row, bg=BG)
-            col.pack(side="left", fill="x")
+            col.grid(row=0, column=1, sticky="ew")
             tk.Label(col, text=comp["name"], fg=FG, bg=BG, font=(FONT, 10, "bold")).pack(anchor="w")
             if r.get("detail"):
-                tk.Label(col, text=r["detail"], fg=BAD if not r.get("ok") else WARN, bg=BG, font=(FONT, 9), justify="left",
-                         wraplength=440).pack(anchor="w")
+                wrapped_label(col, r["detail"], row, px(40), fg=BAD if not r.get("ok") else WARN,
+                              font=(FONT, 9)).pack(fill="x")
 
-    # -- ページ4 ----------------------------------------------------------
-    def _page_iphone(self):
-        self._title("iPhoneの準備")
-        steps = [
-            "AltServerを起動して、iPhoneをUSBでつなぎます（「信頼」を選びます）。",
-            "タスクトレイのAltServerのアイコン → Install AltStore → iPhoneを選びます。",
-            "PhoneCam.ipa をiPhoneに保存し、AltStoreの My Apps → ＋ から追加します。",
-        ]
-        for i, t in enumerate(steps, 1):
-            row = tk.Frame(self.body, bg=BG)
-            row.pack(fill="x", pady=5)
-            tk.Label(row, text=str(i), fg=SUB, bg=BG, font=(FONT, 14, "bold"), width=3).pack(side="left", anchor="n")
-            tk.Label(row, text=t, fg=FG, bg=BG, font=(FONT, 10), justify="left", wraplength=450).pack(side="left", anchor="w")
-        box = tk.Frame(self.body, bg=BG)
-        box.pack(anchor="w", pady=(18, 0))
+    # -- ページ4〜10: iPhone の手順 ----------------------------------------
+    def _ctx(self):
+        alt = bool(find_altserver())
+        if not alt:
+            try:
+                alt = self.controller.statuses.get("altserver", {}).get("state") == STATE_OK
+            except Exception:
+                pass
+        link = False
+        fn = _host.get("link_connected")
+        if fn:
+            try:
+                link = bool(fn())
+            except Exception:
+                link = False
+        return {"altserver": alt, "app": self.app_ok, "link": link}
+
+    def _page_step(self, i):
+        steps = iphone.IPHONE_STEPS
+        step = steps[i]
+        sid = step["id"]
+        self._step_id = sid
+        self._step_index = i
+        self._first = sid not in self._visited
+        self._visited.add(sid)
+        head = tk.Frame(self.body, bg=BG)
+        head.pack(fill="x")
+        tk.Label(head, text=str(i + 1), bg=BG, fg=ACCENT, font=(FONT, 40, "bold")).pack(side="left")
+        tk.Label(head, text="全%d段階" % len(steps), bg=BG, fg=SUB, font=(FONT, 9)).pack(side="right", anchor="s")
+        tk.Label(self.body, text=step["title"], bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
+        for line in step["lines"]:
+            wrapped_label(self.body, line, self.body, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
+        self.chip = tk.Label(self.body, text="確認しています…", bg=PANEL, fg=SUB, font=(FONT, 10), padx=px(12),
+                             pady=px(5), anchor="w")
+        self.chip.pack(anchor="w", pady=(px(16), px(12)))
+        extra = getattr(self, "_extra_" + sid, None)
+        if extra:
+            extra()
+        # フッター
+        make_link(self.footer, "あとで", self._skip_iphone).pack(side="left")
+        last = i == len(steps) - 1
+        if last:
+            self.next_btn = make_button(self.footer, "完了", self._finish, primary=True, state="disabled")
+        else:
+            self.next_btn = make_button(self.footer, "次へ", lambda: self.show(self.page + 1), primary=True)
+        self.next_btn.pack(side="right")
+        if not (i == 0 and self.mode == "iphone"):
+            make_button(self.footer, "戻る", self._back).pack(side="right", padx=(0, px(10)))
+        self._render_chip()
+
+    def _back(self):
+        if self.page == PAGE_IPHONE:
+            self.controller.recheck()
+            self.show(PAGE_CHECK)
+        else:
+            self.show(self.page - 1)
+
+    def _btn_row(self, items):
+        """ボタンを2つずつ並べる (幅が足りなくても切れない)。items = [(text, command, enabled)]"""
+        row = None
+        for n, (text, cmd, enabled) in enumerate(items):
+            if n % 2 == 0:
+                row = tk.Frame(self.body, bg=BG)
+                row.pack(anchor="w", pady=(0, px(8)))
+            b = make_button(row, text, cmd, state="normal" if enabled else "disabled")
+            b.pack(side="left", padx=(0, px(10)))
+
+    def _extra_itunes(self):
+        path = find_itunes()
+        self._btn_row([("iTunesを開く", lambda: self.launch(path), bool(path))])
+        if not path:
+            wrapped_label(self.body, "iTunesが見つかりません。前の画面でインストールできます。", self.body,
+                          font=(FONT, 9)).pack(fill="x")
+
+    def _extra_altstore(self):
+        path = find_altserver()
+        self._btn_row([("AltServerを起動", lambda: self.launch(path), bool(path)),
+                       ("公式の手順を開く", lambda: self.open_url(FAQ_URL), True)])
+        wrapped_label(self.body, "うまくいかないときは、AltServerを「管理者として実行」してみてください。",
+                      self.body, font=(FONT, 9)).pack(fill="x")
+
+    def _extra_phonecam(self):
+        repo = APP_REPO
+        url = iphone.source_url(repo)
+        deeplink = iphone.source_deeplink(repo)
+        if url and phonecam_qr is not None:
+            box = tk.Frame(self.body, bg=BG)
+            box.pack(anchor="w", pady=(0, px(8)))
+            cv = tk.Canvas(box, highlightthickness=0, bd=0, bg="#ffffff")
+            try:
+                phonecam_qr.draw_on_canvas(cv, phonecam_qr.make_qr(deeplink, "M"), cell=px(4), quiet=3)
+                cv.pack(side="left")
+            except Exception:
+                cv.destroy()
+            side = tk.Frame(box, bg=BG)
+            side.pack(side="left", padx=(px(16), 0), anchor="n")
+            wrapped_label(side, "iPhoneのカメラでQRコードを読み取り、AltStoreで開きます。", self.body, px(260),
+                          font=(FONT, 9)).pack(fill="x")
+            wrapped_label(side, "追加できたら、AltStoreで「PhoneCam」を入手します。", self.body, px(260),
+                          font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
+            ent = tk.Entry(self.body, font=(FONT, 9), relief="flat", bg=PANEL, fg=FG, readonlybackground=PANEL,
+                           highlightthickness=0, bd=0)
+            ent.insert(0, url)
+            ent.configure(state="readonly")
+            ent.pack(fill="x", ipady=px(6), pady=(0, px(8)))
+            self._btn_row([("URLをコピー", lambda: self._copy(url), True)])
+        wrapped_label(self.body, "QRが使えないときは、PhoneCam.ipaを直接入れる方法もあります。AltServerのアイコンを"
+                                 "Shiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。"
+                                 "（この方法だと、アプリの更新は自分で入れ直します）",
+                      self.body, font=(FONT, 9)).pack(fill="x")
+        ipa = ipa_url()
+        self.dl_btn = make_button(self.body, "PhoneCam.ipaをダウンロード", self._download_ipa,
+                                  state="normal" if ipa else "disabled")
+        self.dl_btn.pack(anchor="w", pady=(px(8), 0))
+        self.dl_label = wrapped_label(self.body, "", self.body, font=(FONT, 9))
+        self.dl_label.pack(fill="x", pady=(px(4), 0))
+        if self._dl_state and self._dl_state[0] == "ok":
+            self.dl_label.config(text="保存しました: %s" % self._dl_state[1])
+
+    def _copy(self, text):
+        try:
+            self.top.clipboard_clear()
+            self.top.clipboard_append(text)
+            if self.chip is not None:
+                self.chip.config(text="✓ URLをコピーしました", fg=GOOD)
+        except Exception:
+            pass
+
+    def _download_ipa(self):
         url = ipa_url()
-        if url:
-            make_button(box, "iPhone用アプリをダウンロード", lambda: self.open_url(url)).pack(side="left")
-        alt = find_altserver()
-        if alt:
-            make_button(box, "AltServerを起動", lambda: self.launch(alt)).pack(side="left", padx=(10, 0))
-        make_button(self.footer, "完了", self._finish, primary=True).pack(side="right")
+        if not url or (self._dl_state and self._dl_state[0] == "busy"):
+            return
+        self._dl_state = ("busy", "")
+        if self.dl_btn is not None:
+            self.dl_btn.config(state="disabled")
+        if self.dl_label is not None:
+            self.dl_label.config(text="ダウンロード中…", fg=SUB)
+        dest = os.path.join(downloads_dir(), "PhoneCam.ipa")
+
+        def work():
+            try:
+                download_file(url, dest, "zip")
+                self._dl_state = ("ok", dest)
+            except Exception as e:
+                self._dl_state = ("err", str(e) if isinstance(e, DownloadError) else friendly_net_error(e))
+
+        threading.Thread(target=work, name="ipa-download", daemon=True).start()
+        self.top.after(300, self._dl_pump)
+
+    def _dl_pump(self):
+        if self.finished:
+            return
+        st = self._dl_state
+        if st and st[0] == "busy":
+            self.top.after(300, self._dl_pump)
+            return
+        try:
+            if self.dl_btn is not None:
+                self.dl_btn.config(state="normal")
+            if st and st[0] == "ok":
+                if self.dl_label is not None:
+                    self.dl_label.config(text="保存しました: %s" % st[1], fg=GOOD)
+                _open_folder_select(st[1])
+            elif st and self.dl_label is not None:
+                self.dl_label.config(text=st[1], fg=BAD)
+        except Exception:
+            pass
+
+    # -- 状態の自動更新 (2秒ごと) ------------------------------------------
+    def _start_pump(self):
+        self._next_probe = 0.0
+        if self._pump_job is None:
+            self._pump_job = self.top.after(200, self._pump)
+
+    def _pump(self):
+        self._pump_job = None
+        if self.finished or self.page < PAGE_IPHONE:
+            return
+        try:
+            if self._probe_result is not None:
+                snap, app = self._probe_result
+                self._probe_result = None
+                self.snap, self.app_ok = snap, app
+                self._next_probe = time.monotonic() + POLL_MS / 1000.0
+                if self._apply():
+                    return
+            if not self._probing and time.monotonic() >= self._next_probe:
+                self._probing = True
+                want_app = getattr(self, "_step_id", "") == "test"
+                linked = bool(self._ctx().get("link"))
+
+                def work():
+                    try:
+                        snap = iphone.query_usbmux()
+                        app = False
+                        if want_app and not linked:
+                            app = iphone.probe_phonecam(snap)
+                        self._probe_result = (snap, app)
+                    except Exception:
+                        self._probe_result = ({}, False)
+                    finally:
+                        self._probing = False
+
+                threading.Thread(target=work, name="iphone-probe", daemon=True).start()
+        except Exception:
+            pass
+        self._pump_job = self.top.after(250, self._pump)
+
+    def _render_chip(self):
+        if self.chip is None:
+            return
+        state, text = iphone.step_status(self._step_id, self.snap, self._ctx())
+        if state == iphone.DONE:
+            self.chip.config(text="✓ " + text, fg=GOOD)
+        elif state == iphone.WAIT:
+            self.chip.config(text="● " + text, fg=SUB)
+        elif state == iphone.MANUAL:
+            self.chip.config(text="○ " + text, fg=SUB)
+        else:
+            self.chip.config(text="! " + text, fg=WARN)
+        if self._step_id == "test" and self.next_btn is not None:
+            self.next_btn.config(state="normal" if state == iphone.DONE else "disabled")
+        return state
+
+    def _apply(self):
+        """新しい検出結果を画面へ。自動で次へ進んだら True。"""
+        state = self._render_chip()
+        if self._first and iphone.should_auto_advance(self._step_id, state, set()):
+            self.show(self.page + 1)
+            return True
+        return False
 
     # -- 終了 -------------------------------------------------------------
     def _finish(self):
@@ -1420,11 +1883,14 @@ class SetupWizard:
     def _skip(self):
         self._end(self.on_skip)
 
+    def _skip_iphone(self):
+        self._end(self.on_finish if self.mode == "setup" else self.on_skip)
+
     def _close(self):
         if self.controller.busy:
             return
-        if self.page == 3:
-            self._finish()
+        if self.page >= PAGE_IPHONE:
+            self._skip_iphone()
         else:
             self._skip()
 
@@ -1433,6 +1899,12 @@ class SetupWizard:
             return
         self.finished = True
         self.controller.unlisten(self._listener)
+        if self._pump_job is not None:
+            try:
+                self.top.after_cancel(self._pump_job)
+            except Exception:
+                pass
+            self._pump_job = None
         try:
             self.top.grab_release()
         except Exception:
@@ -1451,16 +1923,19 @@ class SetupWizard:
         if self.finished:
             return
         if what == "statuses" or what == "checking":
-            if self.page == 1 and self.panel is not None:
+            if self.page == PAGE_CHECK and self.panel is not None:
                 self.panel.render()
                 self._update_next_label()
+                self._fit_window()
         elif what == "stage" and self.stage_label is not None:
             self.stage_label.config(text=self.controller.stage)
         elif what == "progress" and self.bar is not None:
             self.bar.set(self.controller.progress)
         elif what == "log":
             self._refill_log()
-        elif what == "done" and self.page == 2:
+        elif what == "audio" and self.page == PAGE_INSTALL:
+            self._show_audio_note()
+        elif what == "done" and self.page == PAGE_INSTALL:
             self._show_outcome()
 
 

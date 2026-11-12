@@ -41,6 +41,16 @@ jobs:
           name: PhoneCamReceiver
           path: out
 
+      # AltStore のソース。releases/latest/download/altstore-source.json が常に最新のリリースを指す
+      - name: Generate AltStore source
+        run: |
+          python3 .github/scripts/make_altstore_source.py \
+            --repo "${{ github.repository }}" \
+            --version "${{ steps.ver.outputs.version }}" \
+            --build "${{ github.run_number }}" \
+            --ipa out/PhoneCam.ipa \
+            --out out/altstore-source.json
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -51,3 +61,4 @@ jobs:
           files: |
             out/PhoneCam.ipa
             out/PhoneCamReceiver.exe
+            out/altstore-source.json
