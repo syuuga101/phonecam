@@ -2,3 +2,6 @@ av
 numpy
 pyvirtualcam
 sounddevice
+sv-ttk
+darkdetect
+pillow

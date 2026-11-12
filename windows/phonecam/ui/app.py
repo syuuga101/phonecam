@@ -26,10 +26,137 @@ from phonecam.core.stream import StreamController
 from phonecam.core.vcam import CAM_RELEASE_HOLD_SEC
 from phonecam.core.version import APP_VERSION
 from phonecam.ui.dpi import apply_ui_scale, enable_dpi_awareness, px
-from phonecam.ui.labels import HINT_FG, METER_MIN_DB, MODE3_LABELS, PHONE_NOTE_SECONDS, THROTTLE_MS
+from phonecam.i18n import set_language, t
+from phonecam.ui import icons, theme
+from phonecam.ui.labels import METER_MIN_DB, MODE3_LABELS, PHONE_NOTE_SECONDS, THROTTLE_MS
 from phonecam.ui.tkdeps import messagebox, tk, ttk
 from phonecam.ui import dshow_ui, phone_sync, update_ui
 from phonecam.ui.pages import audio, connection_video, effects, quality, recording, setup, shortcuts, status
+
+
+# 左ナビ: (キー, アイコン名)。順番が nb のページ番号 (STATUS_TAB_INDEX = 6 もこれに合わせる)
+NAV_ITEMS = [("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
+             ("audio", "mic"), ("recording", "record"), ("status", "gauge"),
+             ("shortcuts", "keyboard"), ("settings", "gear")]
+SETUP_INDEX = len(NAV_ITEMS)  # セットアップはナビに出さない (設定から open_setup() で開く)
+
+
+class _FrameWrapper:
+    """ttk.Frame を継承せず包む (tk の無い環境/テストの差し替えでも import・構築できるように)。
+    pack/pack_forget などは中の frame に委譲し、str() は frame のパス (pack(before=...) 用)。"""
+
+    def __getattr__(self, name):
+        if name == "frame":
+            raise AttributeError(name)
+        return getattr(self.frame, name)
+
+    def __str__(self):
+        return str(self.frame)
+
+
+class _ContentArea(_FrameWrapper):
+    """右の内容欄。一度に1ページだけ表示する。旧 ttk.Notebook の index()/select() の互換 shim。"""
+
+    def __init__(self, master, on_select):
+        self.frame = ttk.Frame(master)
+        self._pages = []
+        self._cur = -1
+        self._on_select = on_select
+
+    def add_page(self):
+        host = ttk.Frame(self.frame)
+        self._pages.append(host)
+        return host
+
+    def tabs(self):
+        return [str(p) for p in self._pages]
+
+    def index(self, what):
+        if what == "current":
+            return self._cur
+        for i, p in enumerate(self._pages):
+            if what is p or str(what) == str(p):
+                return i
+        raise tk.TclError("tab not found")
+
+    def select(self, what=None):
+        if what is None:
+            return str(self._pages[self._cur]) if self._cur >= 0 else ""
+        i = what if isinstance(what, int) else self.index(what)
+        if i == self._cur or not (0 <= i < len(self._pages)):
+            return
+        if self._cur >= 0:
+            self._pages[self._cur].pack_forget()
+        self._cur = i
+        self._pages[i].pack(fill="both", expand=True)
+        self._on_select(i)
+
+
+class _Nav(_FrameWrapper):
+    """Windows 11 設定アプリ風の左ナビ (アイコン + ラベル)。選択行は薄い面 + 左のアクセントバー。"""
+
+    def __init__(self, master, items, on_click):
+        self.frame = ttk.Frame(master, width=px(200))
+        self.frame.pack_propagate(False)
+        self._items = items
+        self._on_click = on_click
+        self._rows = []
+        self._sel = -1
+        self.icon_lbl = ttk.Label(self.frame)
+        self.icon_lbl.pack(anchor="w", padx=px(16), pady=(px(14), px(10)))
+        self._set_app_icon()
+        for i, (key, icon) in enumerate(items):
+            row = tk.Frame(self.frame, cursor="hand2", takefocus=1)
+            bar = tk.Frame(row, width=px(3))
+            ic = tk.Label(row, borderwidth=0)
+            tx = tk.Label(row, text=t("nav." + key), anchor="w", borderwidth=0, font=theme.font(10))
+            row.pack(fill="x", padx=px(8), pady=px(1))
+            bar.pack(side="left", fill="y", pady=px(8))
+            ic.pack(side="left", padx=(px(10), px(12)), pady=px(8))
+            tx.pack(side="left", fill="x", expand=True)
+            for w in (row, bar, ic, tx):
+                w.bind("<Button-1>", lambda e, n=i: self._on_click(n))
+                w.bind("<Enter>", lambda e, n=i: self._hover(n, True))
+                w.bind("<Leave>", lambda e, n=i: self._hover(n, False))
+            row.bind("<Up>", lambda e, n=i: self._on_click(max(0, n - 1)))
+            row.bind("<Down>", lambda e, n=i: self._on_click(min(len(items) - 1, n + 1)))
+            row.bind("<Return>", lambda e, n=i: self._on_click(n))
+            self._rows.append((row, bar, ic, tx, icon))
+        theme.on_change(self.restyle)
+        self.restyle()
+
+    def _set_app_icon(self):
+        img = icons.app_icon(20)
+        if img is not None:
+            self.icon_lbl.configure(image=img)
+            self.icon_lbl._img = img
+
+    def _hover(self, n, on):
+        if n != self._sel:
+            c = theme.colors()
+            self._paint(n, c["select"] if on else c["bg"], False)
+
+    def _paint(self, n, bg, selected):
+        c = theme.colors()
+        row, bar, ic, tx, icon = self._rows[n]
+        for w in (row, ic, tx):
+            w.configure(bg=bg)
+        bar.configure(bg=c["accent"] if selected else bg)
+        tx.configure(fg=c["text"])
+        img = icons.get(icon, 16, c["accent"] if selected else None)
+        if img is not None:
+            ic.configure(image=img)
+            ic._img = img
+
+    def restyle(self):
+        self._set_app_icon()
+        c = theme.colors()
+        for n in range(len(self._rows)):
+            self._paint(n, c["select"] if n == self._sel else c["bg"], n == self._sel)
+
+    def highlight(self, n):
+        self._sel = n
+        self.restyle()
 
 
 class App:
@@ -38,6 +165,8 @@ class App:
         migrate_legacy_settings()
         self._setup_key_present = settings_has_key("setup_done")  # None=設定ファイルなし(新規) / False=旧バージョンの設定
         self.settings = load_settings()
+        set_language(self.settings.get("language", "system"))
+        theme.init(root, self.settings.get("theme", "system"))
         self.state = SharedState()
         self.audio = AudioEngine(lambda: (self.settings["mic_volume"], self.settings["mic_mute"],
                                           self.settings["mic_delay_ms"]))
@@ -90,7 +219,7 @@ class App:
             except Exception:
                 self.setup = None
 
-        root.title("PhoneCam 受信 v%s" % APP_VERSION)
+        root.title("PhoneCam")
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         root.minsize(px(560), px(560))
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
@@ -150,6 +279,20 @@ class App:
             self._schedule_send(group)
 
     # -- UI 構築 ----------------------------------------------------------
+    def set_theme(self, mode):
+        """設定 theme ("system"/"light"/"dark") を保存して即反映する。"""
+        self._changed("theme", mode, None)
+        theme.set_mode(mode)
+
+    def set_language(self, lang):
+        """設定 language を保存する (文言は次回起動で切り替わる)。"""
+        self._changed("language", lang, None)
+        set_language(lang)
+
+    def open_setup(self):
+        """セットアップ画面を内容欄に出す (ナビでは「設定」を選択状態のままにする)。"""
+        self.nb.select(SETUP_INDEX)
+
     def _section(self, parent, title):
         frame = ttk.LabelFrame(parent, text=title, padding=(10, 6))
         frame.pack(fill="x", padx=10, pady=5)
@@ -159,80 +302,109 @@ class App:
     def _build_ui(self):
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
+        self.nav = _Nav(outer, NAV_ITEMS, lambda n: self.nb.select(n))
+        self.nav.pack(side="left", fill="y")
+        right = ttk.Frame(outer)
+        right.pack(side="left", fill="both", expand=True)
+        self._right = right
 
-        # 熱警告バナー (どのタブを開いていても見えるよう下部に表示)
+        # 熱警告バナー (どのページを開いていても見えるよう下部に表示)
         self.warn_var = tk.StringVar(value="")
-        self.warn_label = ttk.Label(outer, textvariable=self.warn_var, foreground="#c0392b",
-                                    font=("", 9, "bold"), wraplength=px(560), justify="left", padding=(14, 6))
-        self.nb = ttk.Notebook(outer)
-        self.nb.pack(fill="both", expand=True, padx=4, pady=(6, 4))
+        self.warn_label = ttk.Label(right, textvariable=self.warn_var, foreground=theme.colors()["live"],
+                                    font=theme.font(9, "bold"), wraplength=px(560), justify="left", padding=(14, 6))
+        theme.on_change(lambda: self.warn_label.configure(foreground=theme.colors()["live"]))
+        self.nb = _ContentArea(right, self._page_selected)
+        self.nb.pack(fill="both", expand=True)
         self.upd_check_var = tk.BooleanVar(value=bool(self.settings.get("update_check", True)))
-        self.upd_status_var = tk.StringVar(value="最終確認: まだ確認していません")
+        self.upd_status_var = tk.StringVar(value=t("update.status.never"))
         try:
-            self._build_update_banner(outer)
+            self._build_update_banner(right)
         except Exception:  # 更新バナーの不具合でアプリ本体を止めない
             self._upd_banner = None
-        self._canvases = []
-        self.root.bind_all("<MouseWheel>", self._on_wheel)
+        self._canvases = []  # 旧互換 (スクロールは widgets.page が管理)
 
-        p1 = self._page("接続・映像")
-        connection_video.build(self, p1)
-        p2 = self._page("画質調整")
-        quality.build(self, p2)
-        p3 = self._page("エフェクト")
-        effects.build(self, p3)
-        p_rec = self._page("録画")
-        recording.build(self, p_rec)
-        p_aud = self._page("音声")
-        audio.build(self, p_aud)
-        p4 = self._page("状態")
-        status.build(self, p4)
-        p_keys = self._page("ショートカット")
-        try:
-            shortcuts.build(self, p_keys)
-        except Exception as e:  # ショートカット画面の不具合でアプリ本体を止めない
-            ttk.Label(p_keys, text="ショートカットの画面を表示できませんでした (%s)" % e).pack(padx=14, pady=14, anchor="w")
-        p_setup = self._page("セットアップ")
+        # ページをまたいで使う変数は、ビルド順に依存しないよう先に作っておく
+        # (各ページが同名で作り直しても、読み書きする側は常に何か持っている)
+        self.codec_now_var = tk.StringVar(value=t("video.now.none"))
+        self.decoder_now_var = tk.StringVar(value="")
+        self.watch_var = tk.StringVar(value="")
+        self.dshow_var = tk.StringVar(value="")
+        self.cam_note_var = tk.StringVar(value="")
+        self.ver_note_var = tk.StringVar(value="")
+
+        hosts = [self._page(key) for key, _icon in NAV_ITEMS]
+        p_setup = self._page("setup")
         self._setup_tab = p_setup
+
+        def guarded(host, builder, what):
+            try:
+                builder()
+            except Exception as e:  # 1ページの不具合でアプリ本体を止めない
+                ttk.Label(host, text=t("shell.page_error", name=what, err=e), wraplength=px(480),
+                          justify="left").pack(padx=14, pady=14, anchor="w")
+
+        def placeholder(host):
+            ttk.Label(host, text=t("shell.placeholder"), foreground=theme.colors()["text2"]).pack(padx=24, pady=24, anchor="w")
+
+        # 接続 / 映像 (connection_video 担当が build_connection / build_video を公開する。無ければ build / 仮表示)
+        if hasattr(connection_video, "build_connection"):
+            connection_video.build_connection(self, hosts[0])
+        else:
+            connection_video.build(self, hosts[0])
+        if hasattr(connection_video, "build_video"):
+            connection_video.build_video(self, hosts[1])
+        else:
+            placeholder(hosts[1])
+        quality.build(self, hosts[2])
+        effects.build(self, hosts[3])
+        audio.build(self, hosts[4])
+        recording.build(self, hosts[5])
+        status.build(self, hosts[6])
+        guarded(hosts[7], lambda: shortcuts.build(self, hosts[7]), t("nav.shortcuts"))
         try:
-            setup.build(self, p_setup)
-        except Exception as e:  # セットアップ画面の不具合でアプリ本体を止めない
-            self.setup = None
-            ttk.Label(p_setup, text="セットアップ画面を表示できませんでした (%s)" % e).pack(padx=14, pady=14, anchor="w")
+            from phonecam.ui.pages import settings as settings_page
+        except ImportError:
+            settings_page = None
+        if settings_page is not None and hasattr(settings_page, "build"):
+            guarded(hosts[8], lambda: settings_page.build(self, hosts[8]), t("nav.settings"))
+        else:
+            placeholder(hosts[8])
+
+        def build_setup():
+            try:
+                setup.build(self, p_setup)
+            except Exception:
+                self.setup = None
+                raise
+        guarded(p_setup, build_setup, t("shell.setup"))
         if self.setup is None:
             try:
                 self._build_update_section(p_setup, None)
             except Exception:
                 pass
-        self.nb.bind("<<NotebookTabChanged>>", self._tab_changed)
         self._toast_label = None
         self._toast_job = None
+        self.nb.select(0)
 
-    def _page(self, title):
-        """スクロール可能なタブページを作り、中身を載せるフレームを返す。"""
-        page = ttk.Frame(self.nb)
-        self.nb.add(page, text=title)
-        canvas = tk.Canvas(page, highlightthickness=0, borderwidth=0)
-        vsb = ttk.Scrollbar(page, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=vsb.set)
-        vsb.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        body = ttk.Frame(canvas)
-        win = canvas.create_window((0, 0), window=body, anchor="nw")
-        body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-        self._canvases.append(canvas)
-        return body
+    def _page(self, key):
+        """内容欄にページ用のホスト frame を1つ足して返す (中身は各ページの build が page() で作る)。"""
+        return self.nb.add_page()
 
-    def _on_wheel(self, e):
+    def _page_selected(self, index):
+        """内容欄のページが切り替わった (旧 <<NotebookTabChanged>> 相当)。"""
         try:
-            canvas = self._canvases[self.nb.index("current")]
-            canvas.yview_scroll(int(-e.delta / 120), "units")
+            self.nav.highlight(index if index < len(NAV_ITEMS) else len(NAV_ITEMS) - 1)
         except Exception:
             pass
+        self._tab_changed()
+
+    def _on_wheel(self, e):
+        """旧互換 (スクロールは widgets の共通ハンドラが行う)。"""
+        return None
 
     def _hint(self, parent, row, text, **grid):
-        lbl = ttk.Label(parent, text=text, foreground=HINT_FG, wraplength=px(480), justify="left")
+        lbl = ttk.Label(parent, text=text, foreground=theme.colors()["text2"], wraplength=px(480), justify="left")
+        theme.on_change(lambda: lbl.configure(foreground=theme.colors()["text2"]))
         lbl.grid(row=row, column=0, columnspan=3, sticky="w", **grid)
 
         # 画面の狭いノートPCでも見切れないよう、折り返し幅を親の実際の幅に合わせる
@@ -280,7 +452,9 @@ class App:
         self._slider_vars[key] = var
         return scale, val_label, var
 
-    CAM_STATUS_TEXT = {"ok": "登録済み", "missing": "未登録", "outdated": "更新が必要", "unavailable": "利用できません"}
+    @property
+    def CAM_STATUS_TEXT(self):
+        return {k: t("shell.cam." + k) for k in ("ok", "missing", "outdated", "unavailable")}
 
     def _tab_changed(self, _e=None):
         self._graph_dirty = True
@@ -303,7 +477,7 @@ class App:
         save_settings(self.settings)
 
     def _mode_combo(self, parent, row, key, group, on_change):
-        ttk.Label(parent, text="モード").grid(row=row, column=0, sticky="w", pady=2)
+        ttk.Label(parent, text=t("shell.mode")).grid(row=row, column=0, sticky="w", pady=2)
         var = tk.StringVar(value=self._value_to_label(MODE3_LABELS, self.settings[key]))
         cb = ttk.Combobox(parent, textvariable=var, values=[l for _, l in MODE3_LABELS], state="readonly", width=14)
         cb.grid(row=row, column=1, sticky="w", padx=6)
@@ -354,7 +528,9 @@ class App:
 
     HOTKEY_POLL_MS = 50
 
-    HOTKEY_TAKEN_TEXT = "このキーは他のアプリが使っています"
+    @property
+    def HOTKEY_TAKEN_TEXT(self):
+        return t("shortcuts.taken")
 
     ZOOM_STEP = 0.25
 
@@ -369,9 +545,10 @@ class App:
             pass
         try:
             if self._toast_label is None:
-                self._toast_label = tk.Label(self.root, bg="#1d1d1f", fg="#ffffff", font=("Yu Gothic UI", 11, "bold"),
+                self._toast_label = tk.Label(self.root, font=theme.font(11, "bold"),
                                              padx=18, pady=8, borderwidth=0)
-            self._toast_label.config(text=text)
+            _c = theme.colors()  # 反転配色 (ライト=暗い帯 / ダーク=明るい帯)
+            self._toast_label.config(text=text, bg=_c["text"], fg=_c["bg"])
             self._toast_label.place(relx=0.5, rely=1.0, y=-px(24), anchor="s")
             self._toast_label.lift()
             if self._toast_job is not None:
@@ -404,7 +581,7 @@ class App:
         pn = getattr(self, "_phone_note", None)
         if pn and time.monotonic() < pn[1]:
             self.status_var.set(pn[0])
-        self.phone_mute_var.set("iPhoneでミュート中" if connected_now and st.get("micMuted") else "")
+        self.phone_mute_var.set(t("shell.phone_muted") if connected_now and st.get("micMuted") else "")
         self.fps_var.set("%.1f" % snap["recv_fps"] if snap["connected"] else "-")
         self.dec_var.set("%.1f ms" % snap["decode_ms"] if snap["connected"] else "-")
         self.res_var.set(snap["resolution"])
@@ -415,14 +592,14 @@ class App:
             self._apply_ranges(st)
             parts = []
             if "iso" in st:
-                parts.append("現在のISO %d" % round(st["iso"]))
+                parts.append(t("shell.cur.iso", v=round(st["iso"])))
             if st.get("exposureSeconds"):
-                parts.append("シャッター 1/%d" % round(1.0 / st["exposureSeconds"]))
+                parts.append(t("shell.cur.shutter", v=round(1.0 / st["exposureSeconds"])))
             self.cur_exp_var.set(" / ".join(parts))
             if "temperature" in st:
-                self.cur_wb_var.set("現在の色温度 %dK / 色かぶり %d" % (round(st["temperature"]), round(st.get("tint", 0))))
+                self.cur_wb_var.set(t("shell.cur.wb", k=round(st["temperature"]), tint=round(st.get("tint", 0))))
             if "lensPosition" in st:
-                self.cur_focus_var.set("現在の位置 %.2f" % st["lensPosition"])
+                self.cur_focus_var.set(t("shell.cur.focus", v="%.2f" % st["lensPosition"]))
         connected = snap["connected"]
         self._update_phone_status(st if connected else {})
         now = time.monotonic()
@@ -480,6 +657,12 @@ for _mod in (connection_video, quality, effects, recording, audio, status, short
     for _name in _mod.METHODS:
         setattr(App, _name, getattr(_mod, _name))
 del _mod, _name
+try:
+    from phonecam.ui.pages import settings as _settings_page
+    for _name in getattr(_settings_page, "METHODS", ()):
+        setattr(App, _name, getattr(_settings_page, _name))
+except ImportError:
+    pass
 
 
 def _bind_setup():
@@ -514,15 +697,11 @@ def main():
     if helper is not None:
         return helper
     if tk is None:
-        print("tkinter が使用できません。Python を公式インストーラーで再インストールしてください。")
+        print(t("shell.no_tk"))
         return 1
     enable_dpi_awareness()  # Tk を作る前に (作ったあとでは効かない)
     root = tk.Tk()
     apply_ui_scale(root)
-    try:
-        ttk.Style().theme_use("vista")
-    except Exception:
-        pass
     _APP_REF.append(App(root))
     root.mainloop()
     return 0
@@ -536,7 +715,7 @@ def _show_fatal(exc):
         r = tk.Tk() if tk is not None else None
         if r is not None:
             r.withdraw()
-            messagebox.showerror("PhoneCam", "起動中にエラーが発生しました。\n\n%s" % detail[-1500:])
+            messagebox.showerror("PhoneCam", t("shell.fatal", detail=detail[-1500:]))
             r.destroy()
             return
     except Exception:

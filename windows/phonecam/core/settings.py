@@ -108,6 +108,9 @@ DEFAULT_SETTINGS = {
     "mic_priority": "low",       # "low"=低遅延優先 / "stable"=安定優先
     # iPhoneのカメラを動かすタイミング
     "run_mode": "auto",
+    "theme": "system",           # "system" / "light" / "dark"
+    "language": "system",        # "system" / "ja" / "en" ...
+    "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
     "idle_stop_sec": 10,
     # 初回セットアップ (ウィザード) を終えたか
     "setup_done": False,
@@ -336,6 +339,18 @@ def sanitize_settings(s):
         s["mic_exclusive"] = None
     if s.get("mic_priority") not in AUDIO_PRIORITIES:
         s["mic_priority"] = DEFAULT_SETTINGS["mic_priority"]
+    if s.get("theme") not in ("system", "light", "dark"):
+        s["theme"] = DEFAULT_SETTINGS["theme"]
+    lang = s.get("language")
+    if not isinstance(lang, str) or not lang.strip() or len(lang) > 16:
+        s["language"] = DEFAULT_SETTINGS["language"]
+    try:
+        ratio = float(s.get("preview_width_ratio"))
+        if ratio != ratio:
+            raise ValueError
+    except Exception:
+        ratio = DEFAULT_SETTINGS["preview_width_ratio"]
+    s["preview_width_ratio"] = min(1.0, max(1.0 / 3.0, ratio))
     # カメラの動かし方
     if s.get("run_mode") not in RUN_MODES:
         s["run_mode"] = DEFAULT_SETTINGS["run_mode"]

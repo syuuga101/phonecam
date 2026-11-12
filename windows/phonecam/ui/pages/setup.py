@@ -7,9 +7,11 @@ import time
 from phonecam.core.deps import phonecam_audio, phonecam_setup
 from phonecam.core.paths import _is_frozen
 from phonecam.core.settings import save_settings
+from phonecam.i18n import t
 from phonecam.ui.dpi import px
-from phonecam.ui.labels import UPD_BG, UPD_FG, UPD_FONT, UPD_LINE, UPD_SUB, setup_outcome_text
+from phonecam.ui.labels import setup_outcome_text
 from phonecam.ui.tkdeps import messagebox, tk, ttk
+from phonecam.ui.update_ui import hint, page, row, section
 from phonecam.ui.util import webbrowser_open
 
 
@@ -31,14 +33,13 @@ def _first_run_check(app):
     if st not in ("missing", "outdated"):
         return
     if st == "outdated":
-        msg = "新しいバージョンの専用カメラに更新します。このあと管理者の確認が表示されたら「はい」を押してください。"
+        msg = t("setup.first_run.update_cam")
     else:
-        msg = "専用カメラ「PhoneCam」をWindowsに登録します。このあと管理者の確認が表示されたら「はい」を押してください。"
+        msg = t("setup.first_run.register_cam")
     if messagebox.askyesno("PhoneCam", msg):
         app._start_elevated("register")
     else:
-        app.cam_note_var.set("専用カメラ「PhoneCam」は未登録（または古い）のままです。使うには「登録する（更新）」を押してください。"
-                              "それまでは出力先に「OBS Virtual Camera」などを選べます。")
+        app.cam_note_var.set(t("setup.first_run.declined_note"))
 
 
 # -- セットアップ (必要ソフトの導入) -----------------------------------
@@ -61,56 +62,50 @@ def _setup_changed(app):
 
 
 def _build_setup_tab(app, parent):
+    body = page(parent)
     if app.setup is None:
-        ttk.Label(parent, text="セットアップ機能を読み込めませんでした。").pack(padx=14, pady=14, anchor="w")
+        ttk.Label(body, text=t("setup.unavailable")).pack(padx=14, pady=14, anchor="w")
         return
     ps = phonecam_setup
-    wrap = tk.Frame(parent, bg=ps.BG)
-    wrap.pack(fill="both", expand=True, padx=10, pady=8)
-    inner = tk.Frame(wrap, bg=ps.BG)
-    inner.pack(fill="both", expand=True, padx=16, pady=14)
-    tk.Label(inner, text="セットアップ", bg=ps.BG, fg=ps.FG, font=(ps.FONT, 18, "bold")).pack(anchor="w")
-    app.setup_summary_var = tk.StringVar(value="確認しています…")
-    tk.Label(inner, textvariable=app.setup_summary_var, bg=ps.BG, fg=ps.SUB, font=(ps.FONT, 10)).pack(anchor="w", pady=(4, 10))
-    app.setup_panel = ps.SetupPanel(inner, app.setup, "tab", on_install_one=app._setup_install_one)
+    # 必要なソフト: 状況の要約 + 項目の一覧 (SetupPanel) + 操作
+    card = section(body, t("setup.components.title"))
+    app.setup_summary_var = tk.StringVar(value=t("setup.summary.checking"))
+    ttk.Label(card, textvariable=app.setup_summary_var).pack(anchor="w", pady=(0, px(6)))
+    app.setup_panel = ps.SetupPanel(card, app.setup, "tab", on_install_one=app._setup_install_one)
     app.setup_panel.pack(fill="x")
-    bar = tk.Frame(inner, bg=ps.BG)
-    bar.pack(fill="x", pady=(14, 0))
-    app.setup_recheck_btn = ps.make_button(bar, "再チェック", app._setup_recheck)
+    bar = ttk.Frame(card)
+    bar.pack(fill="x", pady=(px(10), 0))
+    app.setup_recheck_btn = ttk.Button(bar, text=t("setup.recheck"), command=app._setup_recheck)
     app.setup_recheck_btn.pack(side="left")
-    app.setup_all_btn = ps.make_button(bar, "足りないものをすべてインストール", app._setup_install_missing, primary=True)
-    app.setup_all_btn.pack(side="left", padx=(10, 0))
+    app.setup_all_btn = ttk.Button(bar, text=t("setup.install_missing"), command=app._setup_install_missing,
+                                   style="Accent.TButton")
+    app.setup_all_btn.pack(side="left", padx=(px(10), 0))
     app.setup_note_var = tk.StringVar(value="")
-    tk.Label(inner, textvariable=app.setup_note_var, bg=ps.BG, fg=ps.WARN, font=(ps.FONT, 10), justify="left",
-             wraplength=px(480)).pack(anchor="w", pady=(10, 0))
-    app.setup_manual_box = tk.Frame(inner, bg=ps.BG)
+    ttk.Label(card, textvariable=app.setup_note_var, justify="left", wraplength=px(480)).pack(anchor="w", pady=(px(10), 0))
+    app.setup_manual_box = ttk.Frame(card)
     app.setup_manual_box.pack(anchor="w")
-    tk.Frame(inner, bg=ps.LINE, height=1).pack(fill="x", pady=(14, 10))
-    tk.Label(inner, text="iPhoneへのインストール", bg=ps.BG, fg=ps.FG, font=(ps.FONT, 11, "bold")).pack(anchor="w")
-    row = tk.Frame(inner, bg=ps.BG)
-    row.pack(anchor="w", pady=(8, 0))
-    app.setup_iphone_btn = ps.make_button(row, "iPhoneのセットアップ", app._setup_iphone, primary=True)
-    app.setup_iphone_btn.pack(side="left")
-    row2 = tk.Frame(inner, bg=ps.BG)
-    row2.pack(anchor="w", pady=(px(8), 0))
-    app.setup_ipa_btn = ps.make_button(row2, "PhoneCam.ipaを開く", app._setup_open_ipa)
+    # iPhone へのインストール
+    card = section(body, t("setup.iphone.title"))
+    r = row(card, "download", t("setup.iphone.setup.label"), t("setup.iphone.setup.hint"))
+    app.setup_iphone_btn = ttk.Button(r, text=t("setup.iphone.setup.button"), command=app._setup_iphone,
+                                      style="Accent.TButton")
+    app.setup_iphone_btn.pack(side="right")
+    r2 = row(card, "document", t("setup.iphone.files.label"))
+    # AltServer は見つかったときだけ _setup_update_summary が出す (ipa の左に並ぶ)
+    app.setup_alt_btn = ttk.Button(r2, text=t("setup.iphone.altserver"), command=app._setup_launch_altserver)
+    app.setup_ipa_btn = ttk.Button(r2, text=t("setup.iphone.ipa"), command=app._setup_open_ipa)
     if ps.ipa_url():
-        app.setup_ipa_btn.pack(side="left")
-    app.setup_alt_btn = ps.make_button(row2, "AltServerを起動", app._setup_launch_altserver)
-    app.setup_alt_btn.pack(side="left", padx=(px(10), 0))
-    app.setup_alt_btn.pack_forget()
-    row3 = tk.Frame(inner, bg=ps.BG)
-    row3.pack(anchor="w", pady=(px(8), 0))
-    app.setup_diag_btn = ps.make_button(row3, "AltServerの診断", app._setup_diagnose)
-    app.setup_diag_btn.pack(side="left")
-    tk.Label(row3, text="AltStoreの更新で「エラー2003」などが出るとき", bg=ps.BG, fg=ps.SUB,
-             font=(ps.FONT, 9)).pack(side="left", padx=(px(10), 0))
+        app.setup_ipa_btn.pack(side="right")
+    app._setup_files_row = r2
+    r3 = row(card, "wrench", t("setup.diagnose.label"), t("setup.diagnose.hint"))
+    app.setup_diag_btn = ttk.Button(r3, text=t("setup.diagnose.button"), command=app._setup_diagnose)
+    app.setup_diag_btn.pack(side="right")
     try:
-        app._build_update_section(inner, ps)
+        app._build_update_section(body, ps)
     except Exception:
         pass
-    rerun = ps.make_link(inner, "初期セットアップをやり直す", app._setup_rerun)
-    rerun.pack(anchor="w", pady=(16, 0))
+    r4 = row(section(body, t("setup.rerun.title")), "play", t("setup.rerun.label"))
+    ttk.Button(r4, text=t("setup.rerun.button"), command=app._setup_rerun).pack(side="right")
     app.setup.listen(app._setup_event)
     app.setup_panel.render()
     app.root.after(400, app._setup_initial_check)
@@ -135,7 +130,7 @@ def _setup_event(app, what):
         # ウィザードから始めたときは、ウィザード側に表示があるので、ここには「実行中」の文を出さない
         # (出すと、終わっても消えずに残る)
         app.setup_note_var.set("" if app._wizard is not None else
-                                "インストール中です。管理者の確認が表示されたら「はい」を押してください…")
+                                t("setup.note.installing"))
         app._setup_clear_manual()
     elif what == "stage" and app.setup.busy and app._wizard is None:
         app.setup_note_var.set(app.setup.stage)
@@ -149,11 +144,11 @@ def _setup_update_summary(app):
     ps = phonecam_setup
     c = app.setup
     if not c.checked:
-        text = "確認しています…"
+        text = t("setup.summary.checking")
     else:
         missing = [x for x in ps.COMPONENTS if c.statuses.get(x["id"], {}).get("state") != ps.STATE_OK
                    and ps.is_selectable(x["id"], c.statuses)]
-        text = "すべて導入済みです" if not missing else "未導入・要確認: %d 件" % len(missing)
+        text = t("setup.summary.all_ok") if not missing else t("setup.summary.missing", count=len(missing))
     app.setup_summary_var.set(text)
     busy = c.busy
     for b in (app.setup_recheck_btn, app.setup_all_btn):
@@ -162,7 +157,7 @@ def _setup_update_summary(app):
         except Exception:
             pass
     if ps.find_altserver():
-        app.setup_alt_btn.pack(side="left", padx=(px(10), 0))
+        app.setup_alt_btn.pack(side="right", padx=(px(10), 0))
     else:
         app.setup_alt_btn.pack_forget()
 
@@ -181,8 +176,8 @@ def _setup_show_outcome(app):
         return
     app.setup_note_var.set(setup_outcome_text(out, lambda cid: ps.COMPONENT_BY_ID[cid]["name"]))
     for m in out.get("manual", []):
-        ps.make_link(app.setup_manual_box, "%s の公式ページを開く（%s）" % (m["name"], m["text"]),
-                     lambda u=m["url"]: webbrowser_open(u), bg=ps.BG).pack(anchor="w")
+        ttk.Button(app.setup_manual_box, text=t("setup.manual.open", name=m["name"], text=m["text"]),
+                   command=lambda u=m["url"]: webbrowser_open(u), style="Toolbutton").pack(anchor="w")
 
 
 def _setup_show_audio(app):
@@ -234,7 +229,7 @@ def _setup_install_missing(app):
            if ps.is_selectable(x["id"], app.setup.statuses)
            and (x["required"] or x["id"] == "altserver")]
     if not ids:
-        app.setup_note_var.set("インストールが必要なものはありません。")
+        app.setup_note_var.set(t("setup.note.nothing_to_install"))
         return
     app._setup_start(ids)
 
@@ -358,21 +353,9 @@ def _wizard_closed(app):
 
 
 def _build_update_section(app, parent, ps):
-    """セットアップタブの「アップデート」欄。"""
-    bg = ps.BG if ps is not None else UPD_BG
-    fg = ps.FG if ps is not None else UPD_FG
-    sub = ps.SUB if ps is not None else UPD_SUB
-    font = ps.FONT if ps is not None else UPD_FONT
-    tk.Frame(parent, bg=ps.LINE if ps is not None else UPD_LINE, height=1).pack(fill="x", pady=(14, 10))
-    tk.Label(parent, text="アップデート", bg=bg, fg=fg, font=(font, 11, "bold")).pack(anchor="w")
-    tk.Checkbutton(parent, text="起動時に更新を確認する", variable=app.upd_check_var, command=app._update_check_toggled,
-                   bg=bg, activebackground=bg, fg=fg, activeforeground=fg, selectcolor="#ffffff",
-                   font=(font, 10), anchor="w", bd=0, highlightthickness=0).pack(anchor="w", pady=(6, 0))
-    row = tk.Frame(parent, bg=bg)
-    row.pack(anchor="w", pady=(6, 0))
-    app._upd_button(row, "今すぐ確認", app._update_check_now).pack(side="left")
-    tk.Label(row, textvariable=app.upd_status_var, bg=bg, fg=sub, font=(font, 9), justify="left",
-             wraplength=px(380), anchor="w").pack(side="left", padx=(px(10), 0))
+    """セットアップページの「アップデート」欄 (設定ページと同じ行)。"""
+    card = section(parent, t("update.section"))
+    app._build_update_rows(card)
 
 
 def build(app, parent):

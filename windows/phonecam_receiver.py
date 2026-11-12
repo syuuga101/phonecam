@@ -30,7 +30,10 @@ import phonecam.core.version as _m_version
 import phonecam.ui.app as _m_app
 import phonecam.ui.dpi as _m_dpi
 import phonecam.ui.labels as _m_labels
+import phonecam.ui.icons as _m_icons
+import phonecam.ui.theme as _m_theme
 import phonecam.ui.tkdeps as _m_tkdeps
+import phonecam.ui.widgets as _m_widgets
 import phonecam.ui.util as _m_util
 import phonecam.ui.dshow_ui as _m_dshow_ui
 import phonecam.ui.phone_sync as _m_phone_sync
@@ -40,6 +43,8 @@ import phonecam.ui.pages.connection_video as _m_p_conn
 import phonecam.ui.pages.effects as _m_p_effects
 import phonecam.ui.pages.quality as _m_p_quality
 import phonecam.ui.pages.recording as _m_p_recording
+import phonecam.ui.pages.preview as _m_p_preview
+import phonecam.ui.pages.settings as _m_p_settings
 import phonecam.ui.pages.setup as _m_p_setup
 import phonecam.ui.pages.shortcuts as _m_p_shortcuts
 import phonecam.ui.pages.status as _m_p_status

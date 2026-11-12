@@ -2,7 +2,13 @@
 """UI 用の表示ラベル定数・色・文言整形関数
 """
 
-from phonecam.core.softcam_shmem import WATCH_STATE_LABELS
+from phonecam.core.softcam_shmem import (
+    AUTO_UNSUPPORTED_NOTE as _AUTO_UNSUPPORTED_NOTE,
+    IDLE_STOP_LABELS as _IDLE_STOP_LABELS,
+    RUN_MODE_LABELS as _RUN_MODE_LABELS,
+    WATCH_STATE_LABELS as _WATCH_STATE_LABELS,
+)
+from phonecam.i18n import t
 
 
 # ---------------------------------------------------------------------------
@@ -12,7 +18,7 @@ from phonecam.core.softcam_shmem import WATCH_STATE_LABELS
 PHONE_NOTE_SECONDS = 5.0
 
 
-LENS_LABELS = [("wide", "広角"), ("ultrawide", "超広角"), ("front", "インカメ")]
+LENS_LABELS = [("wide", t("labels.lens.wide")), ("ultrawide", t("labels.lens.ultrawide")), ("front", t("labels.lens.front"))]
 
 
 RES_LABELS = ["720p", "1080p", "4K"]
@@ -21,72 +27,75 @@ RES_LABELS = ["720p", "1080p", "4K"]
 FPS_LABELS = [30, 60]
 
 
-MODE3_LABELS = [("auto", "自動"), ("locked", "固定"), ("manual", "マニュアル")]
+MODE3_LABELS = [("auto", t("labels.mode3.auto")), ("locked", t("labels.mode3.locked")), ("manual", t("labels.mode3.manual"))]
 
 
 SHUTTER_VALUES = [30, 50, 60, 100, 120, 250, 500, 1000]
 
 
-ORIENT_LABELS = [("auto", "自動"), ("landscape", "横"), ("portrait", "縦")]
+ORIENT_LABELS = [("auto", t("labels.orient.auto")), ("landscape", t("labels.orient.landscape")), ("portrait", t("labels.orient.portrait"))]
 
 
-BACKEND_LABELS = [("phonecam", "PhoneCam（専用カメラ）"), ("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Capture")]
+BACKEND_LABELS = [("phonecam", t("labels.backend.phonecam")), ("obs", "OBS Virtual Camera"), ("unitycapture", "Unity Capture")]
 
 
 CODEC_LABELS = [("h264", "H.264"), ("hevc", "HEVC(H.265)")]
 
 
-OUTPUT_SIZE_LABELS = [("720p", "1280×720（HD）"), ("1080p", "1920×1080（フルHD・おすすめ）"), ("4K", "3840×2160（4K）")]
+OUTPUT_SIZE_LABELS = [("720p", t("labels.output.720p")), ("1080p", t("labels.output.1080p")), ("4K", t("labels.output.4K"))]
 
 
-CANVAS_LABELS = [("follow", "向きの設定に合わせる"), ("landscape", "横長で固定"), ("portrait", "縦長で固定"),
-                 ("native", "映像のサイズそのまま（サイズが変わるとOBS・Discordで再読み込みが必要）")]
+CANVAS_LABELS = [("follow", t("labels.canvas.follow")), ("landscape", t("labels.canvas.landscape")), ("portrait", t("labels.canvas.portrait")),
+                 ("native", t("labels.canvas.native"))]
 
 
-DECODER_LABELS = {"hw": "ハードウェア", "sw": "ソフトウェア"}
+DECODER_LABELS = {"hw": t("labels.decoder.hw"), "sw": t("labels.decoder.sw")}
 
 
-MIC_PATH_LABELS = {"lowLatency": "低遅延", "capture": "通常"}
+MIC_PATH_LABELS = {"lowLatency": t("labels.micpath.lowLatency"), "capture": t("labels.micpath.capture")}
 
 
-AUDIO_PATH_LABELS = {"dedicated": "専用（低遅延）", "shared": "映像と共用"}
+AUDIO_PATH_LABELS = {"dedicated": t("labels.audiopath.dedicated"), "shared": t("labels.audiopath.shared")}
 
 
-THIN_TEXT = "PCの処理が追いつかないためフレームを間引いています"
+THIN_TEXT = t("labels.thin")
 
 
-CAM_REG_EXPLAIN = ("OBSやDiscordのカメラ一覧に「PhoneCam」を出すための登録です。普段はそのままで大丈夫です。"
-                   "新しいバージョンにして「更新が必要」と出たときは「登録する（更新）」を押してください。"
-                   "「登録を解除」はPhoneCamを使わなくなったとき（アンインストール）に使います。")
+CAM_REG_EXPLAIN = t("labels.cam_reg_explain")
 
 
-FIT_LABELS = [("pad", "余白を付けて全体を表示"), ("crop", "はみ出す部分を切り取って埋める")]
+FIT_LABELS = [("pad", t("labels.fit.pad")), ("crop", t("labels.fit.crop"))]
 
 
-BG_MODE_LABELS = [("off", "オフ"), ("blur", "ぼかし"), ("green", "切り抜き(緑)")]
+BG_MODE_LABELS = [("off", t("labels.bgmode.off")), ("blur", t("labels.bgmode.blur")), ("green", t("labels.bgmode.green"))]
 
 
-BG_QUALITY_LABELS = [("fast", "速度優先"), ("balanced", "バランス")]
+BG_QUALITY_LABELS = [("fast", t("labels.bgq.fast")), ("balanced", t("labels.bgq.balanced"))]
 
 
-THERMAL_LABELS = {"nominal": "正常", "fair": "やや高い", "serious": "高い", "critical": "危険"}
+THERMAL_LABELS = {"nominal": t("labels.thermal.nominal"), "fair": t("labels.thermal.fair"), "serious": t("labels.thermal.serious"), "critical": t("labels.thermal.critical")}
 
 
-BATTERY_STATE_LABELS = {"charging": "充電中", "full": "満充電", "unplugged": "放電中", "unknown": "不明"}
+BATTERY_STATE_LABELS = {"charging": t("labels.battery.charging"), "full": t("labels.battery.full"), "unplugged": t("labels.battery.unplugged"), "unknown": t("labels.battery.unknown")}
 
 
-SCREEN_AUTO_LABELS = [(0, "しない"), (10, "10秒"), (30, "30秒"), (60, "60秒")]
+SCREEN_AUTO_LABELS = [(0, t("labels.screen_auto.0")), (10, t("labels.sec.10")), (30, t("labels.sec.30")), (60, t("labels.sec.60"))]
 
 
-REC_RES_LABELS = [("same", "配信と同じ"), ("4k", "4K")]
+REC_RES_LABELS = [("same", t("labels.recres.same")), ("4k", "4K")]
 
 
-REC_PRESET_LABELS = [("standard", "標準"), ("high", "高画質"), ("max", "最高")]
+REC_PRESET_LABELS = [("standard", t("labels.recpreset.standard")), ("high", t("labels.recpreset.high")), ("max", t("labels.recpreset.max"))]
 
 
-REC_CONTAINER_LABELS = [("mp4", "MP4（おすすめ・どこでも再生できます）"), ("mov", "MOV（編集ソフト向け）")]
+REC_CONTAINER_LABELS = [("mp4", t("labels.container.mp4")), ("mov", t("labels.container.mov"))]
 
 
+# core/softcam_shmem.py の日本語ラベルを、値をキーに翻訳したもの
+RUN_MODE_LABELS = [(v, t("labels.runmode." + v)) for v, _ in _RUN_MODE_LABELS]
+IDLE_STOP_LABELS = [(v, t("labels.sec.%d" % v)) for v, _ in _IDLE_STOP_LABELS]
+AUTO_UNSUPPORTED_NOTE = t("labels.auto_unsupported")
+WATCH_STATE_LABELS = {k: t("labels.watch." + k) for k in _WATCH_STATE_LABELS}
 
 
 # 更新バナー・更新欄の配色 (Apple 風: 淡いグレーの帯、青のボタン)
@@ -114,16 +123,16 @@ UPD_WARN = "#b25000"
 UPD_FONT = "Yu Gothic UI"
 
 
-STATUS_TAB_INDEX = 5
+STATUS_TAB_INDEX = 6  # app.NAV_ITEMS の「状態」の番号
 
 
 METER_MIN_DB = -60.0
 
 
-THERMAL_WARNING = "iPhoneが熱くなっています。fpsを30に下げるか、エフェクトをオフにしてください"
+THERMAL_WARNING = t("labels.thermal_warning")
 
 
-HINT_FG = "#666666"
+HINT_FG = "#8a8a8a"  # 旧互換 (新しい画面は theme.colors()["text2"])
 
 
 THROTTLE_MS = 50  # 1コントロールあたり最大 20 msg/s
@@ -137,11 +146,11 @@ def setup_outcome_text(out, name_of):
         notes.append(out["error"])
     elif failed:
         details = " / ".join("%s: %s" % (name_of(c), r.get("detail", "")) for c, r in failed.items())
-        notes.append("完了しなかった項目があります。" + details)
+        notes.append(t("labels.setup.partial") + details)
     else:
-        notes.append("インストールが完了しました。")
+        notes.append(t("labels.setup.done"))
     if out.get("reboot"):
-        notes.append("再起動が必要です。PCを再起動してください。")
+        notes.append(t("labels.setup.reboot"))
     return "\n".join(notes)
 
 
@@ -151,20 +160,20 @@ def watch_text(watcher, now):
     detail = watcher.detail()
     err = getattr(watcher, "last_error", "")
     if err:
-        detail = (detail + "、" if detail else "") + "エラー: " + err[:120]
-    return "%s（%s）" % (label, detail) if detail else label
+        detail = detail + (t("labels.sep") if detail else "") + t("labels.error") + ": " + err[:120]
+    return t("labels.watch_fmt", label=label, detail=detail) if detail else label
 
 
 def format_battery(level, state):
     """バッテリー表示文字列。level は 0-1 または -1 (不明)。"""
-    st = BATTERY_STATE_LABELS.get(state, "不明")
+    st = BATTERY_STATE_LABELS.get(state, t("labels.unknown"))
     try:
         lv = float(level)
     except Exception:
         lv = -1.0
     if lv < 0:
-        return "不明" if st == "不明" else st
-    return "%d%%（%s）" % (round(lv * 100), st)
+        return st
+    return t("labels.battery_fmt", pct=round(lv * 100), state=st)
 
 
 def is_thermal_warning(thermal):

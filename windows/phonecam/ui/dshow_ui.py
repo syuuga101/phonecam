@@ -5,6 +5,7 @@
 import sys
 import time
 from phonecam.core.deps import phonecam_dshowctl
+from phonecam.i18n import t
 from phonecam.ui.labels import MODE3_LABELS, SHUTTER_VALUES
 
 
@@ -13,16 +14,16 @@ def _dshow_init(app):
     app.dshowctl = None
     app._dshow_reason = ""
     if phonecam_dshowctl is None:
-        app._dshow_reason = "モジュールがありません"
+        app._dshow_reason = t("shell.dshow.nomodule")
     else:
         try:
             app.dshowctl = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES)
             if not app.dshowctl.open():
-                app._dshow_reason = ("Windowsのみ対応" if not sys.platform.startswith("win")
-                                      else "PhoneCamカメラの準備ができていません")
+                app._dshow_reason = (t("shell.dshow.winonly") if not sys.platform.startswith("win")
+                                      else t("shell.dshow.notready"))
         except Exception:
             app.dshowctl = None
-            app._dshow_reason = "初期化に失敗しました"
+            app._dshow_reason = t("shell.dshow.initfail")
     app._dshow_show_state()
     app._dshow_retry_t = time.monotonic() + app.DSHOW_RETRY_SEC
     app.root.after(app.DSHOW_POLL_MS, app._dshow_tick)
@@ -31,7 +32,7 @@ def _dshow_init(app):
 def _dshow_show_state(app):
     try:
         ok = app.dshowctl is not None and app.dshowctl.is_open
-        app.dshow_var.set("有効" if ok else "無効（%s）" % (app._dshow_reason or "未接続"))
+        app.dshow_var.set(t("shell.dshow.on") if ok else t("shell.dshow.off", reason=app._dshow_reason or t("shell.dshow.disconnected")))
     except Exception:
         pass
 

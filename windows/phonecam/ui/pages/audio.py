@@ -7,9 +7,7 @@ import time
 from phonecam.core.audio_engine import (
     AudioEngine,
     DEFAULT_DEVICE_LABEL,
-    OBS_AUDIO_TIP,
     SYSTEM_DEFAULT_KEY,
-    VBCABLE_LATENCY_HINT,
     VBCABLE_PANEL_MISSING,
     choose_output_device,
     find_vbcable_control_panel,
@@ -17,18 +15,79 @@ from phonecam.core.audio_engine import (
 )
 from phonecam.core.deps import sd
 from phonecam.core.settings import AUDIO_AVAILABLE
+from phonecam.i18n import t
+from phonecam.ui import theme
 from phonecam.ui.dpi import px
-from phonecam.ui.labels import HINT_FG, METER_MIN_DB
+from phonecam.ui.labels import METER_MIN_DB
 from phonecam.ui.tkdeps import tk, ttk
+from phonecam.ui.widgets import page, row, section
+
+
+def _switch(r, var, command):
+    """行の右端にスイッチ (Switch.TCheckbutton) を置く。"""
+    cb = ttk.Checkbutton(r, style="Switch.TCheckbutton", variable=var, command=command)
+    cb.pack(side="right")
+    return cb
+
+
+def _value_label(r, var, **kw):
+    """行の右端に値表示 (読み取り専用の文字) を置く。"""
+    lbl = ttk.Label(r, textvariable=var, anchor="e", justify="right", **kw)
+    lbl.pack(side="right")
+    return lbl
+
+
+def _row_slider(app, r, key, lo, hi, fmt, round_to):
+    """行の右側にスライダー + 値表示を置く (設定保存は従来の _slider と同じ)。戻り値: (scale, value_label, var)。"""
+    var = tk.DoubleVar(value=float(app.settings[key]))
+    val_label = ttk.Label(r, width=8, anchor="e")
+    val_label.pack(side="right")
+    scale = ttk.Scale(r, from_=lo, to=hi, variable=var, orient="horizontal", length=px(180))
+    scale.pack(side="right", padx=(0, 8))
+    val_label.config(text=fmt(var.get()))
+
+    def on_write(*_):
+        try:
+            v = float(var.get())
+        except Exception:
+            return
+        v = int(round(round(v / round_to) * round_to))
+        val_label.config(text=fmt(v))
+        if app._ui_sync:  # 設定からUIを合わせているだけのときは、保存も送信もしない
+            return
+        app._changed(key, v, None)
+
+    var.trace_add("write", on_write)
+    app._slider_vars[key] = var
+    return scale, val_label, var
 
 
 def _build_audio(app, parent):
-    f = app._section(parent, "iPhoneのマイク")
-    app.mic_var = tk.BooleanVar(value=bool(app.settings["mic_enabled"]))
-    app.mic_cb = ttk.Checkbutton(f, text="iPhoneのマイクを使う", variable=app.mic_var, command=app._mic_toggled)
-    app.mic_cb.grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
+    pg = page(parent)
 
-    ttk.Label(f, text="出力先").grid(row=1, column=0, sticky="w", pady=2)
+    # --- iPhoneのマイク ---
+    c = section(pg, t("audio.mic.section"))
+    r = row(c, "mic", t("audio.mic.use"))
+    app.mic_var = tk.BooleanVar(value=bool(app.settings["mic_enabled"]))
+    app.mic_cb = _switch(r, app.mic_var, app._mic_toggled)
+
+    # メインのミュート: iPhoneに伝えて音声そのものを送らせない
+    r = row(c, "volume", t("audio.mute.label"))
+    app.mic_muted_var = tk.BooleanVar(value=bool(app.settings.get("mic_muted", False)))
+    app.mic_muted_cb = _switch(
+        r, app.mic_muted_var,
+        lambda: app._changed("mic_muted", bool(app.mic_muted_var.get()), "micMuted"))
+    app.phone_mute_var = tk.StringVar(value="")
+    app.phone_mute_lbl = ttk.Label(r, textvariable=app.phone_mute_var, foreground=theme.colors()["live"])
+    app.phone_mute_lbl.pack(side="right", padx=(0, 10))
+
+    r = row(c, "speaker", t("audio.pcmute.label"), t("audio.pcmute.hint"))
+    app.mute_var = tk.BooleanVar(value=bool(app.settings["mic_mute"]))
+    app.mute_cb = _switch(r, app.mute_var, lambda: app._changed("mic_mute", bool(app.mute_var.get()), None))
+
+    # --- 出力と音量 ---
+    c = section(pg, t("audio.output.section"))
+    r = row(c, "speaker", t("audio.device.label"))
     try:
         app._audio_devices = list_output_devices() if AUDIO_AVAILABLE else []
     except Exception:
@@ -36,88 +95,85 @@ def _build_audio(app, parent):
     names = [d["name"] for d in app._audio_devices]
     cur = choose_output_device(app._audio_devices, app.settings["mic_device"])
     app.audio_dev_var = tk.StringVar(value=cur["name"] if cur else DEFAULT_DEVICE_LABEL)
-    app.audio_dev_cb = ttk.Combobox(f, textvariable=app.audio_dev_var, values=[DEFAULT_DEVICE_LABEL] + names,
-                                     state="readonly", width=42)
-    app.audio_dev_cb.grid(row=1, column=1, columnspan=2, sticky="ew", padx=6)
+    app.audio_dev_cb = ttk.Combobox(r, textvariable=app.audio_dev_var, values=[DEFAULT_DEVICE_LABEL] + names,
+                                     state="readonly", width=34)
+    app.audio_dev_cb.pack(side="right")
     app.audio_dev_cb.bind("<<ComboboxSelected>>", lambda e: app._audio_device_changed())
 
-    app.vol_scale, _, _ = app._slider(f, 2, "音量", "mic_volume", 0, 200, None,
-                                        lambda v: "%d%%" % round(v), 5, as_int=True)
-    mf = ttk.Frame(f)
-    mf.grid(row=3, column=0, columnspan=3, sticky="w")
-    # メインのミュート: iPhoneに伝えて音声そのものを送らせない
-    app.mic_muted_var = tk.BooleanVar(value=bool(app.settings.get("mic_muted", False)))
-    app.mic_muted_cb = ttk.Checkbutton(mf, text="ミュート", variable=app.mic_muted_var,
-                                        command=lambda: app._changed("mic_muted", bool(app.mic_muted_var.get()), "micMuted"))
-    app.mic_muted_cb.grid(row=0, column=0, sticky="w")
-    app.phone_mute_var = tk.StringVar(value="")
-    app.phone_mute_lbl = ttk.Label(mf, textvariable=app.phone_mute_var, foreground="#c0392b", font=("", 9, "bold"))
-    app.phone_mute_lbl.grid(row=0, column=1, sticky="w", padx=(10, 0))
-    app.mute_var = tk.BooleanVar(value=bool(app.settings["mic_mute"]))
-    app.mute_cb = ttk.Checkbutton(mf, text="PCで消音（iPhoneからは送られ続けます）", variable=app.mute_var,
-                                   command=lambda: app._changed("mic_mute", bool(app.mute_var.get()), None))
-    app.mute_cb.grid(row=1, column=0, columnspan=2, sticky="w")
+    r = row(c, "volume", t("audio.volume.label"))
+    app.vol_scale, _, _ = _row_slider(app, r, "mic_volume", 0, 200, lambda v: "%d%%" % round(v), 5)
 
-    ttk.Label(f, text="入力レベル").grid(row=4, column=0, sticky="w", pady=(6, 2))
-    app.meter = tk.Canvas(f, height=12, highlightthickness=0, borderwidth=0, background="#e5e5ea")
-    app.meter.grid(row=4, column=1, sticky="ew", padx=6, pady=(6, 2))
-    app._meter_bar = app.meter.create_rectangle(0, 0, 0, 12, width=0, fill="#34c759")
-    app.meter_text = ttk.Label(f, text="", width=9, anchor="e", foreground=HINT_FG)
-    app.meter_text.grid(row=4, column=2, padx=(6, 0))
+    r = row(c, "clock", t("audio.delay.label"), t("audio.delay.hint"))
+    app.delay_scale, _, _ = _row_slider(app, r, "mic_delay_ms", 0, 500, lambda v: "%d ms" % round(v), 10)
 
-    app.delay_scale, _, _ = app._slider(f, 5, "音声の遅延", "mic_delay_ms", 0, 500, None,
-                                          lambda v: "%d ms" % round(v), 10, as_int=True)
-    app._hint(f, 6, "映像より音が早いときに増やして、映像に合わせます", pady=(0, 4))
-
-    pf = ttk.Frame(f)
-    pf.grid(row=7, column=0, columnspan=3, sticky="w", pady=(4, 0))
-    ttk.Label(pf, text="再生バッファ").pack(side="left")
+    r = row(c, "gauge", t("audio.priority.label"))
     app.prio_var = tk.StringVar(value=app.settings["mic_priority"])
     app.prio_rbs = []
-    for text, val in (("低遅延優先", "low"), ("安定優先", "stable")):
-        rb = ttk.Radiobutton(pf, text=text, value=val, variable=app.prio_var, command=app._prio_changed)
-        rb.pack(side="left", padx=(10, 0))
+    for text, val in ((t("audio.priority.stable"), "stable"), (t("audio.priority.low"), "low")):
+        rb = ttk.Radiobutton(r, text=text, value=val, variable=app.prio_var, command=app._prio_changed)
+        rb.pack(side="right", padx=(8, 0))
         app.prio_rbs.append(rb)
-    app.excl_var = tk.BooleanVar(value=app._exclusive_effective())
-    app.excl_cb = ttk.Checkbutton(f, text="排他モード（さらに低遅延）", variable=app.excl_var,
-                                   command=app._exclusive_toggled)
-    app.excl_cb.grid(row=8, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
+    r = row(c, "gauge", t("audio.exclusive.label"), t("audio.exclusive.hint"))
+    app.excl_var = tk.BooleanVar(value=app._exclusive_effective())
+    app.excl_cb = _switch(r, app.excl_var, app._exclusive_toggled)
+
+    # --- 入力レベル ---
+    c = section(pg, t("audio.level.section"))
+    r = row(c, "mic", t("audio.level.label"))
+    app.meter_text = ttk.Label(r, text="", width=9, anchor="e", foreground=theme.colors()["text2"])
+    app.meter_text.pack(side="right")
+    app.meter = tk.Canvas(r, height=px(10), width=px(180), highlightthickness=0, borderwidth=0,
+                          background=theme.colors()["separator"])
+    app.meter.pack(side="right", padx=(0, 8))
+    app._meter_bar = app.meter.create_rectangle(0, 0, 0, px(10), width=0, fill=theme.colors()["accent"])
+
+    def recolor(*_):
+        try:
+            col = theme.colors()
+            app.meter.configure(background=col["separator"])
+            app.meter_text.configure(foreground=col["text2"])
+            app.phone_mute_lbl.configure(foreground=col["live"])
+            app.audio_err_lbl.configure(foreground=col["live"])
+        except Exception:
+            pass
+    theme.on_change(recolor)
+
+    # --- 状態 (読み取り専用) ---
+    c = section(pg, t("audio.status.section"))
     app.audio_info_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.audio_info_var, foreground=HINT_FG, wraplength=px(520), justify="left").grid(
-        row=9, column=0, columnspan=3, sticky="w", pady=(4, 0))
     app.audio_err_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.audio_err_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
-        row=10, column=0, columnspan=3, sticky="w", pady=(2, 0))
-    ttk.Label(f, text="音声経路").grid(row=11, column=0, sticky="w", pady=(6, 2))
+    r = row(c, "info", t("audio.info.label"))
+    _value_label(r, app.audio_info_var, wraplength=px(320))
+    r = row(c, "info", t("audio.error.label"))
+    app.audio_err_lbl = _value_label(r, app.audio_err_var, wraplength=px(320), foreground=theme.colors()["live"])
     app.audio_path_var = tk.StringVar(value="-")
-    ttk.Label(f, textvariable=app.audio_path_var).grid(row=11, column=1, columnspan=2, sticky="w", padx=6, pady=(6, 2))
-    ttk.Label(f, text="iPhone側のマイク").grid(row=12, column=0, sticky="w", pady=2)
+    r = row(c, "link", t("audio.path.label"))
+    _value_label(r, app.audio_path_var)
     app.mic_path_var = tk.StringVar(value="-")
-    ttk.Label(f, textvariable=app.mic_path_var).grid(row=12, column=1, columnspan=2, sticky="w", padx=6)
-    ttk.Label(f, text="再生モード").grid(row=13, column=0, sticky="w", pady=2)
+    r = row(c, "mic", t("audio.micpath.label"))
+    _value_label(r, app.mic_path_var)
     app.audio_mode_var = tk.StringVar(value="-")
-    ttk.Label(f, textvariable=app.audio_mode_var, wraplength=px(380), justify="left").grid(
-        row=13, column=1, columnspan=2, sticky="w", padx=6)
-    ttk.Label(f, text="音声の遅延（PCの出力まで）").grid(row=14, column=0, sticky="w", pady=2)
+    r = row(c, "play", t("audio.mode.label"))
+    _value_label(r, app.audio_mode_var, wraplength=px(320))
     app.audio_lat_var = tk.StringVar(value="-")
-    ttk.Label(f, textvariable=app.audio_lat_var, font=("", 9, "bold")).grid(row=14, column=1, columnspan=2, sticky="w", padx=6)
     app.audio_under_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.audio_under_var, foreground=HINT_FG, font=("", 8)).grid(
-        row=15, column=0, columnspan=3, sticky="w")
-    app._hint(f, 16, "アンダーランが増えるときは「安定優先」にするか、排他モードをオフにしてください。VB-CABLE内部の遅延は含みません")
-    app.vbcable_btn = ttk.Button(f, text="VB-CABLEの遅延設定を開く", command=app._open_vbcable_panel)
-    app.vbcable_btn.grid(row=17, column=0, columnspan=3, sticky="w", pady=(6, 2))
+    r = row(c, "clock", t("audio.latency.label"), t("audio.latency.hint"))
+    _value_label(r, app.audio_lat_var)
+    r = row(c, "info", t("audio.under.label"))
+    _value_label(r, app.audio_under_var)
+
+    # --- VB-CABLE (1行 + ボタン) ---
+    c = section(pg, t("audio.vbcable.section"))
+    r = row(c, "wrench", t("audio.vbcable.label"), t("audio.vbcable.hint"))
+    app.vbcable_btn = ttk.Button(r, text=t("audio.vbcable.open"), command=app._open_vbcable_panel)
+    app.vbcable_btn.pack(side="right")
     app._vbcable_path = find_vbcable_control_panel() if os.name == "nt" else None
     if app._vbcable_path is None:
         app._set_enabled(app.vbcable_btn, False)
-    app._hint(f, 18, VBCABLE_LATENCY_HINT)
-    app._hint(f, 19, OBS_AUDIO_TIP)
-    app._hint(f, 20, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
-                      "OBSやDiscordでマイクとして「CABLE Output」を選べます", pady=(6, 0))
-    app._hint(f, 21, "初めて使うときは、iPhoneでマイクの許可が必要です")
+
     if not AUDIO_AVAILABLE:
-        app.audio_err_var.set("音声ライブラリ(sounddevice)が見つかりません。install.bat を実行してください")
+        app.audio_err_var.set(t("audio.error.nolib"))
         for w in [app.mic_cb, app.audio_dev_cb, app.vol_scale, app.mute_cb, app.delay_scale,
                   app.excl_cb] + app.prio_rbs:
             app._set_enabled(w, False)
@@ -135,7 +191,7 @@ def _open_vbcable_panel(app):
         try:
             os.startfile(path)
         except Exception as e:
-            app.audio_err_var.set("VB-CABLEのコントロールパネルを開けませんでした（%s）" % e)
+            app.audio_err_var.set(t("audio.vbcable.openfail", err=e))
 
 
 def _mic_toggled(app):
@@ -205,8 +261,9 @@ def _meter_tick(app):
         shown = max(METER_MIN_DB, min(0.0, app._meter_db))
         w = app.meter.winfo_width()
         x = int(w * (shown - METER_MIN_DB) / -METER_MIN_DB)
-        color = "#34c759" if shown < -12 else ("#ff9f0a" if shown < -3 else "#ff3b30")
-        app.meter.coords(app._meter_bar, 0, 0, x, 12)
+        col = theme.colors()
+        color = col["accent"] if shown < -3 else col["live"]
+        app.meter.coords(app._meter_bar, 0, 0, x, px(10))
         app.meter.itemconfigure(app._meter_bar, fill=color)
         app.meter_text.config(text="%d dBFS" % round(shown) if app._meter_db > METER_MIN_DB else "-")
     except Exception:

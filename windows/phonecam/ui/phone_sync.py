@@ -2,6 +2,8 @@
 """iPhone 側の状態を UI へ反映 (_apply_phone_edit / _update_v13 / _apply_ranges)
 """
 
+from phonecam.i18n import t
+from phonecam.ui import theme
 from phonecam.core.settings import AUDIO_AVAILABLE, LENSES, SCREEN_AUTO_VALUES
 from phonecam.core.stats import format_bytes, format_mmss
 from phonecam.ui.labels import (
@@ -34,12 +36,12 @@ def _apply_phone_edit(app, st, now=None):
     lens = pe.get("lens")
     if lens in LENSES and lens != app.settings.get("lens"):
         app._lens_changed(lens, send=False)
-        notes.append("iPhoneでカメラを「%s」に切り替えました" % dict(LENS_LABELS)[lens])
+        notes.append(t("shell.sync.lens", name=dict(LENS_LABELS)[lens]))
     muted = pe.get("micMuted")
     if isinstance(muted, bool) and muted != bool(app.settings.get("mic_muted", False)):
         app.mic_muted_var.set(muted)
         app._changed("mic_muted", muted, None)
-        notes.append("iPhoneでマイクをミュートしました" if muted else "iPhoneでマイクのミュートを解除しました")
+        notes.append(t("shell.sync.muted") if muted else t("shell.sync.unmuted"))
     return " / ".join(notes) if notes else None
 
 
@@ -76,8 +78,8 @@ def _update_v13(app, st, connected, snap, now):
             app.screen_black_var.set(black)
             app._schedule_save()
         auto = st.get("autoBlackSeconds")
-        extra = "（自動: %s）" % app._value_to_label(SCREEN_AUTO_LABELS, auto) if auto in SCREEN_AUTO_VALUES else ""
-        app.screen_state_var.set("現在のiPhoneの画面: %s%s" % ("黒" if black else "通常", extra))
+        extra = t("shell.sync.screen_auto", v=app._value_to_label(SCREEN_AUTO_LABELS, auto)) if auto in SCREEN_AUTO_VALUES else ""
+        app.screen_state_var.set(t("shell.sync.screen", state=t("shell.sync.screen_black") if black else t("shell.sync.screen_normal"), extra=extra))
     else:
         app.screen_state_var.set("")
 
@@ -88,13 +90,13 @@ def _update_v13(app, st, connected, snap, now):
     if connected:
         if now >= app._rec_lock_until:
             app.rec_btn.state(["!disabled"])
-        app.rec_btn.config(text="録画停止" if active else "録画開始")
+        app.rec_btn.config(text=t("recording.button.stop") if active else t("recording.button.start"))
     else:
         app.rec_btn.state(["disabled"])
-        app.rec_btn.config(text="録画開始")
+        app.rec_btn.config(text=t("recording.button.start"))
     if connected and rec:
-        app.rec_vars["state"].set("● 録画中  %s" % format_mmss(rec.get("seconds", 0)) if active else "停止中")
-        app.rec_labels["state"].config(foreground="#c0392b" if active else app._default_fg)
+        app.rec_vars["state"].set(t("shell.sync.rec_active", time=format_mmss(rec.get("seconds", 0))) if active else t("shell.sync.rec_stopped"))
+        app.rec_labels["state"].config(foreground=theme.colors()["live"] if active else theme.colors()["text"])
         app.rec_vars["file"].set(rec.get("fileName") or "-")
         size = rec.get("bytes")
         app.rec_vars["size"].set(format_bytes(size) if (active or size) else "-")
@@ -105,7 +107,7 @@ def _update_v13(app, st, connected, snap, now):
         app.rec_vars["state"].set("-")
         for k in ("file", "size", "free"):
             app.rec_vars[k].set("-")
-        app.rec_labels["state"].config(foreground=app._default_fg)
+        app.rec_labels["state"].config(foreground=theme.colors()["text"])
         app.rec_error_var.set("")
 
     # 音声の状態表示
@@ -115,14 +117,13 @@ def _update_v13(app, st, connected, snap, now):
             app.audio_err_var.set(app.audio.error)
             app.audio_info_var.set("")
         elif connected and mic and mic.get("available") is False:
-            app.audio_err_var.set("iPhoneのマイクが使えません。iPhoneの設定でPhoneCamのマイクを許可してください")
+            app.audio_err_var.set(t("shell.sync.mic_unavailable"))
             app.audio_info_var.set("")
         else:
             app.audio_err_var.set("")
-            info = "出力先: %s" % app.audio.device_name if app.audio.running else ""
+            info = t("shell.sync.output", name=app.audio.device_name) if app.audio.running else ""
             if app.audio.running and connected and mic.get("sampleRate"):
-                info += "　（iPhone %d Hz / 溜まり %d ms / 目標 %d ms）" % (
-                    mic["sampleRate"], round(app.audio.buffered_ms()), round(app.audio.target_ms()))
+                info += t("shell.sync.audio_detail", hz=int(mic["sampleRate"]), buf=round(app.audio.buffered_ms()), target=round(app.audio.target_ms()))
             app.audio_info_var.set(info)
     elif AUDIO_AVAILABLE:
         app.audio_err_var.set("")
@@ -138,13 +139,13 @@ def _update_v13(app, st, connected, snap, now):
     app.mic_path_var.set(MIC_PATH_LABELS.get(mp, "-") if connected and app.settings["mic_enabled"] else "-")
     if AUDIO_AVAILABLE and app.audio.running:
         if app.audio.mode == "exclusive":
-            mode = "排他モード（%s）" % app.audio.mode_detail
+            mode = t("shell.sync.excl", d=app.audio.mode_detail)
         else:
-            mode = "共有モード（%s）" % app.audio.mode_detail
+            mode = t("shell.sync.shared", d=app.audio.mode_detail)
         if app.audio.notice:
             mode = app.audio.notice + "\n" + mode
         app.audio_mode_var.set(mode)
-        app.audio_under_var.set("アンダーラン回数: %d" % app.audio.underruns)
+        app.audio_under_var.set(t("shell.sync.underruns", n=app.audio.underruns))
     else:
         app.audio_mode_var.set(app.audio.notice or "-")
         app.audio_under_var.set("")

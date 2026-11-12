@@ -54,6 +54,301 @@ except Exception:  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
+# 多言語化 (phonecam.i18n が無い / キーが未登録のときは下の日本語がそのまま出る)
+# ---------------------------------------------------------------------------
+
+_JA = {
+    "setup.wizard.list_sep": "、",
+    "setup.wizard.sentence_fmt": "%s。",
+    "setup.wizard.components_1": "PhoneCamカメラ",
+    "setup.wizard.components_2": "OBSやDiscordに表示される専用カメラ",
+    "setup.wizard.components_3": "Visual C++ ランタイム",
+    "setup.wizard.components_4": "専用カメラの動作に必要",
+    "setup.wizard.components_5": "Apple USBドライバ（iTunes）",
+    "setup.wizard.components_6": "USBケーブルでの接続に必要（Wi-Fiだけなら不要）",
+    "setup.wizard.components_7": "AltServerの動作に必要",
+    "setup.wizard.components_8": "iPhoneにアプリを入れて自動更新する",
+    "setup.wizard.components_9": "iPhoneのマイクをOBSで使う（任意）。今のスピーカーとマイクは既定のまま変わりません",
+    "setup.wizard.manual_text_1": "公式サイトから「vc_redist.x64.exe」をダウンロードして実行してください。",
+    "setup.wizard.manual_text_2": "公式サイトの「Windows版iTunes（Microsoft Store版ではない方）」をダウンロードして実行してください。",
+    "setup.wizard.manual_text_3": "AltStoreの案内ページにある「iCloud（Apple公式サイト版）」のリンクからインストールしてください。",
+    "setup.wizard.manual_text_4": "公式サイトから「AltServer for Windows」をダウンロードし、zipを展開して Setup.exe を実行してください。",
+    "setup.wizard.manual_text_5": "公式サイトから zip をダウンロードして展開し、VBCABLE_Setup_x64.exe を管理者として実行してください。",
+    "setup.wizard.detect_camera_1": "ソース実行ではregister.batを使ってください",
+    "setup.wizard.detect_camera_2": "更新が必要です",
+    "setup.wizard.detect_camera_3": "このexeにはカメラが含まれていません",
+    "setup.wizard.detect_itunes_1": "・",
+    "setup.wizard.detect_itunes_2": "Microsoft Store版の%sが入っています。AltServerと一緒に使えないため、インストール時に削除して公式サイト版のiTunesに入れ替えます",
+    "setup.wizard.detect_itunes_3": "USB接続はOK・AltServerには公式サイト版が必要",
+    "setup.wizard.store_labels_1": "Appleデバイス",
+    "setup.wizard.remove_store_package_1": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: %s）",
+    "setup.wizard.remove_store_package_2": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード %s）",
+    "setup.wizard.remove_store_package_3": "Microsoft Store版（%s）を削除しました",
+    "setup.wizard.detect_icloud_1": "Microsoft Store版が入っています（インストール時に削除して公式サイト版に入れ替えます）",
+    "setup.wizard.detect_all_1": "確認できませんでした。「再チェック」を押してください",
+    "setup.wizard.friendly_net_error_1": "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.friendly_net_error_2": "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください",
+    "setup.wizard.friendly_net_error_3": "インターネットに接続できませんでした。ネットワークを確認して、もう一度お試しください",
+    "setup.wizard.friendly_net_error_4": "ダウンロードに失敗しました。ネットワークを確認して、もう一度お試しください",
+    "setup.wizard.validate_download_1": "ダウンロードしたファイルが見つかりません。もう一度お試しください",
+    "setup.wizard.validate_download_2": "ダウンロードしたファイルが空でした。もう一度お試しください",
+    "setup.wizard.validate_download_3": "ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.validate_download_4": "ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください",
+    "setup.wizard.validate_download_5": "ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.validate_download_6": "zipファイルが壊れています。もう一度ダウンロードしてください",
+    "setup.wizard.download_file_1": "安全でないURL (https以外) からはダウンロードしません。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.download_file_2": "ダウンロード先が安全でないURL (https以外) に転送されたため中止しました。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.download_file_3": "キャンセルされました。もう一度やり直すときは「もう一度試す」を押してください",
+    "setup.wizard.safe_extract_zip_1": "zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.safe_extract_zip_2": "zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.evaluate_signature_1": "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.evaluate_signature_2": "署名を確認しました（%s）",
+    "setup.wizard.evaluate_signature_3": "不明",
+    "setup.wizard.evaluate_signature_4": "インストーラーの署名者が想定と違うため、実行しませんでした（想定: %s / 実際: %s）。ダウンロードをやり直してください",
+    "setup.wizard.evaluate_signature_5": "署名のないファイルです（%s は署名なしで配布されています）。ファイルの改ざん検知のみで実行します",
+    "setup.wizard.evaluate_signature_6": "インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.evaluate_signature_7": "インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: %s）",
+    "setup.wizard.evaluate_signature_9": "不明なエラー",
+    "setup.wizard.verify_authenticode_1": "Windows 以外では確認できません",
+    "setup.wizard.step_register_camera_1": "PhoneCamカメラを登録",
+    "setup.wizard.stage_for_run_1": "インストーラーの場所が不正です",
+    "setup.wizard.explain_exit_code_1": "インストールが途中で取り消されました。もう一度やり直してください",
+    "setup.wizard.explain_exit_code_2": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください",
+    "setup.wizard.explain_exit_code_3": "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください",
+    "setup.wizard.explain_exit_code_4": "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください",
+    "setup.wizard.explain_exit_code_5": "インストーラーのファイルが壊れています。ダウンロードからやり直してください",
+    "setup.wizard.explain_exit_code_6": "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
+    "setup.wizard.explain_exit_code_7": "すでに新しい版が入っています。そのままお使いいただけます",
+    "setup.wizard.explain_exit_code_8": "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください",
+    "setup.wizard.run_installer_1": "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください",
+    "setup.wizard.run_installer_2": "終了コード %s",
+    "setup.wizard.execute_step_1": "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください",
+    "setup.wizard.execute_step_2": "インストーラーが見つかりません。もう一度ダウンロードからやり直してください",
+    "setup.wizard.execute_step_3": "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください",
+    "setup.wizard.execute_step_4": "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.execute_step_5": "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.execute_step_6": "winget 終了コード %s",
+    "setup.wizard.execute_step_7": "不明な手順です。PhoneCamを最新版にしてからやり直してください",
+    "setup.wizard.execute_step_8": "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください",
+    "setup.wizard.execute_step_9": "予期しないエラーが起きました。もう一度お試しください",
+    "setup.wizard.run_job_1": "ジョブファイルの検証情報がないため実行しませんでした",
+    "setup.wizard.run_job_2": "ジョブファイルが変更されています",
+    "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: %s）",
+    "setup.wizard.slow_hint_1": "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）",
+    "setup.wizard.missing_common_1": "インストーラーを最後の「完了」まで進めてから「確認」を押してください。「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。",
+    "setup.wizard.guide_1": "「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
+    "setup.wizard.guide_2": "「次へ」→ 使用許諾に同意 →「インストール」を押します",
+    "setup.wizard.guide_3": "「ユーザーアカウント制御」が出たら「はい」を押します",
+    "setup.wizard.guide_4": "「完了」が出たら押して、この画面の「確認」を押します",
+    "setup.wizard.guide_5": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
+    "setup.wizard.guide_6": "Apple公式サイト版のiTunesがまだ見つかりません",
+    "setup.wizard.guide_7": "「インストーラーを開く」を押します（iCloudのインストーラーが開きます）",
+    "setup.wizard.guide_8": "使用許諾に同意して「インストール」を押します",
+    "setup.wizard.guide_9": "完了したら「完了」を押して、この画面の「確認」を押します",
+    "setup.wizard.guide_10": "iCloudにサインインする必要はありません。再起動を求められたら「いいえ（あとで）」を選び、すべて終わってからPCを再起動してください。",
+    "setup.wizard.guide_11": "Apple公式サイト版のiCloudがまだ見つかりません",
+    "setup.wizard.guide_12": "「インストーラーを開く」を押します（AltServerのインストーラーが開きます）",
+    "setup.wizard.guide_13": "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
+    "setup.wizard.guide_14": "「Finish」を押します。画面右下のタスクトレイにAltServerのアイコンが出ます",
+    "setup.wizard.guide_15": "この画面の「確認」を押します",
+    "setup.wizard.guide_16": "Windowsファイアウォールの許可画面が出たら、「プライベート ネットワーク」にチェックを入れて「アクセスを許可する」を押してください（AltServerがiPhoneを見つけるのに必要です）。",
+    "setup.wizard.guide_17": "AltServerがまだ見つかりません",
+    "setup.wizard.guide_18": "「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
+    "setup.wizard.guide_19": "「Install Driver」ボタンを押します",
+    "setup.wizard.guide_20": "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
+    "setup.wizard.guide_21": "「OK」で閉じて、この画面の「確認」を押します",
+    "setup.wizard.guide_22": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
+    "setup.wizard.guide_23": "VB-CABLE（CABLE Input）がまだ見つかりません",
+    "setup.wizard.missing_words_1": "「%s」はまだ使える状態になっていません（%s）",
+    "setup.wizard.missing_words_2": "「%s」がまだ見つかりません",
+    "setup.wizard.shell_open_1": "Windows 以外では開けません",
+    "setup.wizard.shell_open_2": "ShellExecute に失敗しました (%s)",
+    "setup.wizard.guidedflow_skip_1": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます",
+    "setup.wizard.guidedflow_prepare_1": "%s: すでに入っています",
+    "setup.wizard.guidedflow_prepare_2": "すでに入っていました",
+    "setup.wizard.guidedflow_prepare_3": "%s のMicrosoft Store版を削除しています…",
+    "setup.wizard.prepare_prog_1": "%s をダウンロード中… %s / %s",
+    "setup.wizard.prepare_prog_2": "%s をダウンロード中… %s",
+    "setup.wizard.guidedflow_prepare_4": "%s をダウンロード中…",
+    "setup.wizard.guidedflow_prepare_5": "%s: ダウンロード完了",
+    "setup.wizard.guidedflow_prepare_6": "%s のインストーラーを確認しています…",
+    "setup.wizard.guidedflow_prepare_7": "このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。",
+    "setup.wizard.guidedflow_prepare_8": "インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.guidedflow_prepare_9": "%s: 「インストーラーを開く」を押してください",
+    "setup.wizard.guidedflow__locate_1": "zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください",
+    "setup.wizard.guidedflow_launch_1": "インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください",
+    "setup.wizard.guidedflow_launch_2": "インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください",
+    "setup.wizard.guidedflow_launch_3": "管理者の確認で「いいえ」が押されました。もう一度「インストーラーを開く」を押して、「はい」を選んでください",
+    "setup.wizard.guidedflow_launch_4": "インストーラーを開けませんでした。ウイルス対策ソフトがブロックしていないか確認して、「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.guidedflow_check_1": "インストーラーがまだ動いています。画面の案内に沿って「完了」まで進めてから、もう一度「確認」を押してください",
+    "setup.wizard.run_diagnostics_1": "AltServer が起動しているか確認しています…",
+    "setup.wizard.run_diagnostics_2": "AltServer が起動している",
+    "setup.wizard.run_diagnostics_3": "確認できませんでした",
+    "setup.wizard.run_diagnostics_4": "もう一度「診断」を押してください",
+    "setup.wizard.run_diagnostics_5": "AltServer が動いていません",
+    "setup.wizard.run_diagnostics_6": "スタートメニューから AltServer を起動してください（セットアップタブの「AltServerを起動」でも開けます）",
+    "setup.wizard.run_diagnostics_7": "Apple Mobile Device Service が動いている",
+    "setup.wizard.run_diagnostics_8": "Apple公式サイト版のiTunesを入れて、PCを再起動してください（セットアップタブの「インストール」から入れられます）",
+    "setup.wizard.run_diagnostics_9": "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します",
+    "setup.wizard.run_diagnostics_10": "Bonjour Service が動いている",
+    "setup.wizard.run_diagnostics_11": "Bonjour は公式サイト版のiTunes / iCloudと一緒に入ります。公式サイト版を入れ直してください",
+    "setup.wizard.run_diagnostics_12": "サービスを開始してください（Windowsキー → 「サービス」→ Bonjour サービス →「開始」）。直らないときはPCを再起動します",
+    "setup.wizard.run_diagnostics_13": "%s を確認しています…",
+    "setup.wizard.run_diagnostics_14": "サービスが止まっています",
+    "setup.wizard.run_diagnostics_15": "サービスが見つかりません",
+    "setup.wizard.run_diagnostics_16": "iTunes を確認しています…",
+    "setup.wizard.run_diagnostics_17": "公式サイト版のiTunesが入っている",
+    "setup.wizard.run_diagnostics_18": "Microsoft Store版は使えません。セットアップタブの「インストール」で公式サイト版に入れ替えてください",
+    "setup.wizard.run_diagnostics_19": "iTunes が見つかりません",
+    "setup.wizard.run_diagnostics_20": "セットアップタブの「インストール」からApple公式サイト版のiTunesを入れてください",
+    "setup.wizard.run_diagnostics_21": "iPhone を確認しています…",
+    "setup.wizard.run_diagnostics_22": "iPhoneがUSBでつながっている",
+    "setup.wizard.run_diagnostics_23": "つながっていますが、このPCを信頼していません",
+    "setup.wizard.run_diagnostics_24": "iPhoneのロックを解除して、「このコンピュータを信頼」→「信頼」を押してください",
+    "setup.wizard.run_diagnostics_25": "iPhoneが見つかりません",
+    "setup.wizard.run_diagnostics_26": "LightningケーブルでPCにつなぎ、iPhoneのロックを解除して「信頼」を押してください。更新中はUSBでつないだままにするのがいちばん確実です",
+    "setup.wizard.run_diagnostics_27": "ネットワークの設定を確認しています…",
+    "setup.wizard.run_diagnostics_28": "ネットワークの種類が「プライベート」",
+    "setup.wizard.run_diagnostics_29": "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク で「プライベート」を選んでください",
+    "setup.wizard.run_diagnostics_30": "VPN がオフ",
+    "setup.wizard.run_diagnostics_31": "Tailscale などのVPNを使っているときは、いったんオフにしてください",
+    "setup.wizard.run_diagnostics_32": "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、ネットワーク プロファイルを「プライベート」にしてください",
+    "setup.wizard.run_diagnostics_33": "ネットワークが見つかりません",
+    "setup.wizard.run_diagnostics_34": "Wi-Fi または有線LANにつないでください",
+    "setup.wizard.run_diagnostics_35": "「パブリック」になっています（%s）",
+    "setup.wizard.run_diagnostics_36": "「パブリック」のネットワークもあります（%s）",
+    "setup.wizard.run_diagnostics_37": "iPhoneと同じネットワークが「パブリック」なら、",
+    "setup.wizard.run_diagnostics_38": "VPNらしい接続が有効です（%s）",
+    "setup.wizard.run_diagnostics_39": "Tailscale などのVPNをいったんオフにしてから更新してください（AltServerがiPhoneを見つけにくくなります）",
+    "setup.wizard.run_diagnostics_40": "ファイアウォールを確認しています…（少し時間がかかります）",
+    "setup.wizard.run_diagnostics_41": "ファイアウォールがAltServerを許可している",
+    "setup.wizard.run_diagnostics_42": "AltServer を起動したときの Windows セキュリティの画面で、「プライベート ネットワーク」を許可してください",
+    "setup.wizard.run_diagnostics_43": "AltServer をブロックするルールがあります",
+    "setup.wizard.run_diagnostics_44": "Windowsセキュリティ > ファイアウォールとネットワーク保護 > ファイアウォールによるアプリケーションの許可 で、AltServer の「プライベート」にチェックを入れてください",
+    "setup.wizard.run_diagnostics_45": "AltServer を許可するルールが見つかりません",
+    "setup.wizard.run_diagnostics_46": "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します",
+    "setup.wizard.diagnostics_summary_1": "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。",
+    "setup.wizard.diagnostics_summary_2": "直す必要があるもの: %d 件",
+    "setup.wizard.diagnostics_summary_3": "確認してほしいもの: %d 件",
+    "setup.wizard.diagnostics_summary_4": "。下の「→」の案内を上から順に試してください。",
+    "setup.wizard.setupengine__prepare_1": "%s をインストール",
+    "setup.wizard.setupengine__prepare_2": "zipの中にインストーラーが見つかりませんでした",
+    "setup.wizard.setupengine_run_1": "準備に失敗しました。もう一度お試しください",
+    "setup.wizard.setupengine_run_2": "%s: wingetで代わりにインストールします",
+    "setup.wizard.setupengine_run_3": "%s をインストール (winget)",
+    "setup.wizard.setupengine_run_4": "結果を確認中…",
+    "setup.wizard.setupengine_run_5": "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: %s）",
+    "setup.wizard.setupengine_run_6": "インストールは終わりましたが、まだ認識できません。再起動してから再チェックしてください",
+    "setup.wizard.setupengine_run_7": "登録の処理は終わりましたが、状態が変わっていません。もう一度お試しください",
+    "setup.wizard.setupengine__run_elevated_1": "管理者の確認が表示されたら「はい」を押してください…",
+    "setup.wizard.setupengine__run_elevated_2": "管理者権限でインストールを開始します (%d 件)",
+    "setup.wizard.setupengine__run_elevated_3": "管理者の確認がキャンセルされたため、インストールしませんでした。もう一度お試しください。",
+    "setup.wizard.setupengine__run_elevated_4": "インストールが時間内に終わりませんでした。もう一度お試しください。",
+    "setup.wizard.setupengine__run_elevated_5": "インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
+    "setup.wizard.setupengine__run_elevated_6": "詳細: %s %s",
+    "setup.wizard.setupengine__run_elevated_7": "完了",
+    "setup.wizard.setupengine__run_elevated_8": "失敗 ",
+    "setup.wizard.setupengine__run_elevated_9": "実行されませんでした",
+    "setup.wizard.setupcontroller_start_1": "準備しています…",
+    "setup.wizard.start_work_1": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: %s）",
+    "setup.wizard.guided_run_work_1": "予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.guided_open_work_1": "インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.icons_1": "導入済み",
+    "setup.wizard.icons_2": "未導入",
+    "setup.wizard.icons_3": "要確認",
+    "setup.wizard.setuppanel_render_1": "確認しています…",
+    "setup.wizard.setuppanel__row_1": "失敗",
+    "setup.wizard.setuppanel__row_2": "公式のインストーラーを開いて、手順を画面で案内します",
+    "setup.wizard.setuppanel__wizard_action_1": "スキップ",
+    "setup.wizard.setuppanel__tab_action_1": "更新",
+    "setup.wizard.setuppanel__tab_action_2": "インストール",
+    "setup.wizard.diagnosticsdialog___init___1": "AltServerの診断",
+    "setup.wizard.diagnosticsdialog___init___2": "閉じる",
+    "setup.wizard.diagnosticsdialog___init___3": "もう一度診断する",
+    "setup.wizard.diagnosticsdialog_run_1": "診断しています…",
+    "setup.wizard.run_work_1": "診断",
+    "setup.wizard.run_work_2": "診断を実行できませんでした (%s)",
+    "setup.wizard.run_work_3": "もう一度「診断する」を押してください",
+    "setup.wizard.diagnosticsdialog_render_1": "更新に使うPCの条件",
+    "setup.wizard.diagnosticsdialog_render_2": "AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。",
+    "setup.wizard.diagnosticsdialog_render_3": "AltStore公式の手順を開く",
+    "setup.wizard.setupwizard_1": "ようこそ",
+    "setup.wizard.setupwizard_2": "必要なソフトの確認",
+    "setup.wizard.setupwizard_3": "iPhoneの準備",
+    "setup.wizard.setupwizard___init___1": "PhoneCam セットアップ",
+    "setup.wizard.setupwizard__page_welcome_1": "PhoneCam へようこそ",
+    "setup.wizard.setupwizard__page_welcome_2": "iPhoneをOBSのカメラにするために必要なソフトを確認します。すでに入っているものは飛ばします。\nVisual C++ とカメラの登録は自動で入れます（管理者の確認が1回出ます）。\niTunes・iCloud・AltServer・VB-CABLE は、公式のインストーラーを画面に開いて、押すボタンを1つずつご案内します。\nそのあと、iPhoneにPhoneCamを入れる手順もご案内します。",
+    "setup.wizard.setupwizard__page_welcome_3": "次へ",
+    "setup.wizard.setupwizard__page_check_1": "iPhoneをマイクとしても使う",
+    "setup.wizard.setupwizard__page_check_2": "OBSやDiscordでiPhoneの音声を使うための「VB-CABLE」（無料）を一緒に入れます。PCのマイクを使う場合は不要です。",
+    "setup.wizard.setupwizard__page_check_3": "再チェック",
+    "setup.wizard.setupwizard__page_install_1": "詳細 ▸",
+    "setup.wizard.setupwizard__page_install_2": "もう一度試す",
+    "setup.wizard.setupwizard__page_install_3": "あとで（中止）",
+    "setup.wizard.setupwizard__toggle_log_1": "詳細 ▾",
+    "setup.wizard.setupwizard_overall_text_1": "続けて、下の案内に沿ってインストールします",
+    "setup.wizard.setupwizard_overall_text_2": "一部のインストールが完了しませんでした（下の案内を見てください）",
+    "setup.wizard.setupwizard_overall_text_3": "完了しました（あとで入れる項目があります）",
+    "setup.wizard.setupwizard_overall_text_4": "完了しました",
+    "setup.wizard.setupwizard__show_outcome_1": "再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。",
+    "setup.wizard.setupwizard__show_outcome_2": "%s は自動で入れられませんでした。「%s」",
+    "setup.wizard.setupwizard__show_outcome_3": "%s の公式ページを開く",
+    "setup.wizard.setupwizard__render_results_1": "詳細: %s",
+    "setup.wizard.setupwizard__render_guided_1": "%s をインストール（%d / %d）",
+    "setup.wizard.setupwizard__render_guided_2": "インストーラーを準備しています。上のバーが進みます…",
+    "setup.wizard.setupwizard__render_guided_3": "インストールされたか確認しています…",
+    "setup.wizard.setupwizard__render_guided_4": "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます（このまま「確認」を押しても進めます）",
+    "setup.wizard.setupwizard__render_guided_5": "インストーラーを開く",
+    "setup.wizard.setupwizard__render_guided_6": "確認",
+    "setup.wizard.setupwizard__render_guided_7": "インストーラーをもう一度開く",
+    "setup.wizard.setupwizard__render_guided_8": "公式ページを開く",
+    "setup.wizard.setupwizard__render_guided_9": "この項目はあとで",
+    "setup.wizard.setupwizard__elapsed_text_1": "インストーラーを実行中です（経過 %d:%02d）。画面の案内に沿って進めてください",
+    "setup.wizard.setupwizard__page_step_1": "全%d段階",
+    "setup.wizard.setupwizard__page_step_2": "あとで",
+    "setup.wizard.setupwizard__page_step_3": "戻る",
+    "setup.wizard.setupwizard__extra_itunes_1": "iTunesを開く",
+    "setup.wizard.setupwizard__extra_itunes_2": "iTunesが見つかりません。前の画面でインストールできます。",
+    "setup.wizard.setupwizard__extra_altstore_1": "AltServerを起動",
+    "setup.wizard.setupwizard__extra_altstore_2": "公式の手順を開く",
+    "setup.wizard.setupwizard__extra_altstore_3": "うまくいかないときは、AltServerを「管理者として実行」してみてください。",
+    "setup.wizard.setupwizard__extra_phonecam_1": "iPhoneのカメラでQRコードを読み取り、AltStoreで開きます。",
+    "setup.wizard.setupwizard__extra_phonecam_2": "追加できたら、AltStoreで「PhoneCam」を入手します。",
+    "setup.wizard.setupwizard__extra_phonecam_3": "URLをコピー",
+    "setup.wizard.setupwizard__extra_phonecam_4": "QRが使えないときは、PhoneCam.ipaを直接入れる方法もあります。AltServerのアイコンをShiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。（この方法だと、アプリの更新は自分で入れ直します）",
+    "setup.wizard.setupwizard__extra_phonecam_5": "インストール時に「AltServer.ServerError 2005」が出たときは、AltStoreの「My Apps」でAltStoreを一度「Refresh」してから、もう一度インストールしてください。",
+    "setup.wizard.setupwizard__extra_phonecam_6": "PhoneCam.ipaをダウンロード",
+    "setup.wizard.setupwizard__extra_phonecam_7": "保存しました: %s",
+    "setup.wizard.setupwizard__copy_1": "✓ URLをコピーしました",
+    "setup.wizard.setupwizard__download_ipa_1": "ダウンロード中…",
+}
+
+
+try:
+    from phonecam.i18n import t as _i18n_t
+except Exception:  # pragma: no cover
+    _i18n_t = None
+
+
+def t(key, **kw):
+    text = None
+    if _i18n_t is not None:
+        try:
+            text = _i18n_t(key)
+        except Exception:
+            text = None
+    if text is None or text == key:
+        text = _JA.get(key, key)
+    if kw:
+        try:
+            text = text.format(**kw)
+        except Exception:
+            pass
+    return text
+
+
+# ---------------------------------------------------------------------------
 # 本体との連携
 # ---------------------------------------------------------------------------
 
@@ -98,12 +393,12 @@ JOB_TIMEOUT_MS = 20 * 60 * 1000
 
 # 表示順 (「必要なソフトの確認」の並び)
 COMPONENTS = [
-    {"id": "camera", "name": "PhoneCamカメラ", "purpose": "OBSやDiscordに表示される専用カメラ", "required": True},
-    {"id": "vcredist", "name": "Visual C++ ランタイム", "purpose": "専用カメラの動作に必要", "required": True},
-    {"id": "itunes", "name": "Apple USBドライバ（iTunes）", "purpose": "USBケーブルでの接続に必要（Wi-Fiだけなら不要）", "required": True},
-    {"id": "icloud", "name": "iCloud", "purpose": "AltServerの動作に必要", "required": False},
-    {"id": "altserver", "name": "AltServer", "purpose": "iPhoneにアプリを入れて自動更新する", "required": False, "default_on": True},
-    {"id": "vbcable", "name": "VB-CABLE", "purpose": "iPhoneのマイクをOBSで使う（任意）。今のスピーカーとマイクは既定のまま変わりません", "required": False},
+    {"id": "camera", "name": t("setup.wizard.components_1"), "purpose": t("setup.wizard.components_2"), "required": True},
+    {"id": "vcredist", "name": t("setup.wizard.components_3"), "purpose": t("setup.wizard.components_4"), "required": True},
+    {"id": "itunes", "name": t("setup.wizard.components_5"), "purpose": t("setup.wizard.components_6"), "required": True},
+    {"id": "icloud", "name": "iCloud", "purpose": t("setup.wizard.components_7"), "required": False},
+    {"id": "altserver", "name": "AltServer", "purpose": t("setup.wizard.components_8"), "required": False, "default_on": True},
+    {"id": "vbcable", "name": "VB-CABLE", "purpose": t("setup.wizard.components_9"), "required": False},
 ]
 COMPONENT_BY_ID = {c["id"]: c for c in COMPONENTS}
 # インストールする順番
@@ -139,11 +434,11 @@ SOURCES = {
 }
 
 MANUAL_TEXT = {
-    "vcredist": "公式サイトから「vc_redist.x64.exe」をダウンロードして実行してください。",
-    "itunes": "公式サイトの「Windows版iTunes（Microsoft Store版ではない方）」をダウンロードして実行してください。",
-    "icloud": "AltStoreの案内ページにある「iCloud（Apple公式サイト版）」のリンクからインストールしてください。",
-    "altserver": "公式サイトから「AltServer for Windows」をダウンロードし、zipを展開して Setup.exe を実行してください。",
-    "vbcable": "公式サイトから zip をダウンロードして展開し、VBCABLE_Setup_x64.exe を管理者として実行してください。",
+    "vcredist": t("setup.wizard.manual_text_1"),
+    "itunes": t("setup.wizard.manual_text_2"),
+    "icloud": t("setup.wizard.manual_text_3"),
+    "altserver": t("setup.wizard.manual_text_4"),
+    "vbcable": t("setup.wizard.manual_text_5"),
 }
 
 DEFAULT_MIN_BYTES = 100 * 1024
@@ -283,14 +578,14 @@ def audio_device_names():
 
 def detect_camera():
     if not _frozen():
-        return {"state": STATE_WARN, "detail": "ソース実行ではregister.batを使ってください"}
+        return {"state": STATE_WARN, "detail": t("setup.wizard.detect_camera_1")}
     st = _call("registration_status")
     if st == "ok":
         return {"state": STATE_OK, "detail": ""}
     if st == "outdated":
-        return {"state": STATE_MISSING, "detail": "更新が必要です"}
+        return {"state": STATE_MISSING, "detail": t("setup.wizard.detect_camera_2")}
     if st == "unavailable":
-        return {"state": STATE_WARN, "detail": "このexeにはカメラが含まれていません"}
+        return {"state": STATE_WARN, "detail": t("setup.wizard.detect_camera_3")}
     return {"state": STATE_MISSING, "detail": ""}
 
 
@@ -306,21 +601,20 @@ def detect_itunes(entries=None):
     nonstore = _has_entry(entries, "itunes", exact=True) or bool(_any_file([os.path.join("iTunes", "iTunes.exe")]))
     store = installed_store_packages("itunes")
     if store and (not nonstore or "AppleInc.AppleDevices" in store):
-        names = "・".join("「%s」" % STORE_LABELS.get(p, p) for p in store)
+        names = t("setup.wizard.detect_itunes_1").join("「%s」" % STORE_LABELS.get(p, p) for p in store)
         return {"state": STATE_WARN,
-                "detail": "Microsoft Store版の%sが入っています。AltServerと一緒に使えないため、"
-                          "インストール時に削除して公式サイト版のiTunesに入れ替えます" % names}
+                "detail": t("setup.wizard.detect_itunes_2") % names}
     if service and nonstore:
         return {"state": STATE_OK, "detail": ""}
     if service:
-        return {"state": STATE_WARN, "detail": "USB接続はOK・AltServerには公式サイト版が必要"}
+        return {"state": STATE_WARN, "detail": t("setup.wizard.detect_itunes_3")}
     return {"state": STATE_MISSING, "detail": ""}
 
 
 # Microsoft Store 版のパッケージ名。公式サイト版と共存できず、AltServer は公式サイト版が必要なので入れ替える
 # itunes には「Appleデバイス」アプリも含める。入っていると iTunes でiPhoneを扱えず、AltServer がiPhoneを見つけられない (エラー2003)
 STORE_PACKAGES = {"icloud": ["AppleInc.iCloud"], "itunes": ["AppleInc.iTunes", "AppleInc.AppleDevices"]}
-STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes", "AppleInc.AppleDevices": "Appleデバイス"}
+STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes", "AppleInc.AppleDevices": t("setup.wizard.store_labels_1")}
 
 
 APPX_REPO_KEY = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
@@ -379,10 +673,10 @@ def remove_store_package(cid, runner=None):
             code = subprocess.run(cmd, creationflags=flags, timeout=300,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
     except Exception as e:
-        return False, "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: %s）" % e
+        return False, t("setup.wizard.remove_store_package_1") % e
     if code != 0:
-        return False, "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード %s）" % code
-    return True, "Microsoft Store版（%s）を削除しました" % "・".join(STORE_LABELS.get(p, p) for p in pkgs)
+        return False, t("setup.wizard.remove_store_package_2") % code
+    return True, t("setup.wizard.remove_store_package_3") % t("setup.wizard.detect_itunes_1").join(STORE_LABELS.get(p, p) for p in pkgs)
 
 
 def detect_icloud(entries=None):
@@ -393,7 +687,7 @@ def detect_icloud(entries=None):
         return {"state": STATE_OK, "detail": ""}
     if _store_icloud_installed():
         # Store 版があると公式サイト版のインストールは失敗する (終了コード 1603)。AltStore が動いていればそのままでよい
-        return {"state": STATE_WARN, "detail": "Microsoft Store版が入っています（インストール時に削除して公式サイト版に入れ替えます）"}
+        return {"state": STATE_WARN, "detail": t("setup.wizard.detect_icloud_1")}
     return {"state": STATE_MISSING, "detail": ""}
 
 
@@ -433,7 +727,7 @@ def detect_all():
         try:
             out[cid] = fn()
         except Exception as e:
-            out[cid] = {"state": STATE_WARN, "detail": "確認できませんでした。「再チェック」を押してください"}
+            out[cid] = {"state": STATE_WARN, "detail": t("setup.wizard.detect_all_1")}
     return out
 
 
@@ -452,14 +746,14 @@ class DownloadError(Exception):
 def friendly_net_error(e):
     """ダウンロード失敗の説明 (番号は含めない。番号は technical_net_error で「詳細」へ)。"""
     if isinstance(e, urllib.error.HTTPError):
-        return "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください"
+        return t("setup.wizard.friendly_net_error_1")
     if isinstance(e, (socket.timeout, TimeoutError)):
-        return "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください"
+        return t("setup.wizard.friendly_net_error_2")
     if isinstance(e, urllib.error.URLError):
         if isinstance(getattr(e, "reason", None), (socket.timeout, TimeoutError)):
-            return "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください"
-        return "インターネットに接続できませんでした。ネットワークを確認して、もう一度お試しください"
-    return "ダウンロードに失敗しました。ネットワークを確認して、もう一度お試しください"
+            return t("setup.wizard.friendly_net_error_2")
+        return t("setup.wizard.friendly_net_error_3")
+    return t("setup.wizard.friendly_net_error_4")
 
 
 def technical_net_error(e):
@@ -473,21 +767,20 @@ def validate_download(path, kind, min_bytes=DEFAULT_MIN_BYTES, expected_size=Non
     try:
         size = os.path.getsize(path)
     except OSError:
-        raise DownloadError("ダウンロードしたファイルが見つかりません。もう一度お試しください")
+        raise DownloadError(t("setup.wizard.validate_download_1"))
     if size <= 0:
-        raise DownloadError("ダウンロードしたファイルが空でした。もう一度お試しください")
+        raise DownloadError(t("setup.wizard.validate_download_2"))
     if size < min_bytes:
-        raise DownloadError("ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）。"
-                            "しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください")
+        raise DownloadError(t("setup.wizard.validate_download_3"))
     if expected_size and size != expected_size:
-        raise DownloadError("ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください")
+        raise DownloadError(t("setup.wizard.validate_download_4"))
     with open(path, "rb") as f:
         head = f.read(8)
     sigs = SIGNATURES.get(kind)
     if sigs and not any(head.startswith(s) for s in sigs):
-        raise DownloadError("ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください")
+        raise DownloadError(t("setup.wizard.validate_download_5"))
     if kind == "zip" and not zipfile.is_zipfile(path):
-        raise DownloadError("zipファイルが壊れています。もう一度ダウンロードしてください")
+        raise DownloadError(t("setup.wizard.validate_download_6"))
     return size
 
 
@@ -495,7 +788,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
     """url を dest へ保存して検証する。progress(done, total) を随時呼ぶ (total 不明なら 0)。"""
     opener = opener or urllib.request.urlopen
     if not str(url).lower().startswith("https://"):
-        raise DownloadError("安全でないURL (https以外) からはダウンロードしません。「公式ページを開く」から手動で入れてください")
+        raise DownloadError(t("setup.wizard.download_file_1"))
     os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
     part = dest + ".part"
     req = urllib.request.Request(url, headers={"User-Agent": "PhoneCamSetup/%s" % APP_VERSION})
@@ -504,7 +797,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
         with opener(req, timeout=timeout) as resp:
             final_url = getattr(resp, "geturl", lambda: url)()
             if isinstance(final_url, str) and not final_url.lower().startswith("https://"):
-                raise DownloadError("ダウンロード先が安全でないURL (https以外) に転送されたため中止しました。「公式ページを開く」から手動で入れてください")
+                raise DownloadError(t("setup.wizard.download_file_2"))
             try:
                 expected = int(resp.headers.get("Content-Length") or 0)
             except Exception:
@@ -513,7 +806,7 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
             with open(part, "wb") as out:
                 while True:
                     if cancel is not None and cancel.is_set():
-                        raise DownloadError("キャンセルされました。もう一度やり直すときは「もう一度試す」を押してください")
+                        raise DownloadError(t("setup.wizard.download_file_3"))
                     chunk = resp.read(64 * 1024)
                     if not chunk:
                         break
@@ -557,10 +850,10 @@ def safe_extract_zip(zip_path, dest):
             # dest の外へ出るパス (../ や絶対パス・ドライブ指定) は拒否
             if (target != root and not target.startswith(root + os.sep)) or name.startswith("/") \
                     or ".." in name.split("/") or (len(name) > 1 and name[1] == ":"):
-                raise DownloadError("zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください")
+                raise DownloadError(t("setup.wizard.safe_extract_zip_1"))
             total += info.file_size
         if total > MAX_UNZIPPED_BYTES:
-            raise DownloadError("zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください")
+            raise DownloadError(t("setup.wizard.safe_extract_zip_2"))
         z.extractall(root)
     return root
 
@@ -643,24 +936,20 @@ def evaluate_signature(cid, info):
     から実行してよいかを決める。戻り値: (許可するか, 日本語メッセージ, 署名なしで許可したか)"""
     policy = SIGNER_POLICY.get(cid)
     if policy is None:
-        return False, "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください", False
+        return False, t("setup.wizard.evaluate_signature_1"), False
     result = (info or {}).get("result")
     if result == "valid":
         if _signer_matches(policy, (info or {}).get("signers") or []):
-            return True, "署名を確認しました（%s）" % policy["publisher"], False
-        found = ", ".join(n for n in (info.get("signers") or []) if n) or "不明"
-        return False, ("インストーラーの署名者が想定と違うため、実行しませんでした（想定: %s / 実際: %s）。"
-                       "ダウンロードをやり直してください" % (policy["publisher"], found)), False
+            return True, t("setup.wizard.evaluate_signature_2") % policy["publisher"], False
+        found = ", ".join(n for n in (info.get("signers") or []) if n) or t("setup.wizard.evaluate_signature_3")
+        return False, (t("setup.wizard.evaluate_signature_4") % (policy["publisher"], found)), False
     if result == "unsigned":
         if policy["unsigned_ok"]:
-            return True, "署名のないファイルです（%s は署名なしで配布されています）。ファイルの改ざん検知のみで実行します" % policy["publisher"], True
-        return False, ("インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）。"
-                       "ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください" % policy["publisher"]), False
+            return True, t("setup.wizard.evaluate_signature_5") % policy["publisher"], True
+        return False, (t("setup.wizard.evaluate_signature_6") % policy["publisher"]), False
     if result == "invalid":
-        return False, ("インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。"
-                       "ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください"), False
-    return False, ("インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください"
-                   "（詳細: %s）" % ((info or {}).get("detail") or "不明なエラー")), False
+        return False, (t("setup.wizard.evaluate_signature_7")), False
+    return False, (t("setup.wizard.evaluate_signature_8") % ((info or {}).get("detail") or t("setup.wizard.evaluate_signature_9"))), False
 
 
 def _wintrust():
@@ -696,7 +985,7 @@ def verify_authenticode(path):
     戻り値: {"result": "valid"/"unsigned"/"invalid"/"error", "code": 戻り値, "signers": [CN, O], "detail": str}。
     Windows 以外・例外のときは "error" (呼び出し側は実行しない)。"""
     if os.name != "nt":
-        return {"result": "error", "code": 0, "signers": [], "detail": "Windows 以外では確認できません"}
+        return {"result": "error", "code": 0, "signers": [], "detail": t("setup.wizard.verify_authenticode_1")}
     try:
         ctypes, wintypes, GUID, FILE_INFO, WT_DATA, PROV_CERT = _wintrust()
         wintrust = ctypes.WinDLL("wintrust", use_last_error=True)
@@ -761,7 +1050,7 @@ def check_installer_signature(cid, path, verifier=None):
 # ---------------------------------------------------------------------------
 
 def step_register_camera():
-    return {"id": "camera", "type": "register_camera", "title": "PhoneCamカメラを登録"}
+    return {"id": "camera", "type": "register_camera", "title": t("setup.wizard.step_register_camera_1")}
 
 
 def step_exe(cid, title, path, args, ok_codes=(0, 3010, 1641), timeout=900, retry_args=None, lenient=False, reboot=False,
@@ -833,7 +1122,7 @@ def _stage_for_run(path, stage_dir=None):
         shutil.copytree(src_root, dst_root)
         rel = os.path.relpath(os.path.abspath(path), src_root)
         if rel.startswith(".."):
-            raise RuntimeError("インストーラーの場所が不正です")
+            raise RuntimeError(t("setup.wizard.stage_for_run_1"))
         run_path = os.path.join(dst_root, rel)
     else:
         run_path = os.path.join(base, os.path.basename(path))
@@ -855,27 +1144,27 @@ def explain_exit_code(code, cid=None):
     """インストーラーの終了コード → 「何が起きたか + 次にやること」の1文 (番号は含めない。番号は「詳細」に出す)。"""
     c = (code if code is not None else 1) & 0xFFFFFFFF
     if c in (1602, 1223):
-        return "インストールが途中で取り消されました。もう一度やり直してください"
+        return t("setup.wizard.explain_exit_code_1")
     if c == 1603:
-        msg = "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください"
+        msg = t("setup.wizard.explain_exit_code_2")
         if cid in STORE_PACKAGES:
-            msg += "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください"
+            msg += t("setup.wizard.explain_exit_code_3")
         return msg
     if c == 1618:
-        return "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください"
+        return t("setup.wizard.explain_exit_code_4")
     if c in (1619, 1620):
-        return "インストーラーのファイルが壊れています。ダウンロードからやり直してください"
+        return t("setup.wizard.explain_exit_code_5")
     if c in (5, 740, 1260):
-        return "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください"
+        return t("setup.wizard.explain_exit_code_6")
     if c == 1638:
-        return "すでに新しい版が入っています。そのままお使いいただけます"
-    return "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください"
+        return t("setup.wizard.explain_exit_code_7")
+    return t("setup.wizard.explain_exit_code_8")
 
 
 def _run_installer(step, kind, path, res, runner, verifier):
     """コピー済みのインストーラー (path) を、SHA-256 → 電子署名の順に確認して実行する。"""
     if sha256_file(path) != step["sha256"]:
-        res["detail"] = "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください"
+        res["detail"] = t("setup.wizard.run_installer_1")
         return res
     allowed, message, unsigned = check_installer_signature(step.get("id"), path, verifier)
     res["signature"] = message
@@ -896,7 +1185,7 @@ def _run_installer(step, kind, path, res, runner, verifier):
     res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
     if not res["ok"]:
         res["detail"] = explain_exit_code(code, step.get("id"))
-        res["technical"] = "終了コード %s" % code
+        res["technical"] = t("setup.wizard.run_installer_2") % code
     return res
 
 
@@ -911,15 +1200,15 @@ def execute_step(step, runner=None, verifier=None):
             res["ok"] = ok
             res["code"] = 0 if ok else 1
             if not ok:
-                res["detail"] = "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください"
+                res["detail"] = t("setup.wizard.execute_step_1")
             return res
         if kind in ("exe", "msi"):
             path = step["path"]
             if not os.path.isfile(path):
-                res["detail"] = "インストーラーが見つかりません。もう一度ダウンロードからやり直してください"
+                res["detail"] = t("setup.wizard.execute_step_2")
                 return res
             if not step.get("sha256"):
-                res["detail"] = "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください"
+                res["detail"] = t("setup.wizard.execute_step_3")
                 return res
             # 一般ユーザーが触れない場所へコピーしてから、その実物を確認して実行する
             path, cleanup = _stage_for_run(path, step.get("stage_dir"))
@@ -929,22 +1218,22 @@ def execute_step(step, runner=None, verifier=None):
                 cleanup()
         if kind == "winget":
             if step.get("pkg") not in ALLOWED_WINGET:
-                res["detail"] = "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください"
+                res["detail"] = t("setup.wizard.execute_step_4")
                 return res
             code = _run_cmd(runner, winget_args(step["pkg"]), step.get("timeout", 900))
             res["code"] = code
             res["ok"] = (code & 0xFFFFFFFF) in WINGET_OK_CODES
             res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT
             if not res["ok"]:
-                res["detail"] = "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください"
-                res["technical"] = "winget 終了コード %s" % code
+                res["detail"] = t("setup.wizard.execute_step_5")
+                res["technical"] = t("setup.wizard.execute_step_6") % code
             return res
-        res["detail"] = "不明な手順です。PhoneCamを最新版にしてからやり直してください"
+        res["detail"] = t("setup.wizard.execute_step_7")
         res["technical"] = "type=%s" % kind
     except subprocess.TimeoutExpired:
-        res["detail"] = "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください"
+        res["detail"] = t("setup.wizard.execute_step_8")
     except Exception as e:
-        res["detail"] = "予期しないエラーが起きました。もう一度お試しください"
+        res["detail"] = t("setup.wizard.execute_step_9")
         res["technical"] = str(e)
     return res
 
@@ -958,9 +1247,9 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
         # 管理者権限で何を実行するかは job.json で決まるので、呼び出し側が渡したハッシュと一致するものだけ実行する
         # (ハッシュが渡されていない場合も実行しない)
         if not expected_sha:
-            raise RuntimeError("ジョブファイルの検証情報がないため実行しませんでした")
+            raise RuntimeError(t("setup.wizard.run_job_1"))
         if sha256_file(job_path).lower() != str(expected_sha).strip().lower():
-            raise RuntimeError("ジョブファイルが変更されています")
+            raise RuntimeError(t("setup.wizard.run_job_2"))
         with open(job_path, "r", encoding="utf-8") as f:
             job = json.load(f)
         result_path = job.get("result") or os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
@@ -974,7 +1263,7 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
             if progress:
                 _append_progress(progress, "%d|%d|done" % (i + 1, total))
     except Exception as e:
-        result["error"] = "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: %s）" % e
+        result["error"] = t("setup.wizard.run_job_3") % e
     try:
         if result_path is None:
             result_path = os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
@@ -996,45 +1285,43 @@ AUTO_IDS = ("vcredist", "camera")
 GUIDED_IDS = ("itunes", "icloud", "altserver", "vbcable")
 SLOW_SECONDS = 180          # インストーラーがこれより長く動いているとき、隠れていないか確認を促す
 AUTO_CHECK_SECONDS = 5.0    # インストーラーの実行中に、導入済みになったか裏で確かめる間隔
-SLOW_HINT = "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）"
-MISSING_COMMON = ("インストーラーを最後の「完了」まで進めてから「確認」を押してください。"
-                  "「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。")
+SLOW_HINT = t("setup.wizard.slow_hint_1")
+MISSING_COMMON = (t("setup.wizard.missing_common_1"))
 
 GUIDE = {
     "itunes": {
-        "steps": ["「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
-                  "「次へ」→ 使用許諾に同意 →「インストール」を押します",
-                  "「ユーザーアカウント制御」が出たら「はい」を押します",
-                  "「完了」が出たら押して、この画面の「確認」を押します"],
-        "note": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
-        "missing": "Apple公式サイト版のiTunesがまだ見つかりません",
+        "steps": [t("setup.wizard.guide_1"),
+                  t("setup.wizard.guide_2"),
+                  t("setup.wizard.guide_3"),
+                  t("setup.wizard.guide_4")],
+        "note": t("setup.wizard.guide_5"),
+        "missing": t("setup.wizard.guide_6"),
     },
     "icloud": {
-        "steps": ["「インストーラーを開く」を押します（iCloudのインストーラーが開きます）",
-                  "使用許諾に同意して「インストール」を押します",
-                  "「ユーザーアカウント制御」が出たら「はい」を押します",
-                  "完了したら「完了」を押して、この画面の「確認」を押します"],
-        "note": "iCloudにサインインする必要はありません。再起動を求められたら「いいえ（あとで）」を選び、すべて終わってからPCを再起動してください。",
-        "missing": "Apple公式サイト版のiCloudがまだ見つかりません",
+        "steps": [t("setup.wizard.guide_7"),
+                  t("setup.wizard.guide_8"),
+                  t("setup.wizard.guide_3"),
+                  t("setup.wizard.guide_9")],
+        "note": t("setup.wizard.guide_10"),
+        "missing": t("setup.wizard.guide_11"),
     },
     "altserver": {
-        "steps": ["「インストーラーを開く」を押します（AltServerのインストーラーが開きます）",
-                  "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
-                  "「ユーザーアカウント制御」が出たら「はい」を押します",
-                  "「Finish」を押します。画面右下のタスクトレイにAltServerのアイコンが出ます",
-                  "この画面の「確認」を押します"],
-        "note": "Windowsファイアウォールの許可画面が出たら、「プライベート ネットワーク」にチェックを入れて「アクセスを許可する」を押してください"
-                "（AltServerがiPhoneを見つけるのに必要です）。",
-        "missing": "AltServerがまだ見つかりません",
+        "steps": [t("setup.wizard.guide_12"),
+                  t("setup.wizard.guide_13"),
+                  t("setup.wizard.guide_3"),
+                  t("setup.wizard.guide_14"),
+                  t("setup.wizard.guide_15")],
+        "note": t("setup.wizard.guide_16"),
+        "missing": t("setup.wizard.guide_17"),
     },
     "vbcable": {
-        "steps": ["「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
-                  "「ユーザーアカウント制御」が出たら「はい」を押します",
-                  "「Install Driver」ボタンを押します",
-                  "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
-                  "「OK」で閉じて、この画面の「確認」を押します"],
-        "note": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
-        "missing": "VB-CABLE（CABLE Input）がまだ見つかりません",
+        "steps": [t("setup.wizard.guide_18"),
+                  t("setup.wizard.guide_3"),
+                  t("setup.wizard.guide_19"),
+                  t("setup.wizard.guide_20"),
+                  t("setup.wizard.guide_21")],
+        "note": t("setup.wizard.guide_22"),
+        "missing": t("setup.wizard.guide_23"),
     },
 }
 
@@ -1052,9 +1339,9 @@ def missing_words(cid, status):
     g = GUIDE.get(cid, {})
     detail = (status or {}).get("detail") or ""
     if (status or {}).get("state") == STATE_WARN and detail:
-        head = "「%s」はまだ使える状態になっていません（%s）" % (name, detail)
+        head = t("setup.wizard.missing_words_1") % (name, detail)
     else:
-        head = "%s。" % g.get("missing", "「%s」がまだ見つかりません" % name)
+        head = t("setup.wizard.sentence_fmt") % g.get("missing", t("setup.wizard.missing_words_2") % name)
     return head + "\n" + MISSING_COMMON
 
 
@@ -1091,7 +1378,7 @@ def shell_open(path, args=None, cwd=None):
     求めるときだけ、そのインストーラー自身の UAC が出る。戻り値: LaunchedProcess。
     UAC で「いいえ」なら UserDeclined、起動できなければ OSError。"""
     if os.name != "nt":
-        raise OSError("Windows 以外では開けません")
+        raise OSError(t("setup.wizard.shell_open_1"))
     import ctypes
 
     class SEI(ctypes.Structure):
@@ -1122,7 +1409,7 @@ def shell_open(path, args=None, cwd=None):
         err = ctypes.get_last_error()
         if err == 1223:
             raise UserDeclined()
-        raise OSError(err, "ShellExecute に失敗しました (%s)" % err)
+        raise OSError(err, t("setup.wizard.shell_open_2") % err)
     return LaunchedProcess(info.hProcess, kernel32)
 
 
@@ -1210,7 +1497,7 @@ class GuidedFlow:
             return
         self._close_proc()
         self.results[cid] = {"ok": False, "skipped": True,
-                             "detail": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます"}
+                             "detail": t("setup.wizard.guidedflow_skip_1")}
         self._advance()
 
     def abort(self):
@@ -1239,11 +1526,11 @@ class GuidedFlow:
         except Exception:
             self.statuses = {}
         if self.statuses.get(cid, {}).get("state") == STATE_OK:
-            emit("log", text="%s: すでに入っています" % name)
-            self._finish_ok(cid, "すでに入っていました")
+            emit("log", text=t("setup.wizard.guidedflow_prepare_1") % name)
+            self._finish_ok(cid, t("setup.wizard.guidedflow_prepare_2"))
             return
         if cid in STORE_PACKAGES and self.store_check(cid):
-            emit("stage", text="%s のMicrosoft Store版を削除しています…" % name)
+            emit("stage", text=t("setup.wizard.guidedflow_prepare_3") % name)
             ok, msg = self.store_remover(cid)
             emit("log", text="%s: %s" % (name, msg))
             if not ok:
@@ -1254,17 +1541,17 @@ class GuidedFlow:
 
         def prog(done, total, _n=name):
             if total:
-                emit("stage", text="%s をダウンロード中… %s / %s" % (_n, _mb(done), _mb(total)))
+                emit("stage", text=t("setup.wizard.prepare_prog_1") % (_n, _mb(done), _mb(total)))
                 emit("progress", value=min(1.0, done / float(total)))
             else:
-                emit("stage", text="%s をダウンロード中… %s" % (_n, _mb(done)))
+                emit("stage", text=t("setup.wizard.prepare_prog_2") % (_n, _mb(done)))
 
-        emit("stage", text="%s をダウンロード中…" % name)
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_4") % name)
         emit("progress", value=0.0)
         try:
             self.downloader(src["url"], dest, src["kind"], progress=prog, cancel=cancel)
-            emit("log", text="%s: ダウンロード完了" % name)
-            emit("stage", text="%s のインストーラーを確認しています…" % name)
+            emit("log", text=t("setup.wizard.guidedflow_prepare_5") % name)
+            emit("stage", text=t("setup.wizard.guidedflow_prepare_6") % name)
             job = self._locate(cid, dest)
             allowed, msg, unsigned = check_installer_signature(cid, job["path"], self.verifier)
             emit("log", text="%s: %s" % (name, msg))
@@ -1272,17 +1559,17 @@ class GuidedFlow:
                 self._fail(msg)
                 return
             if unsigned:
-                self.notice = ("このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。")
+                self.notice = (t("setup.wizard.guidedflow_prepare_7"))
             job["sha256"] = sha256_file(job["path"])
         except DownloadError as e:
             self._fail(str(e), getattr(e, "technical", ""))
             return
         except Exception as e:
-            self._fail("インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください", str(e))
+            self._fail(t("setup.wizard.guidedflow_prepare_8"), str(e))
             return
         self.job = job
         self.phase = self.READY
-        emit("stage", text="%s: 「インストーラーを開く」を押してください" % name)
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_9") % name)
         emit("progress", value=1.0)
 
     def _locate(self, cid, dest):
@@ -1295,12 +1582,12 @@ class GuidedFlow:
             msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
             if msi:
                 return {"path": msi, "args": [], "cwd": os.path.dirname(msi), "msi": True}
-            raise DownloadError("zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください")
+            raise DownloadError(t("setup.wizard.guidedflow__locate_1"))
         if cid == "vbcable":
             root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
             if not exe:
-                raise DownloadError("zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください")
+                raise DownloadError(t("setup.wizard.guidedflow__locate_1"))
             return {"path": exe, "args": [], "cwd": os.path.dirname(exe)}
         return {"path": dest, "args": [], "cwd": os.path.dirname(dest)}
 
@@ -1313,10 +1600,10 @@ class GuidedFlow:
         job = self.job
         try:
             if sha256_file(job["path"]) != job.get("sha256"):
-                self._fail("インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください")
+                self._fail(t("setup.wizard.guidedflow_launch_1"))
                 return False
         except Exception:
-            self._fail("インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください")
+            self._fail(t("setup.wizard.guidedflow_launch_2"))
             return False
         self._close_proc()
         try:
@@ -1325,13 +1612,12 @@ class GuidedFlow:
             else:
                 self.proc = self.launcher(job["path"], job.get("args") or [], job.get("cwd"))
         except UserDeclined:
-            self.message = "管理者の確認で「いいえ」が押されました。もう一度「インストーラーを開く」を押して、「はい」を選んでください"
+            self.message = t("setup.wizard.guidedflow_launch_3")
             self.phase = self.READY
             return False
         except Exception as e:
             self.proc = None
-            self._fail("インストーラーを開けませんでした。ウイルス対策ソフトがブロックしていないか確認して、"
-                       "「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+            self._fail(t("setup.wizard.guidedflow_launch_4"), str(e))
             return False
         self.message = ""
         self.phase = self.RUNNING
@@ -1383,7 +1669,7 @@ class GuidedFlow:
         if alive:
             if not auto:
                 self.phase = self.RUNNING
-                self.message = "インストーラーがまだ動いています。画面の案内に沿って「完了」まで進めてから、もう一度「確認」を押してください"
+                self.message = t("setup.wizard.guidedflow_check_1")
             return "running"
         if auto and alive is None and self.phase == self.RUNNING:
             return "running"   # 追跡できないときは、利用者が「確認」を押すまで待つ
@@ -1551,118 +1837,114 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
                 pass
 
     # 1. AltServer.exe が動いているか
-    note("AltServer が起動しているか確認しています…")
+    note(t("setup.wizard.run_diagnostics_1"))
     rc, txt = run(["tasklist", "/FI", "IMAGENAME eq AltServer.exe", "/FO", "CSV", "/NH"], 15)
     if rc is None:
-        out.append(_diag("altserver", "AltServer が起動している", DIAG_WARN, "確認できませんでした", "もう一度「診断」を押してください"))
+        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_4")))
     elif parse_tasklist_has(txt, "AltServer.exe"):
-        out.append(_diag("altserver", "AltServer が起動している", DIAG_OK))
+        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_OK))
     else:
-        out.append(_diag("altserver", "AltServer が起動している", DIAG_NG, "AltServer が動いていません",
-                         "スタートメニューから AltServer を起動してください（セットアップタブの「AltServerを起動」でも開けます）"))
+        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_NG, t("setup.wizard.run_diagnostics_5"),
+                         t("setup.wizard.run_diagnostics_6")))
 
     # 2. Apple Mobile Device Service / 3. Bonjour Service
     for did, label, svc, fix_missing, fix_stopped in (
-            ("amds", "Apple Mobile Device Service が動いている", "Apple Mobile Device Service",
-             "Apple公式サイト版のiTunesを入れて、PCを再起動してください（セットアップタブの「インストール」から入れられます）",
-             "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します"),
-            ("bonjour", "Bonjour Service が動いている", "Bonjour Service",
-             "Bonjour は公式サイト版のiTunes / iCloudと一緒に入ります。公式サイト版を入れ直してください",
-             "サービスを開始してください（Windowsキー → 「サービス」→ Bonjour サービス →「開始」）。直らないときはPCを再起動します")):
-        note("%s を確認しています…" % svc)
+            ("amds", t("setup.wizard.run_diagnostics_7"), "Apple Mobile Device Service",
+             t("setup.wizard.run_diagnostics_8"),
+             t("setup.wizard.run_diagnostics_9")),
+            ("bonjour", t("setup.wizard.run_diagnostics_10"), "Bonjour Service",
+             t("setup.wizard.run_diagnostics_11"),
+             t("setup.wizard.run_diagnostics_12"))):
+        note(t("setup.wizard.run_diagnostics_13") % svc)
         rc, txt = run(["sc.exe", "query", svc], 15)
         state = "unknown" if rc is None else parse_sc_state(rc, txt)
         if state == "running":
             out.append(_diag(did, label, DIAG_OK))
         elif state == "stopped":
-            out.append(_diag(did, label, DIAG_NG, "サービスが止まっています", fix_stopped))
+            out.append(_diag(did, label, DIAG_NG, t("setup.wizard.run_diagnostics_14"), fix_stopped))
         elif state == "missing":
-            out.append(_diag(did, label, DIAG_NG, "サービスが見つかりません", fix_missing))
+            out.append(_diag(did, label, DIAG_NG, t("setup.wizard.run_diagnostics_15"), fix_missing))
         else:
-            out.append(_diag(did, label, DIAG_WARN, "確認できませんでした", "もう一度「診断」を押してください"))
+            out.append(_diag(did, label, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_4")))
 
     # 4. 公式サイト版 iTunes
-    note("iTunes を確認しています…")
+    note(t("setup.wizard.run_diagnostics_16"))
     try:
         st = itunes_status() if itunes_status else detect_itunes()
     except Exception:
-        st = {"state": STATE_WARN, "detail": "確認できませんでした"}
+        st = {"state": STATE_WARN, "detail": t("setup.wizard.run_diagnostics_3")}
     if st.get("state") == STATE_OK:
-        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_OK))
+        out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_OK))
     elif st.get("state") == STATE_WARN:
-        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_NG, st.get("detail", ""),
-                         "Microsoft Store版は使えません。セットアップタブの「インストール」で公式サイト版に入れ替えてください"))
+        out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_NG, st.get("detail", ""),
+                         t("setup.wizard.run_diagnostics_18")))
     else:
-        out.append(_diag("itunes", "公式サイト版のiTunesが入っている", DIAG_NG, "iTunes が見つかりません",
-                         "セットアップタブの「インストール」からApple公式サイト版のiTunesを入れてください"))
+        out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_NG, t("setup.wizard.run_diagnostics_19"),
+                         t("setup.wizard.run_diagnostics_20")))
 
     # 5. iPhone が USB でつながっている (+ 信頼)
-    note("iPhone を確認しています…")
+    note(t("setup.wizard.run_diagnostics_21"))
     try:
         snap = usb_snapshot() if usb_snapshot else (iphone.query_usbmux() if iphone is not None else {})
     except Exception:
         snap = {}
     if snap.get("usb"):
         if snap.get("trusted") is False:
-            out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_NG, "つながっていますが、このPCを信頼していません",
-                             "iPhoneのロックを解除して、「このコンピュータを信頼」→「信頼」を押してください"))
+            out.append(_diag("usb", t("setup.wizard.run_diagnostics_22"), DIAG_NG, t("setup.wizard.run_diagnostics_23"),
+                             t("setup.wizard.run_diagnostics_24")))
         else:
-            out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_OK))
+            out.append(_diag("usb", t("setup.wizard.run_diagnostics_22"), DIAG_OK))
     else:
-        out.append(_diag("usb", "iPhoneがUSBでつながっている", DIAG_NG, "iPhoneが見つかりません",
-                         "LightningケーブルでPCにつなぎ、iPhoneのロックを解除して「信頼」を押してください。"
-                         "更新中はUSBでつないだままにするのがいちばん確実です"))
+        out.append(_diag("usb", t("setup.wizard.run_diagnostics_22"), DIAG_NG, t("setup.wizard.run_diagnostics_25"),
+                         t("setup.wizard.run_diagnostics_26")))
 
     # 6. ネットワークの種類 / 7. VPN
-    note("ネットワークの設定を確認しています…")
+    note(t("setup.wizard.run_diagnostics_27"))
     rc, txt = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _NET_SCRIPT], 30)
     net = parse_network_json(txt) if rc is not None else None
     if net is None:
-        out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN, "確認できませんでした",
-                         "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク で「プライベート」を選んでください"))
-        out.append(_diag("vpn", "VPN がオフ", DIAG_WARN, "確認できませんでした", "Tailscale などのVPNを使っているときは、いったんオフにしてください"))
+        out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"),
+                         t("setup.wizard.run_diagnostics_29")))
+        out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_31")))
     else:
         publics = [p for p in net["profiles"] if p["category"] == NET_PUBLIC]
         others = [p for p in net["profiles"] if p["category"] in (NET_PRIVATE, NET_DOMAIN)]
-        fix_net = ("設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、"
-                   "ネットワーク プロファイルを「プライベート」にしてください")
+        fix_net = (t("setup.wizard.run_diagnostics_32"))
         if not net["profiles"]:
-            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN, "ネットワークが見つかりません",
-                             "Wi-Fi または有線LANにつないでください"))
+            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN, t("setup.wizard.run_diagnostics_33"),
+                             t("setup.wizard.run_diagnostics_34")))
         elif publics and not others:
-            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_NG,
-                             "「パブリック」になっています（%s）" % "・".join(p["name"] or p["alias"] for p in publics), fix_net))
+            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_NG,
+                             t("setup.wizard.run_diagnostics_35") % t("setup.wizard.detect_itunes_1").join(p["name"] or p["alias"] for p in publics), fix_net))
         elif publics:
-            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_WARN,
-                             "「パブリック」のネットワークもあります（%s）" % "・".join(p["name"] or p["alias"] for p in publics),
-                             "iPhoneと同じネットワークが「パブリック」なら、" + fix_net))
+            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN,
+                             t("setup.wizard.run_diagnostics_36") % t("setup.wizard.detect_itunes_1").join(p["name"] or p["alias"] for p in publics),
+                             t("setup.wizard.run_diagnostics_37") + fix_net))
         else:
-            out.append(_diag("network", "ネットワークの種類が「プライベート」", DIAG_OK))
+            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_OK))
         vpns = find_vpn_adapters(net["adapters"])
         if vpns:
-            out.append(_diag("vpn", "VPN がオフ", DIAG_WARN, "VPNらしい接続が有効です（%s）" % "・".join(vpns),
-                             "Tailscale などのVPNをいったんオフにしてから更新してください（AltServerがiPhoneを見つけにくくなります）"))
+            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_38") % t("setup.wizard.detect_itunes_1").join(vpns),
+                             t("setup.wizard.run_diagnostics_39")))
         else:
-            out.append(_diag("vpn", "VPN がオフ", DIAG_OK))
+            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_OK))
 
     # 8. ファイアウォール
-    note("ファイアウォールを確認しています…（少し時間がかかります）")
+    note(t("setup.wizard.run_diagnostics_40"))
     rc, txt = run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], 40)
     if rc is None:
-        out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_WARN, "確認できませんでした",
-                         "AltServer を起動したときの Windows セキュリティの画面で、「プライベート ネットワーク」を許可してください"))
+        out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"),
+                         t("setup.wizard.run_diagnostics_42")))
     else:
         fw = parse_firewall(txt, "altserver")
         if fw["allow_in"] and not fw["block"]:
-            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_OK))
+            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_OK))
         elif fw["block"]:
-            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_NG, "AltServer をブロックするルールがあります",
-                             "Windowsセキュリティ > ファイアウォールとネットワーク保護 > ファイアウォールによるアプリケーションの許可 で、"
-                             "AltServer の「プライベート」にチェックを入れてください"))
+            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_NG, t("setup.wizard.run_diagnostics_43"),
+                             t("setup.wizard.run_diagnostics_44")))
         else:
-            out.append(_diag("firewall", "ファイアウォールがAltServerを許可している", DIAG_NG, "AltServer を許可するルールが見つかりません",
-                             "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。"
-                             "出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します"))
+            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_NG, t("setup.wizard.run_diagnostics_45"),
+                             t("setup.wizard.run_diagnostics_46")))
     note("")
     return out
 
@@ -1672,13 +1954,13 @@ def diagnostics_summary(results):
     ng = [r for r in results if r["state"] == DIAG_NG]
     warn = [r for r in results if r["state"] == DIAG_WARN]
     if not ng and not warn:
-        return "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。"
+        return t("setup.wizard.diagnostics_summary_1")
     parts = []
     if ng:
-        parts.append("直す必要があるもの: %d 件" % len(ng))
+        parts.append(t("setup.wizard.diagnostics_summary_2") % len(ng))
     if warn:
-        parts.append("確認してほしいもの: %d 件" % len(warn))
-    return "、".join(parts) + "。下の「→」の案内を上から順に試してください。"
+        parts.append(t("setup.wizard.diagnostics_summary_3") % len(warn))
+    return t("setup.wizard.list_sep").join(parts) + t("setup.wizard.diagnostics_summary_4")
 
 
 # ---------------------------------------------------------------------------
@@ -1745,9 +2027,9 @@ class SetupEngine:
     def _prepare(self, cid, emit, cancel, progress):
         src = SOURCES[cid]
         dest = os.path.join(self.dir, src["file"])
-        emit("stage", text="%s をダウンロード中…" % COMPONENT_BY_ID[cid]["name"])
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_4") % COMPONENT_BY_ID[cid]["name"])
         self.downloader(src["url"], dest, src["kind"], progress=progress, cancel=cancel)
-        title = "%s をインストール" % COMPONENT_BY_ID[cid]["name"]
+        title = t("setup.wizard.setupengine__prepare_1") % COMPONENT_BY_ID[cid]["name"]
         if cid == "altserver":
             root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
             msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
@@ -1757,12 +2039,12 @@ class SetupEngine:
             if exe:
                 # 無人インストールが効かない場合は、通常のウィンドウ付きでもう一度実行する
                 return step_exe(cid, title, exe, ["/quiet", "/norestart"], retry_args=[], stage_dir=root)
-            raise DownloadError("zipの中にインストーラーが見つかりませんでした")
+            raise DownloadError(t("setup.wizard.setupengine__prepare_2"))
         if cid == "vbcable":
             root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
             if not exe:
-                raise DownloadError("zipの中にインストーラーが見つかりませんでした")
+                raise DownloadError(t("setup.wizard.setupengine__prepare_2"))
             # VB-CABLE は終了コードがあてにならないので、導入後の再検出で判定する
             return step_exe(cid, title, exe, ["-i", "-h"], timeout=300, lenient=True, reboot=True, stage_dir=root)
         return step_exe(cid, title, dest, src["args"], ok_codes=src.get("ok_codes", (0, 3010, 1641)))
@@ -1789,22 +2071,22 @@ class SetupEngine:
 
             def prog(done, total, _name=name):
                 if total:
-                    emit("stage", text="%s をダウンロード中… %s / %s" % (_name, _mb(done), _mb(total)))
+                    emit("stage", text=t("setup.wizard.prepare_prog_1") % (_name, _mb(done), _mb(total)))
                     set_progress(done / float(total))
                 else:
-                    emit("stage", text="%s をダウンロード中… %s" % (_name, _mb(done)))
+                    emit("stage", text=t("setup.wizard.prepare_prog_2") % (_name, _mb(done)))
 
             try:
                 steps.append(self._prepare(cid, emit, cancel, prog))
-                emit("log", text="%s: ダウンロード完了" % name)
+                emit("log", text=t("setup.wizard.guidedflow_prepare_5") % name)
             except Exception as e:
-                msg = str(e) if isinstance(e, DownloadError) else "準備に失敗しました。もう一度お試しください"
+                msg = str(e) if isinstance(e, DownloadError) else t("setup.wizard.setupengine_run_1")
                 emit("log", text="%s: %s%s" % (name, msg, (" [%s]" % getattr(e, "technical", "")) if getattr(e, "technical", "")
                                               else ("" if isinstance(e, DownloadError) else " [%s]" % e)))
                 src = SOURCES[cid]
                 if src.get("winget") and self.winget_finder():
-                    emit("log", text="%s: wingetで代わりにインストールします" % name)
-                    steps.append(step_winget(cid, "%s をインストール (winget)" % name, src["winget"]))
+                    emit("log", text=t("setup.wizard.setupengine_run_2") % name)
+                    steps.append(step_winget(cid, t("setup.wizard.setupengine_run_3") % name, src["winget"]))
                 else:
                     out["results"][cid] = {"ok": False, "detail": msg, "code": None}
                     out["manual"].append({"id": cid, "name": name, "url": src["page"], "text": MANUAL_TEXT.get(cid, "")})
@@ -1817,7 +2099,7 @@ class SetupEngine:
             cid = st.get("id")
             if cid in STORE_PACKAGES and store_package_installed(cid):
                 name = COMPONENT_BY_ID[cid]["name"]
-                emit("stage", text="%s のMicrosoft Store版を削除しています…" % name)
+                emit("stage", text=t("setup.wizard.guidedflow_prepare_3") % name)
                 ok, msg = self.store_remover(cid)
                 emit("log", text="%s: %s" % (name, msg))
                 if not ok:
@@ -1831,19 +2113,19 @@ class SetupEngine:
         else:
             state["units"] = total_units
         emit("progress", value=1.0)
-        emit("stage", text="結果を確認中…")
+        emit("stage", text=t("setup.wizard.setupengine_run_4"))
         try:
             out["statuses"] = self.detector()
         except Exception as e:
-            out["error"] = out["error"] or "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: %s）" % e
+            out["error"] = out["error"] or t("setup.wizard.setupengine_run_5") % e
         # インストールは成功したのに検出できない場合は「要確認」
         for cid, r in out["results"].items():
             st = out["statuses"].get(cid, {}).get("state")
             if r["ok"] and st is not None and st != STATE_OK and cid != "camera":
-                r["detail"] = r["detail"] or "インストールは終わりましたが、まだ認識できません。再起動してから再チェックしてください"
+                r["detail"] = r["detail"] or t("setup.wizard.setupengine_run_6")
             elif r["ok"] and cid == "camera" and st is not None and st != STATE_OK:
                 r["ok"] = False
-                r["detail"] = "登録の処理は終わりましたが、状態が変わっていません。もう一度お試しください"
+                r["detail"] = t("setup.wizard.setupengine_run_7")
         if "vbcable" in out["results"] and out["results"]["vbcable"]["ok"]:
             out["reboot"] = True
         return out
@@ -1861,8 +2143,8 @@ class SetupEngine:
             script = _host.get("script_path")
             if script:
                 params = '"%s" %s' % (script(), params)
-        emit("stage", text="管理者の確認が表示されたら「はい」を押してください…")
-        emit("log", text="管理者権限でインストールを開始します (%d 件)" % len(steps))
+        emit("stage", text=t("setup.wizard.setupengine__run_elevated_1"))
+        emit("log", text=t("setup.wizard.setupengine__run_elevated_2") % len(steps))
         box = []
 
         def work():
@@ -1871,12 +2153,12 @@ class SetupEngine:
             except Exception as e:
                 box.append(("error", str(e)))
 
-        t = threading.Thread(target=work, name="setup-elevated", daemon=True)
-        t.start()
+        th = threading.Thread(target=work, name="setup-elevated", daemon=True)
+        th.start()
         base_units = state["units"]
         seen = 0
-        while t.is_alive():
-            t.join(0.4)
+        while th.is_alive():
+            th.join(0.4)
             seen = self._poll_progress(progress_path, seen, emit, state, base_units, total_units)
         self._poll_progress(progress_path, seen, emit, state, base_units, total_units)
         kind, code = box[0] if box else ("error", 0)
@@ -1889,13 +2171,12 @@ class SetupEngine:
         step_by_id = {s["id"]: s for s in steps}
         if result is None:
             if kind == "cancelled":
-                out["error"] = "管理者の確認がキャンセルされたため、インストールしませんでした。もう一度お試しください。"
+                out["error"] = t("setup.wizard.setupengine__run_elevated_3")
             elif kind == "timeout":
-                out["error"] = "インストールが時間内に終わりませんでした。もう一度お試しください。"
+                out["error"] = t("setup.wizard.setupengine__run_elevated_4")
             else:
-                out["error"] = ("インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を"
-                                "右クリック →「管理者として実行」でやり直してください")
-                emit("log", text="詳細: %s %s" % (kind, code))
+                out["error"] = (t("setup.wizard.setupengine__run_elevated_5"))
+                emit("log", text=t("setup.wizard.setupengine__run_elevated_6") % (kind, code))
             for cid in step_by_id:
                 out["results"][cid] = {"ok": False, "detail": out["error"], "code": None}
             return
@@ -1906,10 +2187,10 @@ class SetupEngine:
                                        "technical": r.get("technical", "")}
             if r.get("reboot"):
                 out["reboot"] = True
-            emit("log", text="%s: %s" % (r.get("title", r.get("id")), "完了" if r.get("ok") else (
-                "失敗 " + r.get("detail", "") + ((" [" + r["technical"] + "]") if r.get("technical") else ""))))
+            emit("log", text="%s: %s" % (r.get("title", r.get("id")), t("setup.wizard.setupengine__run_elevated_7") if r.get("ok") else (
+                t("setup.wizard.setupengine__run_elevated_8") + r.get("detail", "") + ((" [" + r["technical"] + "]") if r.get("technical") else ""))))
         for cid in step_by_id:
-            out["results"].setdefault(cid, {"ok": False, "detail": "実行されませんでした", "code": None})
+            out["results"].setdefault(cid, {"ok": False, "detail": t("setup.wizard.setupengine__run_elevated_9"), "code": None})
         state["units"] = base_units + len(steps)
 
     @staticmethod
@@ -2062,7 +2343,7 @@ class SetupController:
             try:
                 res = self.detector()
             except Exception as e:
-                res = {c["id"]: {"state": STATE_WARN, "detail": "確認できませんでした。「再チェック」を押してください"} for c in COMPONENTS}
+                res = {c["id"]: {"state": STATE_WARN, "detail": t("setup.wizard.detect_all_1")} for c in COMPONENTS}
             self._q.put(("checked", res))
 
         threading.Thread(target=work, name="setup-detect", daemon=True).start()
@@ -2107,7 +2388,7 @@ class SetupController:
             self.audio_message = ""
             self.outcome = {"results": {}, "manual": [], "reboot": False, "error": "", "statuses": {}, "ids": []}
             self.log_lines = []
-            self.stage = "準備しています…"
+            self.stage = t("setup.wizard.setupcontroller_start_1")
             self.progress = 0.0
             self.cancel.clear()
             self._notify("start")
@@ -2119,7 +2400,7 @@ class SetupController:
         self.busy = True
         self.outcome = None
         self.log_lines = []
-        self.stage = "準備しています…"
+        self.stage = t("setup.wizard.setupcontroller_start_1")
         self.progress = 0.0
         self.cancel.clear()
         self.on_busy(True)
@@ -2133,7 +2414,7 @@ class SetupController:
                 out = self.engine.run(ids, emit=emit, cancel=self.cancel)
             except Exception as e:
                 out = {"results": {}, "manual": [], "reboot": False, "statuses": {}, "ids": ids,
-                       "error": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: %s）" % e}
+                       "error": t("setup.wizard.start_work_1") % e}
             if guard is not None:
                 self.audio_polling = True  # "done" より先に立てる (UI の更新ループを止めないため)
             self._q.put(("done", out))
@@ -2186,7 +2467,7 @@ class SetupController:
                 while flow.phase == GuidedFlow.PREPARING and not flow.finished and not self.closed:
                     flow.prepare(self._emit_guided, self.cancel)
             except Exception as e:
-                flow._fail("予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+                flow._fail(t("setup.wizard.guided_run_work_1"), str(e))
             finally:
                 self.guided_working = False
                 self._q.put(("guided", None))
@@ -2206,7 +2487,7 @@ class SetupController:
             try:
                 flow.launch()
             except Exception as e:
-                flow._fail("インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください", str(e))
+                flow._fail(t("setup.wizard.guided_open_work_1"), str(e))
             finally:
                 self.guided_working = False
                 self._q.put(("guided", None))
@@ -2306,18 +2587,81 @@ class SetupController:
 # UI
 # ---------------------------------------------------------------------------
 
-BG = "#ffffff"
-PANEL = "#f5f5f7"
-FG = "#1d1d1f"
-SUB = "#6e6e73"
-LINE = "#d2d2d7"
-ACCENT = "#0071e3"
-GOOD = "#248a3d"
-WARN = "#b25000"
-BAD = "#d70015"
+# 色はテーマ (phonecam.ui.theme.colors()) から取る。取れないとき (単体実行・テスト) は下のライトの値。
+_FALLBACK_COLORS = {"bg": "#fafafa", "card": "#ffffff", "text": "#1c1c1c", "text2": "#616161",
+                    "separator": "#e5e5e5", "accent": "#005fb8", "live": "#c42b1c", "ok": "#0f7b0f"}
+
+BG = PANEL = FG = SUB = LINE = ACCENT = GOOD = WARN = BAD = ""
+ACCENT_FG = ACCENT_HOVER = PANEL_HOVER = DISABLED_FG = ""
+_COLOR_NAMES = ("BG", "PANEL", "FG", "SUB", "LINE", "ACCENT", "GOOD", "WARN", "BAD",
+                "ACCENT_FG", "ACCENT_HOVER", "PANEL_HOVER", "DISABLED_FG")
+
+
+def _rgb(c):
+    try:
+        c = c.lstrip("#")
+        return int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    except Exception:
+        return 255, 255, 255
+
+
+def _lum(c):
+    r, g, b = _rgb(c)
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+
+def _blend(c1, c2, f):
+    a, b = _rgb(c1), _rgb(c2)
+    return "#%02x%02x%02x" % tuple(int(round(a[i] + (b[i] - a[i]) * f)) for i in range(3))
+
+
+def _theme_colors():
+    try:
+        from phonecam.ui import theme as _theme
+        c = dict(_theme.colors())
+        for k, v in _FALLBACK_COLORS.items():
+            c.setdefault(k, v)
+        return c
+    except Exception:
+        return dict(_FALLBACK_COLORS)
+
+
+def _apply_palette():
+    """色の定数 (BG など) を現在のテーマの色にする。変更前の値の dict を返す。"""
+    g = globals()
+    old = {n: g.get(n, "") for n in _COLOR_NAMES}
+    c = _theme_colors()
+    dark = _lum(c["bg"]) < 0.5
+    g["BG"] = c["bg"]
+    g["PANEL"] = c["card"]
+    g["FG"] = c["text"]
+    g["SUB"] = c["text2"]
+    g["LINE"] = c["separator"]
+    g["ACCENT"] = c["accent"]
+    g["GOOD"] = c["ok"]
+    g["BAD"] = c["live"]
+    g["WARN"] = "#e0a030" if dark else "#b25000"  # 警告のくすんだ琥珀色
+    g["ACCENT_FG"] = "#1c1c1c" if _lum(c["accent"]) > 0.6 else "#ffffff"
+    g["ACCENT_HOVER"] = _blend(c["accent"], c["text"], 0.12)
+    g["PANEL_HOVER"] = _blend(c["card"], c["text"], 0.08)
+    g["DISABLED_FG"] = _blend(c["bg"], c["text"], 0.35)
+    try:  # 状態アイコンの色表も更新する (定義より前に呼ばれたときは何もしない)
+        g["ICONS"][STATE_OK] = ("✓", GOOD, g["ICONS"][STATE_OK][2])
+        g["ICONS"][STATE_MISSING] = ("●", SUB, g["ICONS"][STATE_MISSING][2])
+        g["ICONS"][STATE_WARN] = ("!", WARN, g["ICONS"][STATE_WARN][2])
+        g["DIAG_ICONS"][DIAG_OK] = ("✓", GOOD)
+        g["DIAG_ICONS"][DIAG_NG] = ("✗", BAD)
+        g["DIAG_ICONS"][DIAG_WARN] = ("!", WARN)
+    except Exception:
+        pass
+    return old
+
+
+_apply_palette()
+
 FONT = "Yu Gothic UI"
 
-ICONS = {STATE_OK: ("✓", GOOD, "導入済み"), STATE_MISSING: ("●", SUB, "未導入"), STATE_WARN: ("!", WARN, "要確認")}
+ICONS = {STATE_OK: ("✓", GOOD, t("setup.wizard.icons_1")), STATE_MISSING: ("●", SUB, t("setup.wizard.icons_2")), STATE_WARN: ("!", WARN, t("setup.wizard.icons_3"))}
 
 # 画面の拡大率 (DPI / 96)。フォントは tk の scaling でそろうが、ピクセル指定の余白・幅は px() で拡大する
 SCALE = 1.0
@@ -2343,20 +2687,93 @@ def detect_scale(root):
         return 1.0
 
 
+_TOPS = []
+_COLOR_OPTS = ("bg", "fg", "background", "foreground", "activebackground", "activeforeground", "disabledforeground",
+               "readonlybackground", "highlightbackground", "highlightcolor", "selectbackground", "selectforeground",
+               "insertbackground")
+
+
+def _recolor(widget, cmap):
+    """widget 以下のウィジェット (tk 版) の色を cmap (旧→新) で置き換える。"""
+    if getattr(widget, "_pc_keep", False):
+        return
+    for opt in _COLOR_OPTS:
+        try:
+            cur = str(widget.cget(opt)).lower()
+        except Exception:
+            continue
+        if cur in cmap:
+            try:
+                widget.configure(**{opt: cmap[cur]})
+            except Exception:
+                pass
+    try:
+        if widget.winfo_class() == "Canvas":
+            for item in widget.find_all():
+                for opt in ("fill", "outline"):
+                    try:
+                        cur = str(widget.itemcget(item, opt)).lower()
+                    except Exception:
+                        continue
+                    if cur in cmap:
+                        widget.itemconfigure(item, **{opt: cmap[cur]})
+    except Exception:
+        pass
+    try:
+        kids = widget.winfo_children()
+    except Exception:
+        kids = []
+    for k in kids:
+        _recolor(k, cmap)
+
+
+def _on_theme_change():
+    old = _apply_palette()
+    cmap = {}
+    for n in _COLOR_NAMES:
+        if old.get(n) and old[n] != globals()[n]:
+            cmap[old[n].lower()] = globals()[n]
+    if not cmap:
+        return
+    for top in list(_TOPS):
+        try:
+            if not top.winfo_exists():
+                _TOPS.remove(top)
+                continue
+            _recolor(top, cmap)
+        except Exception:
+            try:
+                _TOPS.remove(top)
+            except ValueError:
+                pass
+
+
+def _track_top(top):
+    """テーマ (ライト/ダーク) が切り替わったとき top の色を付け替える。"""
+    _TOPS.append(top)
+    try:
+        from phonecam.ui import theme as _theme
+        _theme.on_change(_on_theme_change)
+    except Exception:
+        pass
+
+
 def make_button(parent, text, command, primary=False, state="normal", big=False):
     """角のない平らなボタン。big は押す場所をはっきり見せたいときの大きいボタン。"""
     if primary:
-        b = tk.Button(parent, text=text, command=command, bg=ACCENT, fg="#ffffff", activebackground="#0077ed",
-                      activeforeground="#ffffff", relief="flat", bd=0, padx=px(40 if big else 22), pady=px(12 if big else 7),
-                      cursor="hand2", font=(FONT, 12 if big else 10, "bold"), disabledforeground="#c7c7cc", state=state)
+        b = tk.Button(parent, text=text, command=command, bg=ACCENT, fg=ACCENT_FG, activebackground=ACCENT_HOVER,
+                      activeforeground=ACCENT_FG, relief="flat", bd=0, padx=px(40 if big else 22), pady=px(12 if big else 7),
+                      cursor="hand2", font=(FONT, 12 if big else 10, "bold"), disabledforeground=DISABLED_FG, state=state)
     else:
-        b = tk.Button(parent, text=text, command=command, bg=PANEL, fg=FG, activebackground="#e8e8ed",
+        b = tk.Button(parent, text=text, command=command, bg=PANEL, fg=FG, activebackground=PANEL_HOVER,
                       activeforeground=FG, relief="flat", bd=0, padx=px(16), pady=px(6), cursor="hand2",
-                      font=(FONT, 10), disabledforeground="#c7c7cc", state=state)
+                      font=(FONT, 10), disabledforeground=DISABLED_FG, state=state)
     return b
 
 
-def make_link(parent, text, command, bg=BG):
+def make_link(parent, text, command, bg=None):
+    if bg is None:
+        bg = BG
     b = tk.Button(parent, text=text, command=command, bg=bg, fg=SUB, activebackground=bg, activeforeground=FG,
                   relief="flat", bd=0, cursor="hand2", font=(FONT, 9), padx=px(4), pady=px(2))
     return b
@@ -2417,7 +2834,9 @@ class ThinProgress:
 class ScrollFrame:
     """縦にスクロールできる領域 (Canvas + 内側の Frame)。中身が収まるときはスクロールバーを隠す。"""
 
-    def __init__(self, parent, bg=BG):
+    def __init__(self, parent, bg=None):
+        if bg is None:
+            bg = BG
         self.outer = tk.Frame(parent, bg=bg)
         self.canvas = tk.Canvas(self.outer, bg=bg, highlightthickness=0, bd=0, yscrollincrement=px(24))
         self.vsb = tk.Scrollbar(self.outer, orient="vertical", command=self.canvas.yview)
@@ -2493,7 +2912,7 @@ class SetupPanel:
         self.install_buttons = {}
         c = self.controller
         if not c.checked:
-            tk.Label(self.frame, text="確認しています…", bg=BG, fg=SUB, font=(FONT, 10)).pack(anchor="w", pady=px(20))
+            tk.Label(self.frame, text=t("setup.wizard.setuppanel_render_1"), bg=BG, fg=SUB, font=(FONT, 10)).pack(anchor="w", pady=px(20))
             return
         for comp in COMPONENTS:
             self._row(comp)
@@ -2513,7 +2932,7 @@ class SetupPanel:
         inner.columnconfigure(1, weight=1)
 
         if res is not None:
-            icon, color, word = ("✓", GOOD, "完了") if res.get("ok") else ("✗", BAD, "失敗")
+            icon, color, word = ("✓", GOOD, t("setup.wizard.setupengine__run_elevated_7")) if res.get("ok") else ("✗", BAD, t("setup.wizard.setuppanel__row_1"))
         else:
             icon, color, word = ICONS.get(state, ICONS[STATE_WARN])
         icon_lbl = tk.Label(inner, text=icon, fg=color, bg=BG, font=(FONT, 12, "bold"))
@@ -2536,7 +2955,7 @@ class SetupPanel:
             wrapped_label(text_col, detail, inner, reserve, font=(FONT, 9),
                           fg=(BAD if res is not None else WARN)).pack(fill="x")
         if cid in GUIDED_IDS and state != STATE_OK and res is None and self.mode in ("wizard", "tab"):
-            wrapped_label(text_col, "公式のインストーラーを開いて、手順を画面で案内します", inner, reserve, font=(FONT, 9),
+            wrapped_label(text_col, t("setup.wizard.setuppanel__row_2"), inner, reserve, font=(FONT, 9),
                           fg=ACCENT).pack(fill="x")
         if self.mode == "wizard" and res is None:
             self._wizard_action(action, comp, state)
@@ -2548,7 +2967,7 @@ class SetupPanel:
         c = self.controller
         cid = comp["id"]
         if state == STATE_OK:
-            tk.Label(action, text="スキップ", fg=SUB, bg=BG, font=(FONT, 9)).pack()
+            tk.Label(action, text=t("setup.wizard.setuppanel__wizard_action_1"), fg=SUB, bg=BG, font=(FONT, 9)).pack()
             return
         if not is_selectable(cid, c.statuses):
             return
@@ -2568,7 +2987,7 @@ class SetupPanel:
         cid = comp["id"]
         if state == STATE_OK or not is_selectable(cid, c.statuses):
             return
-        label = "更新" if cid == "camera" and c.statuses.get(cid, {}).get("detail") else "インストール"
+        label = t("setup.wizard.setuppanel__tab_action_1") if cid == "camera" and c.statuses.get(cid, {}).get("detail") else t("setup.wizard.setuppanel__tab_action_2")
         b = make_button(action, label, lambda cid=cid: self.on_install_one and self.on_install_one(cid),
                         state=("disabled" if c.busy else "normal"))
         b.pack()
@@ -2585,7 +3004,7 @@ def text_section(parent, title, lines, container, numbered=False, intro=""):
     if intro:
         wrapped_label(parent, intro, container, font=(FONT, 9)).pack(fill="x", pady=(px(2), 0))
     for n, line in enumerate(lines, 1):
-        mark = ("%d.  " % n) if numbered else "・"
+        mark = ("%d.  " % n) if numbered else t("setup.wizard.detect_itunes_1")
         wrapped_label(parent, mark + line, container, fg=FG, font=(FONT, 9)).pack(fill="x", pady=(px(3), 0))
 
 
@@ -2606,8 +3025,10 @@ class DiagnosticsDialog:
         self._job = None
         self.closed = False
         set_scale(detect_scale(root))
+        _apply_palette()
         self.top = tk.Toplevel(root)
-        self.top.title("AltServerの診断")
+        _track_top(self.top)
+        self.top.title(t("setup.wizard.diagnosticsdialog___init___1"))
         self.top.configure(bg=BG)
         try:
             self.top.minsize(px(520), px(420))
@@ -2616,8 +3037,8 @@ class DiagnosticsDialog:
             pass
         foot = tk.Frame(self.top, bg=BG)
         foot.pack(side="bottom", fill="x", padx=px(24), pady=px(12))
-        make_button(foot, "閉じる", self.close).pack(side="right")
-        self.run_btn = make_button(foot, "もう一度診断する", self.run, primary=True)
+        make_button(foot, t("setup.wizard.diagnosticsdialog___init___2"), self.close).pack(side="right")
+        self.run_btn = make_button(foot, t("setup.wizard.diagnosticsdialog___init___3"), self.run, primary=True)
         self.run_btn.pack(side="right", padx=(0, px(10)))
         self.scroll = ScrollFrame(self.top)
         self.scroll.outer.pack(side="top", fill="both", expand=True)
@@ -2635,7 +3056,7 @@ class DiagnosticsDialog:
             return
         self.running = True
         self.results = None
-        self.progress_text = "診断しています…"
+        self.progress_text = t("setup.wizard.diagnosticsdialog_run_1")
         self._box = []
         try:
             self.run_btn.config(state="disabled")
@@ -2651,7 +3072,7 @@ class DiagnosticsDialog:
             try:
                 self._box.append(self.runner(progress=prog))
             except Exception as e:
-                self._box.append([_diag("error", "診断", DIAG_WARN, "診断を実行できませんでした (%s)" % e, "もう一度「診断する」を押してください")])
+                self._box.append([_diag("error", t("setup.wizard.run_work_1"), DIAG_WARN, t("setup.wizard.run_work_2") % e, t("setup.wizard.run_work_3"))])
 
         threading.Thread(target=work, name="altserver-diag", daemon=True).start()
         self._schedule()
@@ -2686,9 +3107,9 @@ class DiagnosticsDialog:
         for w in list(self.body.winfo_children()):
             w.destroy()
         self.status_label = None
-        tk.Label(self.body, text="AltServerの診断", bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(self.body, text=t("setup.wizard.diagnosticsdialog___init___1"), bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
         if self.running or self.results is None:
-            self.status_label = wrapped_label(self.body, self.progress_text or "診断しています…", self.body, fg=SUB)
+            self.status_label = wrapped_label(self.body, self.progress_text or t("setup.wizard.diagnosticsdialog_run_1"), self.body, fg=SUB)
             self.status_label.pack(fill="x", pady=(px(8), 0))
         else:
             wrapped_label(self.body, diagnostics_summary(self.results), self.body, fg=FG, font=(FONT, 10)).pack(
@@ -2709,10 +3130,10 @@ class DiagnosticsDialog:
                     wrapped_label(col, "→ " + r["fix"], row, px(40), fg=FG, font=(FONT, 9)).pack(fill="x")
         if iphone is not None:
             text_section(self.body, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
-            text_section(self.body, "更新に使うPCの条件", iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
-                         intro="AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。")
+            text_section(self.body, t("setup.wizard.diagnosticsdialog_render_1"), iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
+                         intro=t("setup.wizard.diagnosticsdialog_render_2"))
             wrapped_label(self.body, iphone.ALTSTORE_NEW_PC_NOTE, self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
-        make_link(self.body, "AltStore公式の手順を開く", lambda: self.open_url(FAQ_URL)).pack(anchor="w", pady=(px(10), 0))
+        make_link(self.body, t("setup.wizard.diagnosticsdialog_render_3"), lambda: self.open_url(FAQ_URL)).pack(anchor="w", pady=(px(10), 0))
         try:
             self.top.update_idletasks()
             sw, sh = self.top.winfo_screenwidth(), self.top.winfo_screenheight()
@@ -2768,7 +3189,7 @@ class SetupWizard:
     """初回セットアップ / やり直し用のウィザード (リサイズ可能な Toplevel)。
     start="iphone" のときは iPhone の手順だけを開く (セットアップタブの「iPhoneのセットアップ」)。"""
 
-    TITLES = ["ようこそ", "必要なソフトの確認", "インストール", "iPhoneの準備"]
+    TITLES = [t("setup.wizard.setupwizard_1"), t("setup.wizard.setupwizard_2"), t("setup.wizard.setuppanel__tab_action_2"), t("setup.wizard.setupwizard_3")]
 
     def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None, start="setup"):
         self.root = root
@@ -2782,8 +3203,10 @@ class SetupWizard:
         self.finished = False
         self._placed = False
         set_scale(detect_scale(root))
+        _apply_palette()
         self.top = tk.Toplevel(root)
-        self.top.title("PhoneCam セットアップ")
+        _track_top(self.top)
+        self.top.title(t("setup.wizard.setupwizard___init___1"))
         self.top.configure(bg=BG)
         try:
             self.top.minsize(px(520), px(440))
@@ -2900,36 +3323,32 @@ class SetupWizard:
 
     # -- ページ1 ----------------------------------------------------------
     def _page_welcome(self):
-        tk.Label(self.body, text="PhoneCam へようこそ", bg=BG, fg=FG, font=(FONT, 22, "bold"), anchor="w").pack(
+        tk.Label(self.body, text=t("setup.wizard.setupwizard__page_welcome_1"), bg=BG, fg=FG, font=(FONT, 22, "bold"), anchor="w").pack(
             anchor="w", pady=(px(36), 0))
-        wrapped_label(self.body, "iPhoneをOBSのカメラにするために必要なソフトを確認します。すでに入っているものは飛ばします。\n"
-                                 "Visual C++ とカメラの登録は自動で入れます（管理者の確認が1回出ます）。\n"
-                                 "iTunes・iCloud・AltServer・VB-CABLE は、公式のインストーラーを画面に開いて、押すボタンを1つずつご案内します。\n"
-                                 "そのあと、iPhoneにPhoneCamを入れる手順もご案内します。",
+        wrapped_label(self.body, t("setup.wizard.setupwizard__page_welcome_2"),
                       self.body, font=(FONT, 11)).pack(fill="x", pady=(px(16), 0))
-        make_link(self.footer, "スキップ", self._skip).pack(side="left")
-        make_button(self.footer, "次へ", lambda: self.show(PAGE_CHECK), primary=True).pack(side="right")
+        make_link(self.footer, t("setup.wizard.setuppanel__wizard_action_1"), self._skip).pack(side="left")
+        make_button(self.footer, t("setup.wizard.setupwizard__page_welcome_3"), lambda: self.show(PAGE_CHECK), primary=True).pack(side="right")
 
     # -- ページ2 ----------------------------------------------------------
     def _page_check(self):
-        self._title("必要なソフトの確認")
+        self._title(t("setup.wizard.setupwizard_2"))
         self.panel = SetupPanel(self.body, self.controller, "wizard")
         self.panel.pack(fill="x")
         self.mic_var = tk.BooleanVar(value=self.controller.mic)
         # VB-CABLE が導入済みなら選ぶ必要がないので表示しない (_sync_mic_option で出し入れする)
         self.mic_box = tk.Frame(self.body, bg=BG)
-        tk.Checkbutton(self.mic_box, text="iPhoneをマイクとしても使う", variable=self.mic_var, bg=BG,
+        tk.Checkbutton(self.mic_box, text=t("setup.wizard.setupwizard__page_check_1"), variable=self.mic_var, bg=BG,
                        activebackground=BG, fg=FG, font=(FONT, 10), bd=0, highlightthickness=0,
                        command=self._mic_changed).pack(anchor="w")
-        tk.Label(self.mic_box, text="OBSやDiscordでiPhoneの音声を使うための「VB-CABLE」（無料）を一緒に入れます。"
-                                    "PCのマイクを使う場合は不要です。",
+        tk.Label(self.mic_box, text=t("setup.wizard.setupwizard__page_check_2"),
                  bg=BG, fg=SUB, font=(FONT, 9), justify="left", anchor="w",
                  wraplength=px(480)).pack(anchor="w", fill="x", padx=(px(22), 0))
         self._sync_mic_option()
-        make_link(self.footer, "スキップ", self._skip).pack(side="left")
-        self.next_btn = make_button(self.footer, "インストール", self._start_install, primary=True)
+        make_link(self.footer, t("setup.wizard.setuppanel__wizard_action_1"), self._skip).pack(side="left")
+        self.next_btn = make_button(self.footer, t("setup.wizard.setuppanel__tab_action_2"), self._start_install, primary=True)
         self.next_btn.pack(side="right")
-        make_button(self.footer, "再チェック", self.controller.recheck).pack(side="right", padx=(0, px(10)))
+        make_button(self.footer, t("setup.wizard.setupwizard__page_check_3"), self.controller.recheck).pack(side="right", padx=(0, px(10)))
         self.panel.render()
         self._update_next_label()
         if not self.controller.checked:
@@ -2959,7 +3378,7 @@ class SetupWizard:
             return
         ids = self.controller.selected_ids()
         try:
-            self.next_btn.config(text="インストール" if ids else "次へ")
+            self.next_btn.config(text=t("setup.wizard.setuppanel__tab_action_2") if ids else t("setup.wizard.setupwizard__page_welcome_3"))
         except Exception:
             pass
 
@@ -2973,13 +3392,13 @@ class SetupWizard:
 
     # -- ページ3 ----------------------------------------------------------
     def _page_install(self):
-        self._title("インストール")
+        self._title(t("setup.wizard.setuppanel__tab_action_2"))
         self.stage_label = wrapped_label(self.body, self.controller.stage, self.body, fg=FG)
         self.stage_label.pack(fill="x")
         self.bar = ThinProgress(self.body)
         self.bar.pack(fill="x", pady=(px(8), px(6)))
         self.bar.set(self.controller.progress)
-        self.detail_btn = make_link(self.body, "詳細 ▸", self._toggle_log)
+        self.detail_btn = make_link(self.body, t("setup.wizard.setupwizard__page_install_1"), self._toggle_log)
         self.detail_btn.pack(anchor="w")
         self.log_frame = tk.Frame(self.body, bg=BG)
         self.log_text = tk.Text(self.log_frame, height=7, bg=PANEL, fg=SUB, relief="flat", bd=0, font=(FONT, 8),
@@ -2997,11 +3416,11 @@ class SetupWizard:
         self.guided_holder.pack(fill="x", pady=(px(10), 0))
         self.audio_label = wrapped_label(self.body, "", self.body, fg=SUB, font=(FONT, 9))
         self.g_elapsed = self.g_hint = None
-        last_label = "閉じる" if self.mode == "guided" else "次へ"
+        last_label = t("setup.wizard.diagnosticsdialog___init___2") if self.mode == "guided" else t("setup.wizard.setupwizard__page_welcome_3")
         self.next_btn = make_button(self.footer, last_label, self._after_install, primary=True, state="disabled")
         self.next_btn.pack(side="right")
-        self.retry_btn = make_button(self.footer, "もう一度試す", self._retry)
-        self.abort_btn = make_link(self.footer, "あとで（中止）", self._abort_guided)
+        self.retry_btn = make_button(self.footer, t("setup.wizard.setupwizard__page_install_2"), self._retry)
+        self.abort_btn = make_link(self.footer, t("setup.wizard.setupwizard__page_install_3"), self._abort_guided)
         if not self.controller.busy and self.controller.outcome is not None:
             self._show_outcome()
         self._render_guided()
@@ -3044,10 +3463,10 @@ class SetupWizard:
         self.log_visible = not self.log_visible
         if self.log_visible:
             self.log_frame.pack(fill="both", expand=True, pady=(px(4), 0))
-            self.detail_btn.config(text="詳細 ▾")
+            self.detail_btn.config(text=t("setup.wizard.setupwizard__toggle_log_1"))
         else:
             self.log_frame.pack_forget()
-            self.detail_btn.config(text="詳細 ▸")
+            self.detail_btn.config(text=t("setup.wizard.setupwizard__page_install_1"))
         self._fit_window()
 
     def _refill_log(self):
@@ -3082,14 +3501,14 @@ class SetupWizard:
     def overall_text(out, guided_pending=False):
         res = (out or {}).get("results", {})
         if guided_pending:
-            return "続けて、下の案内に沿ってインストールします"
+            return t("setup.wizard.setupwizard_overall_text_1")
         failed = [r for r in res.values() if not r.get("ok") and not r.get("skipped")]
         skipped = [r for r in res.values() if r.get("skipped")]
         if (out or {}).get("error") or failed:
-            return "一部のインストールが完了しませんでした（下の案内を見てください）"
+            return t("setup.wizard.setupwizard_overall_text_2")
         if skipped:
-            return "完了しました（あとで入れる項目があります）"
-        return "完了しました"
+            return t("setup.wizard.setupwizard_overall_text_3")
+        return t("setup.wizard.setupwizard_overall_text_4")
 
     def _show_outcome(self):
         out = self.controller.outcome or {}
@@ -3104,9 +3523,9 @@ class SetupWizard:
         if out.get("error"):
             notes.append(out["error"])
         if out.get("reboot"):
-            notes.append("再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。")
+            notes.append(t("setup.wizard.setupwizard__show_outcome_1"))
         for m in out.get("manual", []):
-            notes.append("%s は自動で入れられませんでした。「%s」" % (m["name"], m["text"]))
+            notes.append(t("setup.wizard.setupwizard__show_outcome_2") % (m["name"], m["text"]))
         for w in list(self.manual_holder.winfo_children()):
             w.destroy()
         if notes:
@@ -3120,7 +3539,7 @@ class SetupWizard:
         self.manual_holder.pack(fill="x", before=self.guided_holder)
         for m in out.get("manual", []):
             url = m["url"]
-            make_link(self.manual_holder, "%s の公式ページを開く" % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
+            make_link(self.manual_holder, t("setup.wizard.setupwizard__show_outcome_3") % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
         failed = [cid for cid, r in out.get("results", {}).items() if not r.get("ok") and not r.get("skipped")
                   and cid not in GUIDED_IDS]
         if failed and self.retry_btn is not None and not pending:
@@ -3153,9 +3572,9 @@ class SetupWizard:
             if r.get("detail"):
                 wrapped_label(col, r["detail"], row, px(40), fg=(BAD if not (r.get("ok") or r.get("skipped")) else WARN),
                               font=(FONT, 9)).pack(fill="x")
-            tech = r.get("technical") or (("終了コード %s" % r["code"]) if r.get("code") not in (None, 0) and not r.get("ok") else "")
+            tech = r.get("technical") or ((t("setup.wizard.run_installer_2") % r["code"]) if r.get("code") not in (None, 0) and not r.get("ok") else "")
             if tech:
-                wrapped_label(col, "詳細: %s" % tech, row, px(40), fg=SUB, font=(FONT, 8)).pack(fill="x")
+                wrapped_label(col, t("setup.wizard.setupwizard__render_results_1") % tech, row, px(40), fg=SUB, font=(FONT, 8)).pack(fill="x")
 
     # -- 手順つきインストール (iTunes / iCloud / AltServer / VB-CABLE) ----------
     def _render_guided(self):
@@ -3175,17 +3594,17 @@ class SetupWizard:
         cid = flow.current
         g = GUIDE.get(cid, {"steps": [], "note": ""})
         tk.Frame(holder, bg=LINE, height=1).pack(fill="x", pady=(0, px(10)))
-        tk.Label(holder, text="%s をインストール（%d / %d）" % (flow.name(cid), flow.index + 1, len(flow.ids)), bg=BG, fg=FG,
+        tk.Label(holder, text=t("setup.wizard.setupwizard__render_guided_1") % (flow.name(cid), flow.index + 1, len(flow.ids)), bg=BG, fg=FG,
                  font=(FONT, 14, "bold"), anchor="w").pack(anchor="w")
         phase = flow.phase
         if phase == GuidedFlow.PREPARING or phase == GuidedFlow.CHECKING:
-            text = "インストーラーを準備しています。上のバーが進みます…" if phase == GuidedFlow.PREPARING else "インストールされたか確認しています…"
+            text = t("setup.wizard.setupwizard__render_guided_2") if phase == GuidedFlow.PREPARING else t("setup.wizard.setupwizard__render_guided_3")
             wrapped_label(holder, text, self.body, fg=SUB).pack(fill="x", pady=(px(8), 0))
         else:
             if phase == GuidedFlow.FAILED:
                 wrapped_label(holder, flow.message, self.body, fg=BAD).pack(fill="x", pady=(px(8), 0))
                 if flow.technical:
-                    wrapped_label(holder, "詳細: %s" % flow.technical, self.body, fg=SUB, font=(FONT, 8)).pack(fill="x")
+                    wrapped_label(holder, t("setup.wizard.setupwizard__render_results_1") % flow.technical, self.body, fg=SUB, font=(FONT, 8)).pack(fill="x")
             else:
                 for n, line in enumerate(g["steps"], 1):
                     wrapped_label(holder, "%d.  %s" % (n, line), self.body, fg=FG, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
@@ -3201,8 +3620,7 @@ class SetupWizard:
                     if flow.message:
                         wrapped_label(holder, flow.message, self.body, fg=WARN).pack(fill="x", pady=(px(4), 0))
                     if flow.detected:
-                        wrapped_label(holder, "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます"
-                                              "（このまま「確認」を押しても進めます）", self.body, fg=GOOD).pack(fill="x", pady=(px(4), 0))
+                        wrapped_label(holder, t("setup.wizard.setupwizard__render_guided_4"), self.body, fg=GOOD).pack(fill="x", pady=(px(4), 0))
                     self.g_hint = wrapped_label(holder, SLOW_HINT, self.body, fg=WARN)
                     if flow.is_slow():
                         self.g_hint.pack(fill="x", pady=(px(4), 0))
@@ -3211,28 +3629,28 @@ class SetupWizard:
             row = tk.Frame(holder, bg=BG)
             row.pack(anchor="w", pady=(px(14), 0))
             if phase == GuidedFlow.READY:
-                make_button(row, "インストーラーを開く", c.guided_open, primary=True, big=True).pack(side="left")
+                make_button(row, t("setup.wizard.setupwizard__render_guided_5"), c.guided_open, primary=True, big=True).pack(side="left")
             elif phase == GuidedFlow.RUNNING:
-                make_button(row, "確認", c.guided_confirm, primary=True, big=True).pack(side="left")
-                make_button(row, "インストーラーをもう一度開く", c.guided_open).pack(side="left", padx=(px(10), 0))
+                make_button(row, t("setup.wizard.setupwizard__render_guided_6"), c.guided_confirm, primary=True, big=True).pack(side="left")
+                make_button(row, t("setup.wizard.setupwizard__render_guided_7"), c.guided_open).pack(side="left", padx=(px(10), 0))
             elif phase == GuidedFlow.MISSING:
-                make_button(row, "確認", c.guided_confirm, primary=True, big=True).pack(side="left")
-                make_button(row, "インストーラーをもう一度開く", c.guided_open).pack(side="left", padx=(px(10), 0))
+                make_button(row, t("setup.wizard.setupwizard__render_guided_6"), c.guided_confirm, primary=True, big=True).pack(side="left")
+                make_button(row, t("setup.wizard.setupwizard__render_guided_7"), c.guided_open).pack(side="left", padx=(px(10), 0))
             elif phase == GuidedFlow.FAILED:
-                make_button(row, "もう一度試す", c.guided_retry, primary=True, big=True).pack(side="left")
+                make_button(row, t("setup.wizard.setupwizard__page_install_2"), c.guided_retry, primary=True, big=True).pack(side="left")
             url = flow.page_url(cid)
             row2 = tk.Frame(holder, bg=BG)
             row2.pack(anchor="w", pady=(px(8), 0))
             if url:
-                make_link(row2, "公式ページを開く", lambda u=url: self.open_url(u)).pack(side="left")
-            make_link(row2, "この項目はあとで", c.guided_skip).pack(side="left", padx=(px(10), 0))
+                make_link(row2, t("setup.wizard.setupwizard__render_guided_8"), lambda u=url: self.open_url(u)).pack(side="left")
+            make_link(row2, t("setup.wizard.setupwizard__render_guided_9"), c.guided_skip).pack(side="left", padx=(px(10), 0))
         self._update_install_footer()
         self._fit_window()
 
     @staticmethod
     def _elapsed_text(flow):
         sec = int(flow.elapsed())
-        return "インストーラーを実行中です（経過 %d:%02d）。画面の案内に沿って進めてください" % (sec // 60, sec % 60)
+        return t("setup.wizard.setupwizard__elapsed_text_1") % (sec // 60, sec % 60)
 
     def _schedule_guided_timer(self):
         if getattr(self, "_g_job", None) is None:
@@ -3285,26 +3703,26 @@ class SetupWizard:
         head = tk.Frame(self.body, bg=BG)
         head.pack(fill="x")
         tk.Label(head, text=str(i + 1), bg=BG, fg=ACCENT, font=(FONT, 40, "bold")).pack(side="left")
-        tk.Label(head, text="全%d段階" % len(steps), bg=BG, fg=SUB, font=(FONT, 9)).pack(side="right", anchor="s")
+        tk.Label(head, text=t("setup.wizard.setupwizard__page_step_1") % len(steps), bg=BG, fg=SUB, font=(FONT, 9)).pack(side="right", anchor="s")
         tk.Label(self.body, text=step["title"], bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
         for line in step["lines"]:
             wrapped_label(self.body, line, self.body, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
-        self.chip = tk.Label(self.body, text="確認しています…", bg=PANEL, fg=SUB, font=(FONT, 10), padx=px(12),
+        self.chip = tk.Label(self.body, text=t("setup.wizard.setuppanel_render_1"), bg=PANEL, fg=SUB, font=(FONT, 10), padx=px(12),
                              pady=px(5), anchor="w")
         self.chip.pack(anchor="w", pady=(px(16), px(12)))
         extra = getattr(self, "_extra_" + sid, None)
         if extra:
             extra()
         # フッター
-        make_link(self.footer, "あとで", self._skip_iphone).pack(side="left")
+        make_link(self.footer, t("setup.wizard.setupwizard__page_step_2"), self._skip_iphone).pack(side="left")
         last = i == len(steps) - 1
         if last:
-            self.next_btn = make_button(self.footer, "完了", self._finish, primary=True, state="disabled")
+            self.next_btn = make_button(self.footer, t("setup.wizard.setupengine__run_elevated_7"), self._finish, primary=True, state="disabled")
         else:
-            self.next_btn = make_button(self.footer, "次へ", lambda: self.show(self.page + 1), primary=True)
+            self.next_btn = make_button(self.footer, t("setup.wizard.setupwizard__page_welcome_3"), lambda: self.show(self.page + 1), primary=True)
         self.next_btn.pack(side="right")
         if not (i == 0 and self.mode == "iphone"):
-            make_button(self.footer, "戻る", self._back).pack(side="right", padx=(0, px(10)))
+            make_button(self.footer, t("setup.wizard.setupwizard__page_step_3"), self._back).pack(side="right", padx=(0, px(10)))
         self._render_chip()
 
     def _back(self):
@@ -3326,21 +3744,21 @@ class SetupWizard:
 
     def _extra_itunes(self):
         path = find_itunes()
-        self._btn_row([("iTunesを開く", lambda: self.launch(path), bool(path))])
+        self._btn_row([(t("setup.wizard.setupwizard__extra_itunes_1"), lambda: self.launch(path), bool(path))])
         if not path:
-            wrapped_label(self.body, "iTunesが見つかりません。前の画面でインストールできます。", self.body,
+            wrapped_label(self.body, t("setup.wizard.setupwizard__extra_itunes_2"), self.body,
                           font=(FONT, 9)).pack(fill="x")
 
     def _extra_altstore(self):
         path = find_altserver()
-        self._btn_row([("AltServerを起動", lambda: self.launch(path), bool(path)),
-                       ("公式の手順を開く", lambda: self.open_url(FAQ_URL), True),
-                       ("AltServerの診断", lambda: open_diagnostics(self.top, self.open_url), True)])
-        wrapped_label(self.body, "うまくいかないときは、AltServerを「管理者として実行」してみてください。",
+        self._btn_row([(t("setup.wizard.setupwizard__extra_altstore_1"), lambda: self.launch(path), bool(path)),
+                       (t("setup.wizard.setupwizard__extra_altstore_2"), lambda: self.open_url(FAQ_URL), True),
+                       (t("setup.wizard.diagnosticsdialog___init___1"), lambda: open_diagnostics(self.top, self.open_url), True)])
+        wrapped_label(self.body, t("setup.wizard.setupwizard__extra_altstore_3"),
                       self.body, font=(FONT, 9)).pack(fill="x")
         if iphone is not None:
-            text_section(self.body, "更新に使うPCの条件", iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
-                         intro="AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。")
+            text_section(self.body, t("setup.wizard.diagnosticsdialog_render_1"), iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
+                         intro=t("setup.wizard.diagnosticsdialog_render_2"))
             wrapped_label(self.body, iphone.ALTSTORE_NEW_PC_NOTE, self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
             text_section(self.body, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
 
@@ -3351,7 +3769,8 @@ class SetupWizard:
         if url and phonecam_qr is not None:
             box = tk.Frame(self.body, bg=BG)
             box.pack(anchor="w", pady=(0, px(8)))
-            cv = tk.Canvas(box, highlightthickness=0, bd=0, bg="#ffffff")
+            cv = tk.Canvas(box, highlightthickness=0, bd=0, bg="#ffffff")  # QRコードは明るい地が必須なのでテーマに依らず白
+            cv._pc_keep = True
             try:
                 phonecam_qr.draw_on_canvas(cv, phonecam_qr.make_qr(deeplink, "M"), cell=px(4), quiet=3)
                 cv.pack(side="left")
@@ -3359,38 +3778,35 @@ class SetupWizard:
                 cv.destroy()
             side = tk.Frame(box, bg=BG)
             side.pack(side="left", padx=(px(16), 0), anchor="n")
-            wrapped_label(side, "iPhoneのカメラでQRコードを読み取り、AltStoreで開きます。", self.body, px(260),
+            wrapped_label(side, t("setup.wizard.setupwizard__extra_phonecam_1"), self.body, px(260),
                           font=(FONT, 9)).pack(fill="x")
-            wrapped_label(side, "追加できたら、AltStoreで「PhoneCam」を入手します。", self.body, px(260),
+            wrapped_label(side, t("setup.wizard.setupwizard__extra_phonecam_2"), self.body, px(260),
                           font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
             ent = tk.Entry(self.body, font=(FONT, 9), relief="flat", bg=PANEL, fg=FG, readonlybackground=PANEL,
                            highlightthickness=0, bd=0)
             ent.insert(0, url)
             ent.configure(state="readonly")
             ent.pack(fill="x", ipady=px(6), pady=(0, px(8)))
-            self._btn_row([("URLをコピー", lambda: self._copy(url), True)])
-        wrapped_label(self.body, "QRが使えないときは、PhoneCam.ipaを直接入れる方法もあります。AltServerのアイコンを"
-                                 "Shiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。"
-                                 "（この方法だと、アプリの更新は自分で入れ直します）",
+            self._btn_row([(t("setup.wizard.setupwizard__extra_phonecam_3"), lambda: self._copy(url), True)])
+        wrapped_label(self.body, t("setup.wizard.setupwizard__extra_phonecam_4"),
                       self.body, font=(FONT, 9)).pack(fill="x")
-        wrapped_label(self.body, "インストール時に「AltServer.ServerError 2005」が出たときは、AltStoreの「My Apps」で"
-                                 "AltStoreを一度「Refresh」してから、もう一度インストールしてください。",
+        wrapped_label(self.body, t("setup.wizard.setupwizard__extra_phonecam_5"),
                       self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
         ipa = ipa_url()
-        self.dl_btn = make_button(self.body, "PhoneCam.ipaをダウンロード", self._download_ipa,
+        self.dl_btn = make_button(self.body, t("setup.wizard.setupwizard__extra_phonecam_6"), self._download_ipa,
                                   state="normal" if ipa else "disabled")
         self.dl_btn.pack(anchor="w", pady=(px(8), 0))
         self.dl_label = wrapped_label(self.body, "", self.body, font=(FONT, 9))
         self.dl_label.pack(fill="x", pady=(px(4), 0))
         if self._dl_state and self._dl_state[0] == "ok":
-            self.dl_label.config(text="保存しました: %s" % self._dl_state[1])
+            self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7") % self._dl_state[1])
 
     def _copy(self, text):
         try:
             self.top.clipboard_clear()
             self.top.clipboard_append(text)
             if self.chip is not None:
-                self.chip.config(text="✓ URLをコピーしました", fg=GOOD)
+                self.chip.config(text=t("setup.wizard.setupwizard__copy_1"), fg=GOOD)
         except Exception:
             pass
 
@@ -3402,7 +3818,7 @@ class SetupWizard:
         if self.dl_btn is not None:
             self.dl_btn.config(state="disabled")
         if self.dl_label is not None:
-            self.dl_label.config(text="ダウンロード中…", fg=SUB)
+            self.dl_label.config(text=t("setup.wizard.setupwizard__download_ipa_1"), fg=SUB)
         dest = os.path.join(downloads_dir(), "PhoneCam.ipa")
 
         def work():
@@ -3427,7 +3843,7 @@ class SetupWizard:
                 self.dl_btn.config(state="normal")
             if st and st[0] == "ok":
                 if self.dl_label is not None:
-                    self.dl_label.config(text="保存しました: %s" % st[1], fg=GOOD)
+                    self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7") % st[1], fg=GOOD)
                 _open_folder_select(st[1])
             elif st and self.dl_label is not None:
                 self.dl_label.config(text=st[1], fg=BAD)

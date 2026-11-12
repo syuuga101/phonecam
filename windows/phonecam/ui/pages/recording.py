@@ -4,76 +4,113 @@
 
 import time
 from phonecam.core.settings import rec_estimate_text
+from phonecam.i18n import t
+from phonecam.ui import theme
 from phonecam.ui.dpi import px
 from phonecam.ui.labels import REC_CONTAINER_LABELS, REC_PRESET_LABELS, REC_RES_LABELS
 from phonecam.ui.tkdeps import tk, ttk
+from phonecam.ui.widgets import hint, page, row, section
+
+
+def _rec_combo(app, r, var, labels, key, width):
+    cb = ttk.Combobox(r, textvariable=var, values=[l for _, l in labels], state="readonly", width=width)
+    cb.pack(side="right")
+    cb.bind("<<ComboboxSelected>>", lambda e: app._rec_option_changed(
+        key, app._label_to_value(labels, var.get())))
+    return cb
+
+
+def _rec_switch(r, var, command):
+    cb = ttk.Checkbutton(r, style="Switch.TCheckbutton", variable=var, command=command)
+    cb.pack(side="right")
+    return cb
 
 
 def _build_record(app, parent):
-    f = app._section(parent, "録画の設定（iPhone側で高画質に録画）")
-    ttk.Label(f, text="解像度").grid(row=0, column=0, sticky="w", pady=2)
-    app.rec_res_var = tk.StringVar(value=app._value_to_label(REC_RES_LABELS, app.settings["rec_resolution"]))
-    cb = ttk.Combobox(f, textvariable=app.rec_res_var, values=[l for _, l in REC_RES_LABELS],
-                      state="readonly", width=14)
-    cb.grid(row=0, column=1, sticky="w", padx=6)
-    cb.bind("<<ComboboxSelected>>", lambda e: app._rec_option_changed(
-        "rec_resolution", app._label_to_value(REC_RES_LABELS, app.rec_res_var.get())))
-    ttk.Label(f, text="画質").grid(row=1, column=0, sticky="w", pady=2)
-    app.rec_preset_var = tk.StringVar(value=app._value_to_label(REC_PRESET_LABELS, app.settings["rec_preset"]))
-    cb = ttk.Combobox(f, textvariable=app.rec_preset_var, values=[l for _, l in REC_PRESET_LABELS],
-                      state="readonly", width=14)
-    cb.grid(row=1, column=1, sticky="w", padx=6)
-    cb.bind("<<ComboboxSelected>>", lambda e: app._rec_option_changed(
-        "rec_preset", app._label_to_value(REC_PRESET_LABELS, app.rec_preset_var.get())))
-    ttk.Label(f, text="ファイル形式").grid(row=2, column=0, sticky="w", pady=2)
-    app.rec_container_var = tk.StringVar(
-        value=app._value_to_label(REC_CONTAINER_LABELS, app.settings["rec_container"]))
-    cb = ttk.Combobox(f, textvariable=app.rec_container_var, values=[l for _, l in REC_CONTAINER_LABELS],
-                      state="readonly", width=24)
-    cb.grid(row=2, column=1, columnspan=2, sticky="w", padx=6)
-    cb.bind("<<ComboboxSelected>>", lambda e: app._rec_option_changed(
-        "rec_container", app._label_to_value(REC_CONTAINER_LABELS, app.rec_container_var.get())))
-    app.rec_estimate_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.rec_estimate_var, wraplength=px(480), justify="left").grid(
-        row=3, column=0, columnspan=3, sticky="w", pady=(2, 4))
-    app.rec_custom_var = tk.BooleanVar(value=bool(app.settings["rec_custom_bitrate"]))
-    ttk.Checkbutton(f, text="詳細設定: ビットレートを自分で指定する", variable=app.rec_custom_var,
-                    command=app._rec_custom_toggled).grid(row=4, column=0, columnspan=3, sticky="w")
-    app.rec_bitrate_scale, app.rec_bitrate_label, _ = app._slider(
-        f, 5, "ビットレート (Mbps)", "rec_bitrate", 10, 100, "recordSettings",
-        lambda v: "%d Mbps" % round(v), 5, as_int=True)
-    app.rec_bitrate_widgets = f.grid_slaves(row=5)
-    app.rec_audio_var = tk.BooleanVar(value=bool(app.settings["rec_audio"]))
-    ttk.Checkbutton(f, text="音声を入れる", variable=app.rec_audio_var,
-                    command=lambda: app._rec_option_changed("rec_audio", bool(app.rec_audio_var.get()))
-                    ).grid(row=6, column=0, columnspan=3, sticky="w")
-    app.rec_photos_var = tk.BooleanVar(value=bool(app.settings["rec_photos"]))
-    ttk.Checkbutton(f, text="写真アプリにも保存", variable=app.rec_photos_var,
-                    command=lambda: app._changed("rec_photos", bool(app.rec_photos_var.get()), "recordSettings")
-                    ).grid(row=7, column=0, columnspan=3, sticky="w")
-    app._hint(f, 8, "4K録画中は配信用の映像を縮小して送ります。発熱が増えるので30fpsがおすすめです", pady=(6, 0))
-    app._hint(f, 9, "録画ファイルはiPhoneの「ファイル」アプリ（このiPhone内 > PhoneCam）にも残ります")
-    app._hint(f, 10, "初めて使うときは、iPhoneでマイクと写真への保存の許可が必要です")
-    app._hint(f, 11, "MP4は多くのソフトでそのまま開けます。MOVは編集ソフト向けです。サイズの目安は実際の映像によって前後します")
-    app._refresh_rec_estimate()
+    pg = page(parent)
 
-    g = app._section(parent, "録画")
-    ttk.Style().configure("Rec.TButton", font=("", 12, "bold"), padding=(24, 10))
-    app.rec_btn = ttk.Button(g, text="録画開始", style="Rec.TButton", command=app._rec_clicked)
-    app.rec_btn.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(2, 8))
+    # --- 録画 (ボタンと状態) ---
+    g = section(pg, t("recording.control.section"))
+    r = row(g, "record", t("recording.button.label"))
+    app.rec_btn = ttk.Button(r, text=t("recording.button.start"), style="Accent.TButton", command=app._rec_clicked)
+    app.rec_btn.pack(side="right")
     app.rec_vars = {}
     app.rec_labels = {}
-    for row, (key, name) in enumerate([("state", "状態"), ("file", "ファイル名"),
-                                       ("size", "サイズ"), ("free", "iPhoneの空き容量")], start=1):
-        ttk.Label(g, text=name).grid(row=row, column=0, sticky="w", pady=2)
+    for key, icon in (("state", "info"), ("file", "document"), ("size", "download"), ("free", "folder")):
+        rr = row(g, icon, t("recording.%s.label" % key))
         var = tk.StringVar(value="-")
-        lbl = ttk.Label(g, textvariable=var, wraplength=px(380), justify="left")
-        lbl.grid(row=row, column=1, columnspan=2, sticky="w", padx=6)
+        lbl = ttk.Label(rr, textvariable=var, anchor="e", justify="right", wraplength=px(320))
+        lbl.pack(side="right")
         app.rec_vars[key] = var
         app.rec_labels[key] = lbl
     app.rec_error_var = tk.StringVar(value="")
-    ttk.Label(g, textvariable=app.rec_error_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
-        row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
+    app.rec_error_lbl = ttk.Label(g, textvariable=app.rec_error_var, foreground=theme.colors()["live"],
+                                  wraplength=px(480), justify="left")
+    app.rec_error_lbl.pack(anchor="w")
+
+    def recolor(*_):
+        try:
+            app.rec_error_lbl.configure(foreground=theme.colors()["live"])
+        except Exception:
+            pass
+    theme.on_change(recolor)
+
+    # --- 画質と形式 ---
+    f = section(pg, t("recording.quality.section"))
+    r = row(f, "sparkles", t("recording.preset.label"))
+    app.rec_preset_var = tk.StringVar(value=app._value_to_label(REC_PRESET_LABELS, app.settings["rec_preset"]))
+    _rec_combo(app, r, app.rec_preset_var, REC_PRESET_LABELS, "rec_preset", 14)
+    r = row(f, "aspect", t("recording.resolution.label"), t("recording.resolution.hint"))
+    app.rec_res_var = tk.StringVar(value=app._value_to_label(REC_RES_LABELS, app.settings["rec_resolution"]))
+    _rec_combo(app, r, app.rec_res_var, REC_RES_LABELS, "rec_resolution", 14)
+    r = row(f, "document", t("recording.container.label"), t("recording.container.hint"))
+    app.rec_container_var = tk.StringVar(
+        value=app._value_to_label(REC_CONTAINER_LABELS, app.settings["rec_container"]))
+    _rec_combo(app, r, app.rec_container_var, REC_CONTAINER_LABELS, "rec_container", 24)
+    r = row(f, "gauge", t("recording.estimate.label"))
+    app.rec_estimate_var = tk.StringVar(value="")
+    ttk.Label(r, textvariable=app.rec_estimate_var, anchor="e", justify="right", wraplength=px(320)).pack(side="right")
+
+    r = row(f, "wrench", t("recording.custom.label"), t("recording.custom.hint"))
+    app.rec_custom_var = tk.BooleanVar(value=bool(app.settings["rec_custom_bitrate"]))
+    _rec_switch(r, app.rec_custom_var, app._rec_custom_toggled)
+    r = row(f, "gauge", t("recording.bitrate.label"))
+    app.rec_bitrate_label = ttk.Label(r, width=8, anchor="e")
+    app.rec_bitrate_label.pack(side="right")
+    var = tk.DoubleVar(value=float(app.settings["rec_bitrate"]))
+    app.rec_bitrate_scale = ttk.Scale(r, from_=10, to=100, variable=var, orient="horizontal", length=px(180))
+    app.rec_bitrate_scale.pack(side="right", padx=(0, 8))
+    fmt = lambda v: "%d Mbps" % round(v)
+    app.rec_bitrate_label.config(text=fmt(var.get()))
+
+    def on_write(*_):
+        try:
+            v = int(round(round(float(var.get()) / 5) * 5))
+        except Exception:
+            return
+        app.rec_bitrate_label.config(text=fmt(v))
+        if app._ui_sync:  # 設定からUIを合わせているだけのときは、保存も送信もしない
+            return
+        app._changed("rec_bitrate", v, "recordSettings")
+
+    var.trace_add("write", on_write)
+    app._slider_vars["rec_bitrate"] = var
+    # 詳細設定がオフのときはビットレートの行を無効にする (行の出し入れはしない)
+    app.rec_bitrate_widgets = [app.rec_bitrate_scale, app.rec_bitrate_label]
+
+    # --- 音声・保存先 ---
+    h = section(pg, t("recording.save.section"))
+    r = row(h, "mic", t("recording.audio.label"))
+    app.rec_audio_var = tk.BooleanVar(value=bool(app.settings["rec_audio"]))
+    _rec_switch(r, app.rec_audio_var, lambda: app._rec_option_changed("rec_audio", bool(app.rec_audio_var.get())))
+    r = row(h, "folder", t("recording.photos.label"))
+    app.rec_photos_var = tk.BooleanVar(value=bool(app.settings["rec_photos"]))
+    _rec_switch(r, app.rec_photos_var,
+                lambda: app._changed("rec_photos", bool(app.rec_photos_var.get()), "recordSettings"))
+    # 保存先はiPhone内 (PCにはフォルダを作らない) ので「フォルダを開く」は無し
+    row(h, "folder", t("recording.location.label"), t("recording.location.hint"))
+    hint(pg, t("recording.hint.4k"))
+    app._refresh_rec_estimate()
     app.rec_btn.state(["disabled"])
 
 
@@ -89,11 +126,9 @@ def _rec_custom_toggled(app):
 def _refresh_rec_estimate(app):
     """録画サイズの目安と、詳細設定 (ビットレートのスライダー) の表示切り替え。"""
     app.rec_estimate_var.set(rec_estimate_text(app.settings))
+    on = bool(app.settings.get("rec_custom_bitrate"))
     for w in app.rec_bitrate_widgets:
-        try:
-            (w.grid if app.settings.get("rec_custom_bitrate") else w.grid_remove)()
-        except Exception:
-            pass
+        app._set_enabled(w, on)
 
 
 def _rec_clicked(app):

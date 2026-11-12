@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""状態タブ (iPhone 状態・PC 状態・遅延・熱グラフ)
+"""状態ページ (iPhone 状態・映像・PC・遅延・温度グラフ・診断)
 """
 
 import time
@@ -12,7 +12,6 @@ from phonecam.core.stats import (
     PRESSURE_LABELS,
     THERMAL_BLOCK_COLORS,
     THERMAL_LEVELS,
-    THERMAL_NO_DATA_COLOR,
     format_mmss,
     format_pressure_factors,
     fps_runs,
@@ -29,50 +28,81 @@ from phonecam.ui.labels import (
     format_battery,
     is_thermal_warning,
 )
+from phonecam.i18n import t
+from phonecam.ui import theme
 from phonecam.ui.tkdeps import tk, ttk
+from phonecam.ui.widgets import page, row, section
+
+
+def _value_label(r, var, **kw):
+    """row() の右側に値ラベルを置く。"""
+    lbl = ttk.Label(r, textvariable=var, justify="right", anchor="e", **kw)
+    lbl.pack(side="right")
+    return lbl
+
+
+def _value_rows(app, card, specs, store, labels=None):
+    for key, icon, name in specs:
+        r = row(card, icon, t(name))
+        var = tk.StringVar(value="-")
+        lbl = _value_label(r, var, wraplength=px(300))
+        store[key] = var
+        if labels is not None:
+            labels[key] = lbl
 
 
 def _build_phone_status(app, parent):
-    f = app._section(parent, "iPhoneの状態")
-    app._default_fg = ttk.Style().lookup("TLabel", "foreground") or "#1d1d1f"
+    pg = page(parent)
+    app._status_page = pg
+    app._default_fg = theme.colors()["text"]
     app.st_vars = {}
     app.st_labels = {}
-    for row, (key, name) in enumerate([("thermal", "温度"), ("pressure", "カメラの負荷"), ("factors", "原因"),
-                                       ("hot", "「高い」以上だった時間"), ("sentfps", "送信fps"),
-                                       ("dropped", "落ちたフレーム"), ("dropreasons", "カメラで落ちた理由"),
-                                       ("recdropped", "録画で落ちたフレーム"), ("encode", "エンコード時間"),
-                                       ("battery", "バッテリー"), ("lowpower", "低電力モード"),
-                                       ("processing", "エフェクト処理時間")]):
-        ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=3)
-        var = tk.StringVar(value="-")
-        lbl = ttk.Label(f, textvariable=var)
-        lbl.grid(row=row, column=1, sticky="w", padx=6)
-        app.st_vars[key] = var
-        app.st_labels[key] = lbl
-    app._hint(f, 12, "接続中のiPhoneから約1秒ごとに更新されます", pady=(6, 0))
+    f = section(pg, t("status.iphone.title"))
+    _value_rows(app, f, [
+        ("thermal", "thermometer", "status.iphone.thermal"),
+        ("pressure", "gauge", "status.iphone.pressure"),
+        ("factors", "info", "status.iphone.factors"),
+        ("hot", "clock", "status.iphone.hot"),
+        ("battery", "battery", "status.iphone.battery"),
+        ("lowpower", "battery", "status.iphone.lowpower"),
+    ], app.st_vars, app.st_labels)
     app.ver_note_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.ver_note_var, foreground="#6e6e73", wraplength=px(480),
-              justify="left").grid(row=13, column=0, columnspan=3, sticky="w", pady=(4, 0))
+    app._ver_note_label = ttk.Label(f, textvariable=app.ver_note_var, foreground=theme.colors()["text2"],
+                                    wraplength=px(480), justify="left")
+    app._ver_note_label.pack(anchor="w", pady=(6, 0))
+    # 映像 (iPhone から届く送信側の数字)
+    v = section(pg, t("status.video.title"))
+    _value_rows(app, v, [
+        ("sentfps", "video", "status.video.sentfps"),
+        ("dropped", "video", "status.video.dropped"),
+        ("dropreasons", "info", "status.video.dropreasons"),
+        ("recdropped", "record", "status.video.recdropped"),
+        ("encode", "clock", "status.video.encode"),
+        ("processing", "sparkles", "status.video.processing"),
+    ], app.st_vars, app.st_labels)
+    ttk.Label(v, text=t("status.video.hint"), foreground=theme.colors()["text2"]).pack(anchor="w", pady=(6, 0))
 
 
 def _build_pc_status(app, parent):
-    f = app._section(parent, "PCでの受信・出力")
+    pg = app._status_page
+    f = section(pg, t("status.pc.title"))
     app.pc_vars = {}
-    for row, (key, name) in enumerate([("codec", "受信中のコーデック"), ("decoder", "デコーダー"),
-                                       ("out", "出力サイズ（仮想カメラ）"), ("watch", "使用中の検出")]):
-        ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=2)
-        var = tk.StringVar(value="-")
-        ttk.Label(f, textvariable=var, wraplength=px(340), justify="left").grid(row=row, column=1, sticky="w", padx=6)
-        app.pc_vars[key] = var
+    _value_rows(app, f, [
+        ("codec", "video", "status.pc.codec"),
+        ("decoder", "gear", "status.pc.decoder"),
+        ("out", "aspect", "status.pc.out"),
+        ("watch", "camera", "status.pc.watch"),
+    ], app.pc_vars)
     app.watch_var = app.pc_vars["watch"]
     app.dshow_var = tk.StringVar(value="")
-    ttk.Label(f, text="OBSのカメラ設定ダイアログ連携").grid(row=4, column=0, sticky="w", pady=2)
-    ttk.Label(f, textvariable=app.dshow_var, wraplength=px(340), justify="left").grid(row=4, column=1, columnspan=2, sticky="w", padx=6)
+    r = row(f, "camera", t("status.pc.dshow"))
+    _value_label(r, app.dshow_var, wraplength=px(300))
     app.thin_var = tk.StringVar(value="")
-    ttk.Label(f, textvariable=app.thin_var, foreground="#c0392b", wraplength=px(480), justify="left").grid(
-        row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
-    app._hint(f, 5, "「使用中の検出」は、OBSやDiscordが専用カメラを開いているかをPhoneCamが見ている結果です。"
-                     "「未使用」のままカメラが動かないときは、アプリ側でカメラを一度オフ→オンにしてください", pady=(6, 0))
+    app._thin_label = ttk.Label(f, textvariable=app.thin_var, foreground=theme.colors()["live"],
+                                wraplength=px(480), justify="left")
+    app._thin_label.pack(anchor="w", pady=(6, 0))
+    ttk.Label(f, text=t("status.pc.watch_hint"), foreground=theme.colors()["text2"], wraplength=px(480),
+              justify="left").pack(anchor="w", pady=(6, 0))
 
 
 def _update_pc_status(app, snap):
@@ -80,37 +110,43 @@ def _update_pc_status(app, snap):
     name = CODEC_NAMES.get(snap["codec_in_use"]) if connected else None
     if connected and not name:
         name = CODEC_NAMES.get(snap["phone_status"].get("codec"))  # まだ映像が来ていないときは iPhone の申告値
-    app.codec_now_var.set("現在: %s" % (name or "-"))
+    app.codec_now_var.set(t("status.pc.now", v=name or "-"))
     app.pc_vars["codec"].set(name or "-")
     dec = DECODER_LABELS.get(snap["decoder"]) if connected else None
-    app.decoder_now_var.set("現在: %s" % (dec or "-") if app.settings.get("hw_decode", True)
-                             else "現在: %s" % (dec or "ソフトウェア"))
+    app.decoder_now_var.set(t("status.pc.now", v=dec or "-") if app.settings.get("hw_decode", True)
+                             else t("status.pc.now", v=dec or t("status.pc.software")))
     text = dec or "-"
     if dec and snap.get("decoder_note"):
-        text += "（%s）" % snap["decoder_note"]
+        text += t("status.pc.note", v=snap["decoder_note"])
     app.pc_vars["decoder"].set(text)
     size = canvas_size(app.settings)
-    app.pc_vars["out"].set("%dx%d" % size if size else "映像のサイズそのまま")
+    app.pc_vars["out"].set("%dx%d" % size if size else t("status.pc.out_native"))
     thin = snap.get("thin_total", 0)
     if connected and thin and time.monotonic() - snap.get("thin_last", 0.0) < THIN_NOTICE_SEC:
-        app.thin_var.set("%s（%d コマ）" % (THIN_TEXT, thin))
+        app.thin_var.set(t("status.pc.thin", text=THIN_TEXT, n=thin))
     else:
         app.thin_var.set("")
 
 
 def _build_latency(app, parent):
-    f = app._section(parent, "遅延（直近の平均）")
+    pg = app._status_page
+    f = section(pg, t("status.latency.title"))
     app.lat_vars = {}
-    for row, (key, name) in enumerate([("iphone", "iPhone処理"), ("comm", "通信"), ("pc", "PC処理"),
-                                       ("total", "合計"), ("rtt", "往復(RTT)")]):
-        ttk.Label(f, text=name).grid(row=row, column=0, sticky="w", pady=2)
+    for key, icon, name in [("iphone", "camera", "status.latency.iphone"), ("comm", "wifi", "status.latency.comm"),
+                            ("pc", "gear", "status.latency.pc"), ("total", "clock", "status.latency.total"),
+                            ("rtt", "clock", "status.latency.rtt")]:
+        r = row(f, icon, t(name))
         var = tk.StringVar(value="-")
-        ttk.Label(f, textvariable=var, font=("", 9, "bold") if key == "total" else "TkDefaultFont").grid(
-            row=row, column=1, sticky="w", padx=6)
+        if key == "total":
+            _value_label(r, var, font=("Segoe UI Semibold", 10))
+        else:
+            _value_label(r, var)
         app.lat_vars[key] = var
-    app._hint(f, 5, "カメラの露光やOBSの表示までの時間は含みません", pady=(6, 0))
-    ttk.Button(f, text="計測用タイマーを開く", command=app.open_timer).grid(
-        row=6, column=0, columnspan=2, sticky="w", pady=(6, 0))
+    ttk.Label(f, text=t("status.latency.hint"), foreground=theme.colors()["text2"]).pack(anchor="w", pady=(6, 0))
+    # 診断
+    dg = section(pg, t("status.diag.title"))
+    r = row(dg, "clock", t("status.diag.timer"), t("status.diag.timer_hint"))
+    ttk.Button(r, text=t("status.diag.timer_open"), command=app.open_timer).pack(side="right")
 
 
 def open_timer(app):
@@ -123,17 +159,17 @@ def open_timer(app):
             app._timer_win = None
     win = tk.Toplevel(app.root)
     app._timer_win = win
-    win.title("計測用タイマー")
+    win.title(t("status.timer.title"))
     win.attributes("-topmost", True)
-    win.configure(background="#ffffff")
+    col = theme.colors()
+    win.configure(background=col["bg"])
     win.bind("<Escape>", lambda e: win.destroy())
     t0 = time.perf_counter()
-    label = tk.Label(win, text="00:00.000", font=("Consolas", 72, "bold"), background="#ffffff",
-                     foreground="#1d1d1f", padx=30, pady=16)
+    label = tk.Label(win, text="00:00.000", font=("Consolas", 72, "bold"), background=col["bg"],
+                     foreground=col["text"], padx=30, pady=16)
     label.pack()
-    tk.Label(win, text="カメラをこのタイマーに向け、OBSのプレビューに映るタイマーと実物のタイマーを"
-                       "一緒にスクリーンショットすると、合計の遅延が分かります",
-             font=("", 10), background="#ffffff", foreground="#666666", wraplength=px(560),
+    tk.Label(win, text=t("status.timer.help"),
+             font=("", 10), background=col["bg"], foreground=col["text2"], wraplength=px(560),
              justify="center", padx=20, pady=(0)).pack(pady=(0, 16))
     job = {"id": None}
 
@@ -157,18 +193,30 @@ def open_timer(app):
 
 
 def _build_thermal_graph(app, parent):
-    f = app._section(parent, "温度と受信fpsの履歴")
+    f = section(app._status_page, t("status.graph.title"))
     app._graph_range = 5
     bar = ttk.Frame(f)
-    bar.grid(row=0, column=0, columnspan=3, sticky="e", pady=(0, 4))
+    bar.pack(anchor="e", pady=(0, 4))
     app.graph_range_var = tk.StringVar(value=str(app._graph_range))
     for m in GRAPH_RANGES:
-        ttk.Radiobutton(bar, text="%d分" % m, value=str(m), variable=app.graph_range_var, style="Toolbutton",
-                        command=app._graph_range_changed).pack(side="left", padx=1)
-    app.graph = tk.Canvas(f, height=px(214), highlightthickness=0, borderwidth=0, background="#fbfbfd")
-    app.graph.grid(row=1, column=0, columnspan=3, sticky="ew")
-    f.columnconfigure(0, weight=1)
+        ttk.Radiobutton(bar, text=t("status.graph.minutes", n=m), value=str(m), variable=app.graph_range_var,
+                        style="Toolbutton", command=app._graph_range_changed).pack(side="left", padx=1)
+    app.graph = tk.Canvas(f, height=px(214), highlightthickness=0, borderwidth=0, background=theme.colors()["card"])
+    app.graph.pack(fill="x")
     app.graph.bind("<Configure>", lambda e: setattr(app, "_graph_dirty", True))
+
+    def recolor():
+        c = theme.colors()
+        try:
+            app.graph.config(background=c["card"])
+            app._default_fg = c["text"]
+            app._thin_label.config(foreground=c["live"])
+            app._graph_dirty = True
+            app._graph_drawn = 0.0
+        except Exception:
+            pass
+
+    theme.on_change(recolor)
 
 
 def _graph_range_changed(app):
@@ -185,6 +233,7 @@ def _draw_graph(app):
     """上: 温度の帯 (1秒=1ブロック)。下: 受信fpsの折れ線。どちらも右端が「今」。"""
     c = app.graph
     c.delete("all")
+    c.config(background=theme.colors()["card"])
     W = c.winfo_width()
     if W < px(200):
         return
@@ -193,7 +242,8 @@ def _draw_graph(app):
     window = graph_window(app.thermal_log.samples, N)
     L, R = px(40), px(10)
     pw = W - L - R
-    grey, dark, font_s, font_b = "#8e8e93", "#1d1d1f", ("", 8), ("", 9, "bold")
+    col = theme.colors()
+    grey, dark, font_s, font_b = col["text2"], col["text"], ("", 8), ("", 9, "bold")
 
     def X(i):
         return L + pw * i / float(N)
@@ -202,11 +252,11 @@ def _draw_graph(app):
     cur_lv = window[-1][0]
     cur_text = THERMAL_LABELS[THERMAL_LEVELS[cur_lv]] if cur_lv is not None else "-"
     y = px(4)
-    c.create_text(L, y, text="温度", anchor="nw", fill=dark, font=font_b)
+    c.create_text(L, y, text=t("status.graph.thermal"), anchor="nw", fill=dark, font=font_b)
     c.create_text(W - R, y, anchor="ne", fill=grey, font=font_s,
-                  text="現在: %s　　高い以上の累計 %s" % (cur_text, format_mmss(app.thermal_log.hot_seconds)))
+                  text=t("status.graph.current", level=cur_text, hot=format_mmss(app.thermal_log.hot_seconds)))
     sy0, sy1 = px(24), px(24) + px(28)
-    c.create_rectangle(L, sy0, L + pw, sy1, fill=THERMAL_NO_DATA_COLOR, width=0)
+    c.create_rectangle(L, sy0, L + pw, sy1, fill=col['separator'], width=0)
     for start, length, lv in level_runs(window):
         if lv is None:
             continue
@@ -215,21 +265,22 @@ def _draw_graph(app):
     lx = L
     ly = sy1 + px(10)
     chip = px(10)
-    for name, key in (("正常", "nominal"), ("やや高い", "fair"), ("高い", "serious"), ("危険", "critical")):
+    for name, key in ((t("status.graph.nominal"), "nominal"), (t("status.graph.fair"), "fair"),
+                      (t("status.graph.serious"), "serious"), (t("status.graph.critical"), "critical")):
         c.create_rectangle(lx, ly - chip // 2, lx + chip, ly + chip // 2, fill=THERMAL_BLOCK_COLORS[key], width=0)
-        t = c.create_text(lx + chip + px(4), ly, text=name, anchor="w", fill=grey, font=font_s)
-        bb = c.bbox(t)
+        tid = c.create_text(lx + chip + px(4), ly, text=name, anchor="w", fill=grey, font=font_s)
+        bb = c.bbox(tid)
         lx = (bb[2] if bb else lx + px(60)) + px(14)
-    c.create_rectangle(lx, ly - chip // 2, lx + chip, ly + chip // 2, fill=THERMAL_NO_DATA_COLOR, width=0)
-    c.create_text(lx + chip + px(4), ly, text="データなし", anchor="w", fill=grey, font=font_s)
+    c.create_rectangle(lx, ly - chip // 2, lx + chip, ly + chip // 2, fill=col['separator'], width=0)
+    c.create_text(lx + chip + px(4), ly, text=t("status.graph.nodata"), anchor="w", fill=grey, font=font_s)
 
     # --- 受信fps ---
     y = px(96)
     samples = list(app.thermal_log.samples)
     cur_fps = samples[-1][1] if samples and samples[-1][0] is not None and samples[-1][1] >= 0.5 else None
-    c.create_text(L, y, text="受信fps", anchor="nw", fill=dark, font=font_b)
+    c.create_text(L, y, text=t("status.graph.fps"), anchor="nw", fill=dark, font=font_b)
     c.create_text(W - R, y, anchor="ne", fill=dark if cur_fps is not None else grey, font=font_b,
-                  text="%.0f fps" % cur_fps if cur_fps is not None else "-")
+                  text=t("status.graph.fps_value", v=cur_fps) if cur_fps is not None else "-")
     top, bottom = px(118), px(118) + px(70)
     ph = bottom - top
 
@@ -238,23 +289,23 @@ def _draw_graph(app):
 
     for v in (0, 30, 60):
         yy = Y(v)
-        c.create_line(L, yy, L + pw, yy, fill="#e3e3e8" if v else "#c7c7cc")
+        c.create_line(L, yy, L + pw, yy, fill=col["separator"])
         c.create_text(L - px(6), yy, text=str(v), anchor="e", fill=grey, font=font_s)
-    lw = max(2, px(2))
+    lw = max(1, px(1.5))
     for run in fps_runs(window):
         if len(run) == 1:
             x, v = run[0]
             r = lw
-            c.create_oval(X(x + 0.5) - r, Y(v) - r, X(x + 0.5) + r, Y(v) + r, fill="#0071e3", width=0)
+            c.create_oval(X(x + 0.5) - r, Y(v) - r, X(x + 0.5) + r, Y(v) + r, fill=col["accent"], width=0)
             continue
         pts = []
         for i, v in run:
             pts += [X(i + 0.5), Y(v)]
-        c.create_line(*pts, fill="#0071e3", width=lw, capstyle="round", joinstyle="round")
+        c.create_line(*pts, fill=col["accent"], width=lw, capstyle="round", joinstyle="round")
     ty = bottom + px(6)
     c.create_text(L, ty, text=range_label(minutes), anchor="nw", fill=grey, font=font_s)
     c.create_text(L + pw / 2.0, ty, text=range_label(minutes, 0.5), anchor="n", fill=grey, font=font_s)
-    c.create_text(L + pw, ty, text="今", anchor="ne", fill=grey, font=font_s)
+    c.create_text(L + pw, ty, text=t("status.graph.now"), anchor="ne", fill=grey, font=font_s)
 
 
 def _update_phone_status(app, st):
@@ -268,7 +319,7 @@ def _update_phone_status(app, st):
     app.st_vars["sentfps"].set("%.1f" % sfps if isinstance(sfps, (int, float)) else "-")
     cam_d, net_d = st.get("cameraDroppedFrames"), st.get("networkDroppedFrames")
     app.st_vars["dropped"].set(
-        "カメラ %d / 通信 %d" % (cam_d, net_d)
+        t("status.video.dropped_fmt", cam=cam_d, net=net_d)
         if isinstance(cam_d, (int, float)) and isinstance(net_d, (int, float)) else "-")
     app.st_vars["dropreasons"].set(format_drop_reasons(st.get("cameraDropReasons")))
     rec = st.get("recording")
@@ -276,10 +327,10 @@ def _update_phone_status(app, st):
     app.st_vars["recdropped"].set("%d" % rd if isinstance(rd, (int, float)) and not isinstance(rd, bool) else "-")
     enc = st.get("encodeMs")
     app.st_vars["encode"].set("%.1f ms" % enc if isinstance(enc, (int, float)) else "-")
-    color = {"fair": "#b7791f", "serious": "#d9730d", "critical": "#c0392b"}.get(thermal, app._default_fg)
+    color = {"fair": "#b7791f", "serious": "#d9730d", "critical": theme.colors()["live"]}.get(thermal, app._default_fg)
     try:
         app.st_labels["thermal"].config(
-            foreground=color, font=("", 9, "bold") if thermal == "critical" else "TkDefaultFont")
+            foreground=color, font=("Segoe UI Semibold", 9) if thermal == "critical" else "TkDefaultFont")
     except Exception:
         pass
     if "batteryLevel" in st or "batteryState" in st:
@@ -287,7 +338,7 @@ def _update_phone_status(app, st):
     else:
         app.st_vars["battery"].set("-")
     lp = st.get("lowPowerMode")
-    app.st_vars["lowpower"].set("-" if lp is None else ("オン" if lp else "オフ"))
+    app.st_vars["lowpower"].set("-" if lp is None else (t("status.iphone.on") if lp else t("status.iphone.off")))
     pm = st.get("processingMs")
     app.st_vars["processing"].set("%.1f ms" % pm if isinstance(pm, (int, float)) else "-")
 
@@ -301,7 +352,7 @@ def _update_phone_status(app, st):
 
 
 def build(app, parent):
-    """このタブの中身を parent に作る (App._build_ui から呼ばれる)。"""
+    """このページの中身を parent に作る (App._build_ui から呼ばれる)。"""
     app._build_phone_status(parent)
     app._build_pc_status(parent)
     app._build_latency(parent)
