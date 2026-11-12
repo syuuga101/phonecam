@@ -1,0 +1,53 @@
+name: Release
+
+# VERSION ファイルを書き換えて main にコミットすると、そのバージョンでリリースを作る
+on:
+  push:
+    branches: [main]
+    paths:
+      - "VERSION"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    uses: ./.github/workflows/ios.yml
+
+  windows:
+    uses: ./.github/workflows/windows.yml
+
+  release:
+    needs: [ios, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Download IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: PhoneCam-ipa
+          path: out
+
+      - name: Download receiver
+        uses: actions/download-artifact@v4
+        with:
+          name: PhoneCamReceiver
+          path: out
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: PhoneCam v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            out/PhoneCam.ipa
+            out/PhoneCamReceiver.exe

@@ -5,6 +5,9 @@ enum PacketType {
     static let video: UInt8 = 1
     static let videoHevc: UInt8 = 2
     static let status: UInt8 = 3
+    static let pong: UInt8 = 4
+    static let timing: UInt8 = 5
+    static let audio: UInt8 = 6
     static let control: UInt8 = 10
 }
 

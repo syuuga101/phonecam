@@ -5,7 +5,7 @@ import CoreVideo
 import UIKit
 
 /// AVFoundation を使ったカメラ制御。設定変更は sessionQueue で直列に処理する。
-final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
 
     /// 映像フレーム (videoQueue 上で呼ばれる)
@@ -18,15 +18,44 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     var onError: ((String) -> Void)?
     /// 出力の回転角 (0/90/180/270) が変わったとき (sessionQueue 上で呼ばれる)
     var onRotation: ((Int) -> Void)?
+    /// マイク音声 (captureTime 秒, サンプルレート, Int16 LE モノラル PCM)。マイクが有効なときだけ呼ばれる (audioQueue 上)
+    var onAudio: ((Double, Int, Data) -> Void)?
+    /// 録画用に元の音声 CMSampleBuffer を渡す (audioQueue 上)
+    var onAudioSample: ((CMSampleBuffer) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "phonecam.session")
     private let videoQueue = DispatchQueue(label: "phonecam.video", qos: .userInteractive)
     private let output = AVCaptureVideoDataOutput()
     private var outputAdded = false
 
+    // 音声 (追加/削除は sessionQueue 上)
+    private let audioQueue = DispatchQueue(label: "phonecam.audio", qos: .userInteractive)
+    private let audioOutput = AVCaptureAudioDataOutput()
+    private var audioInput: AVCaptureDeviceInput?
+    private var audioOutputAdded = false
+    private var micWanted = false          // PC からの "mic"
+    private var recAudioWanted = false     // 録画に音声を入れる
+    private var audioRequestPending = false
+    private var recordHighRes = false      // 録画のため 4K に切り替え中
+
+    // 複数スレッドから読む値 (flagLock で保護)
+    private let flagLock = NSLock()
+    private var micSendFlag = false
+    private var audioRate = 0
+    private var droppedCount = 0
+    private var streamReqW = 1920
+    private var streamReqH = 1080
+
+    // システム負荷 (sessionQueue 上)
+    private var pressureObservation: NSKeyValueObservation?
+    private weak var pressureDevice: AVCaptureDevice?
+    private var pressureLevelName = "nominal"
+    private var pressureFactorNames: [String] = []
+
     private var device: AVCaptureDevice?
     private var input: AVCaptureDeviceInput?
     private var started = false
+    private var runWanted = false          // AppModel が求めるカメラの起動状態 (sessionQueue 上)
 
     // 要求値
     private var reqLens = "wide"
@@ -66,13 +95,15 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             queue: nil
         ) { [weak self] _ in
             self?.sessionQueue.async {
-                guard let self = self, self.started, !self.session.isRunning else { return }
+                guard let self = self, self.started, self.runWanted, !self.session.isRunning else { return }
                 self.session.startRunning()
             }
         }
     }
 
     deinit {
+        pressureObservation?.invalidate()
+        pressureObservation = nil
         rotationObservation?.invalidate()
         rotationObservation = nil
         NotificationCenter.default.removeObserver(self)
@@ -94,11 +125,34 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
                 }
                 self.started = true
                 self.reconfigure()
-                if !self.session.isRunning {
-                    self.session.startRunning()
-                }
+                self.updateAudioOnQueue()
+                self.applyRunningOnQueue()
                 self.publishState()
             }
+        }
+    }
+
+    // MARK: - 起動 / 停止
+
+    /// カメラセッションを動かす / 止める。start()/stopRunning は必ず sessionQueue 上で行う。
+    func setRunning(_ want: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.runWanted = want
+            self.applyRunningOnQueue()
+            if self.started {
+                self.publishState()
+            }
+        }
+    }
+
+    /// sessionQueue 上
+    private func applyRunningOnQueue() {
+        guard started else { return }
+        if runWanted {
+            if !session.isRunning { session.startRunning() }
+        } else if session.isRunning {
+            session.stopRunning()
         }
     }
 
@@ -119,10 +173,14 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
             lenses.append("ultrawide")
         }
+        if frontDevice() != nil {
+            lenses.append("front")
+        }
         s["lens"] = activeLens
         s["lenses"] = lenses
-        s["width"] = activeWidth
-        s["height"] = activeHeight
+        let size = reportedSize()
+        s["width"] = size.0
+        s["height"] = size.1
         s["fps"] = activeFps
         s["bitrate"] = bitrate
         s["orientation"] = reqOrientation
@@ -130,6 +188,23 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         s["exposureMode"] = (exposure["mode"] as? String) ?? "auto"
         s["wbMode"] = (wb["mode"] as? String) ?? "auto"
         s["focusMode"] = (focus["mode"] as? String) ?? "auto"
+
+        s["cameraRunning"] = session.isRunning
+        s["pressureLevel"] = pressureLevelName
+        s["pressureFactors"] = pressureFactorNames
+        flagLock.lock()
+        let dropped = droppedCount
+        let rate = audioRate
+        flagLock.unlock()
+        s["cameraDroppedFrames"] = dropped
+        let auth = AVCaptureDevice.authorizationStatus(for: .audio)
+        let micAvailable = (auth != .denied && auth != .restricted)
+            && AVCaptureDevice.default(for: .audio) != nil
+        s["mic"] = [
+            "enabled": micWanted,
+            "available": micAvailable,
+            "sampleRate": rate
+        ] as [String: Any]
 
         guard let dev = device else {
             return s
@@ -161,8 +236,17 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         return s
     }
 
+    /// ステータス / UI に出す映像サイズ。4K 録画中はストリーム側 (PC の要求) のサイズを返す。
+    private func reportedSize() -> (Int, Int) {
+        if recordHighRes && activeWidth > reqWidth {
+            return (reqWidth, reqHeight)
+        }
+        return (activeWidth, activeHeight)
+    }
+
     private func publishState() {
-        onStreamSettings?(activeWidth, activeHeight, activeFps, bitrate)
+        let size = reportedSize()
+        onStreamSettings?(size.0, size.1, activeFps, bitrate)
         onApplied?(buildStatus())
     }
 
@@ -188,7 +272,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         var parts = Set<String>()
         var needReconfigure = false
 
-        if let l = json["lens"] as? String, (l == "wide" || l == "ultrawide"), l != reqLens {
+        if let l = json["lens"] as? String, (l == "wide" || l == "ultrawide" || l == "front"), l != reqLens {
             reqLens = l
             needReconfigure = true
         }
@@ -204,6 +288,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             reqFps = f
             needReconfigure = true
         }
+        flagLock.lock()
+        streamReqW = reqWidth
+        streamReqH = reqHeight
+        flagLock.unlock()
         var orientationChanged = false
         if let o = json["orientation"] as? String,
            (o == "auto" || o == "landscape" || o == "portrait"), o != reqOrientation {
@@ -234,6 +322,16 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             parts.insert("torch")
         }
 
+        if let m = json["mic"] as? [String: Any], let en = m["enabled"] as? NSNumber {
+            micWanted = en.boolValue
+            flagLock.lock()
+            micSendFlag = micWanted
+            flagLock.unlock()
+            if started {
+                updateAudioOnQueue()
+            }
+        }
+
         if started {
             if needReconfigure {
                 reconfigure()   // 内部で全設定を再適用する
@@ -251,7 +349,18 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     // MARK: - デバイス / フォーマット
 
+    /// インカメ (広角 → TrueDepth の順で探す)
+    private func frontDevice() -> AVCaptureDevice? {
+        if let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+            return d
+        }
+        return AVCaptureDevice.default(.builtInTrueDepthCamera, for: .video, position: .front)
+    }
+
     private func pickDevice() -> AVCaptureDevice? {
+        if reqLens == "front", let d = frontDevice() {
+            return d
+        }
         let type: AVCaptureDevice.DeviceType = (reqLens == "ultrawide") ? .builtInUltraWideCamera : .builtInWideAngleCamera
         if let d = AVCaptureDevice.default(type, for: .video, position: .back) {
             return d
@@ -279,7 +388,13 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             return matches.first
         }
 
-        let attempts: [(Int, Int, Int)] = [
+        var attempts: [(Int, Int, Int)] = []
+        if recordHighRes {
+            // 録画のため 4K (現在の fps、無ければ 30)
+            attempts.append((3840, 2160, reqFps))
+            attempts.append((3840, 2160, 30))
+        }
+        attempts += [
             (reqWidth, reqHeight, reqFps),
             (reqWidth, reqHeight, 30),
             (1920, 1080, min(reqFps, 60)),
@@ -299,11 +414,11 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     /// レンズ / 解像度 / fps が変わったときの再構成。終わったら全設定を再適用する。
     private func reconfigure() {
-        guard let dev = pickDevice() else {
+        guard var dev = pickDevice() else {
             onError?("使用できるカメラが見つかりません。")
             return
         }
-        guard let choice = chooseFormat(dev) else {
+        guard var choice = chooseFormat(dev) else {
             onError?("使用できるカメラフォーマットが見つかりません。")
             return
         }
@@ -311,20 +426,40 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         session.beginConfiguration()
         session.sessionPreset = .inputPriority
 
-        if let old = input {
+        let oldInput = input
+        if let old = oldInput {
+            // 切り替え前のカメラのライトが点いたままにならないよう消す
+            let oldDev = old.device
+            if oldDev !== dev, oldDev.hasTorch, oldDev.torchMode != .off {
+                if (try? oldDev.lockForConfiguration()) != nil {
+                    oldDev.torchMode = .off
+                    oldDev.unlockForConfiguration()
+                }
+            }
             session.removeInput(old)
             input = nil
         }
+        var added = false
         do {
             let newInput = try AVCaptureDeviceInput(device: dev)
             if session.canAddInput(newInput) {
                 session.addInput(newInput)
                 input = newInput
+                added = true
             } else {
                 onError?("カメラ入力を追加できませんでした。")
             }
         } catch {
             onError?("カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。")
+        }
+        if !added, let old = oldInput, session.canAddInput(old) {
+            // 追加に失敗したときは元の入力へ戻す (フォーマットも元のカメラ用に選び直す)
+            session.addInput(old)
+            input = old
+            dev = old.device
+            if let c = chooseFormat(dev) {
+                choice = c
+            }
         }
 
         if !outputAdded {
@@ -340,6 +475,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
 
         device = dev
+        observePressure(for: dev)
 
         do {
             try dev.lockForConfiguration()
@@ -363,6 +499,11 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             if conn.isVideoStabilizationSupported {
                 conn.preferredVideoStabilizationMode = .off
             }
+            // インカメでも反転しない映像を送る (左右反転は PC 側で選ぶ)
+            if conn.isVideoMirroringSupported {
+                conn.automaticallyAdjustsVideoMirroring = false
+                conn.isVideoMirrored = false
+            }
         }
         setupRotationCoordinator(for: dev)
         applyRotationOnQueue()
@@ -373,7 +514,11 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         activeWidth = Int(dim.width)
         activeHeight = Int(dim.height)
         activeFps = choice.fps
-        activeLens = (dev.deviceType == .builtInUltraWideCamera) ? "ultrawide" : "wide"
+        if dev.position == .front {
+            activeLens = "front"
+        } else {
+            activeLens = (dev.deviceType == .builtInUltraWideCamera) ? "ultrawide" : "wide"
+        }
 
         applyDeviceSettings(CameraController.allParts)
     }
@@ -548,15 +693,274 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
         }
     }
+
+    // MARK: - 録画連携 / カウンタ
+
+    /// PC が要求したストリームの解像度 (向き補正前: 横長の width, height)
+    func streamRequestSize() -> (Int, Int) {
+        flagLock.lock()
+        defer { flagLock.unlock() }
+        return (streamReqW, streamReqH)
+    }
+
+    /// カメラ側でフレームを落とした数を 0 に戻す (クライアント接続時)
+    func resetCounters() {
+        flagLock.lock()
+        droppedCount = 0
+        flagLock.unlock()
+    }
+
+    /// 録画の開始/終了に合わせてカメラ構成を変える。構成が終わったら completion (最大辺, fps) を呼ぶ。
+    func setRecording(highRes: Bool, audio: Bool, completion: ((Int, Int) -> Void)?) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            let changed = (self.recordHighRes != highRes)
+            self.recordHighRes = highRes
+            self.recAudioWanted = audio
+            if self.started {
+                if changed {
+                    self.reconfigure()
+                }
+                self.updateAudioOnQueue()
+            }
+            self.publishState()
+            completion?(max(self.activeWidth, self.activeHeight), self.activeFps)
+        }
+    }
+
+    // MARK: - マイク (sessionQueue 上)
+
+    /// マイクが必要か (PC のマイク or 録画の音声) に合わせて入力/出力を追加・削除する
+    private func updateAudioOnQueue() {
+        let want = micWanted || recAudioWanted
+        if want && audioInput == nil {
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                addAudio()
+            case .notDetermined:
+                if audioRequestPending { return }
+                audioRequestPending = true
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
+                    self?.sessionQueue.async {
+                        guard let self = self else { return }
+                        self.audioRequestPending = false
+                        if self.started && (self.micWanted || self.recAudioWanted) {
+                            self.updateAudioOnQueue()
+                        }
+                        self.publishState()
+                    }
+                }
+            default:
+                break
+            }
+        } else if !want && audioInput != nil {
+            removeAudio()
+        }
+    }
+
+    private func addAudio() {
+        guard let adev = AVCaptureDevice.default(for: .audio),
+              let ai = try? AVCaptureDeviceInput(device: adev) else { return }
+        session.beginConfiguration()
+        if session.canAddInput(ai) {
+            session.addInput(ai)
+            audioInput = ai
+        }
+        if audioInput != nil && !audioOutputAdded {
+            audioOutput.setSampleBufferDelegate(self, queue: audioQueue)
+            if session.canAddOutput(audioOutput) {
+                session.addOutput(audioOutput)
+                audioOutputAdded = true
+            }
+        }
+        session.commitConfiguration()
+    }
+
+    private func removeAudio() {
+        session.beginConfiguration()
+        if let ai = audioInput {
+            session.removeInput(ai)
+            audioInput = nil
+        }
+        if audioOutputAdded {
+            session.removeOutput(audioOutput)
+            audioOutputAdded = false
+        }
+        session.commitConfiguration()
+        flagLock.lock()
+        audioRate = 0
+        flagLock.unlock()
+    }
+
+    // MARK: - システム負荷 (sessionQueue 上)
+
+    private func observePressure(for dev: AVCaptureDevice) {
+        if pressureObservation != nil && pressureDevice === dev {
+            return
+        }
+        pressureObservation?.invalidate()
+        pressureObservation = nil
+        pressureDevice = dev
+        handlePressure(dev.systemPressureState)
+        pressureObservation = dev.observe(\.systemPressureState, options: [.new]) { [weak self] d, _ in
+            let state = d.systemPressureState
+            self?.sessionQueue.async {
+                self?.handlePressure(state)
+            }
+        }
+    }
+
+    private func handlePressure(_ st: AVCaptureDevice.SystemPressureState) {
+        let level: String
+        if st.level == .fair {
+            level = "fair"
+        } else if st.level == .serious {
+            level = "serious"
+        } else if st.level == .critical {
+            level = "critical"
+        } else if st.level == .shutdown {
+            level = "shutdown"
+        } else {
+            level = "nominal"
+        }
+        var factors: [String] = []
+        if st.factors.contains(.systemTemperature) { factors.append("systemTemperature") }
+        if st.factors.contains(.peakPower) { factors.append("peakPower") }
+        if st.factors.contains(.depthModuleTemperature) { factors.append("depthModuleTemperature") }
+        if #available(iOS 17.0, *) {
+            if st.factors.contains(.cameraTemperature) { factors.append("cameraTemperature") }
+        }
+        let changed = (level != pressureLevelName) || (factors != pressureFactorNames)
+        pressureLevelName = level
+        pressureFactorNames = factors
+        if changed && started {
+            onApplied?(buildStatus())
+        }
+    }
 }
 
 // MARK: - デリゲート
 
 extension CameraController {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output === audioOutput {
+            handleAudioSample(sampleBuffer)
+            return
+        }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let dur = CMSampleBufferGetDuration(sampleBuffer)
         onFrame?(pixelBuffer, pts, dur)
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output === audioOutput { return }
+        flagLock.lock()
+        droppedCount += 1
+        flagLock.unlock()
+    }
+
+    /// 音声バッファを Int16 LE モノラルへ変換して渡す (audioQueue 上)
+    private func handleAudioSample(_ sb: CMSampleBuffer) {
+        onAudioSample?(sb)
+
+        guard let fd = CMSampleBufferGetFormatDescription(sb),
+              let asbdPtr = CMAudioFormatDescriptionGetStreamBasicDescription(fd) else { return }
+        let asbd = asbdPtr.pointee
+        let rate = Int(asbd.mSampleRate)
+        flagLock.lock()
+        audioRate = rate
+        let send = micSendFlag
+        flagLock.unlock()
+        guard send, let callback = onAudio, rate > 0 else { return }
+
+        let channels = max(1, Int(asbd.mChannelsPerFrame))
+        let isFloat = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+        let nonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
+        let bits = Int(asbd.mBitsPerChannel)
+        guard (isFloat && bits == 32) || (!isFloat && bits == 16) else { return }
+        let bytesPerSample = bits / 8
+
+        var sizeNeeded = 0
+        var st = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sb,
+            bufferListSizeNeededOut: &sizeNeeded,
+            bufferListOut: nil,
+            bufferListSize: 0,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: 0,
+            blockBufferOut: nil
+        )
+        guard st == noErr, sizeNeeded > 0 else { return }
+
+        let raw = UnsafeMutableRawPointer.allocate(
+            byteCount: sizeNeeded,
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { raw.deallocate() }
+        let ablPtr = raw.bindMemory(to: AudioBufferList.self, capacity: 1)
+        var blockBuffer: CMBlockBuffer?
+        st = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sb,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: ablPtr,
+            bufferListSize: sizeNeeded,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
+            blockBufferOut: &blockBuffer
+        )
+        guard st == noErr else { return }
+
+        let list = UnsafeMutableAudioBufferListPointer(ablPtr)
+        guard list.count > 0 else { return }
+
+        // 1 フレームあたりのサンプルを (buffer, オフセット) で引く
+        let frames: Int
+        if nonInterleaved {
+            frames = Int(list[0].mDataByteSize) / bytesPerSample
+        } else {
+            frames = Int(list[0].mDataByteSize) / (bytesPerSample * channels)
+        }
+        guard frames > 0 else { return }
+
+        var out = Data(count: frames * 2)
+        out.withUnsafeMutableBytes { (dst: UnsafeMutableRawBufferPointer) in
+            guard let dstBase = dst.baseAddress else { return }
+            let d = dstBase.bindMemory(to: Int16.self, capacity: frames)
+            for i in 0..<frames {
+                var sum: Float = 0
+                var n: Float = 0
+                for c in 0..<channels {
+                    var base: UnsafeRawPointer?
+                    var index = i
+                    if nonInterleaved {
+                        guard c < list.count, let p = list[c].mData else { continue }
+                        if i >= Int(list[c].mDataByteSize) / bytesPerSample { continue }
+                        base = UnsafeRawPointer(p)
+                    } else {
+                        guard let p = list[0].mData else { continue }
+                        base = UnsafeRawPointer(p)
+                        index = i * channels + c
+                    }
+                    guard let b = base else { continue }
+                    if isFloat {
+                        sum += b.load(fromByteOffset: index * 4, as: Float.self)
+                    } else {
+                        sum += Float(b.load(fromByteOffset: index * 2, as: Int16.self)) / 32768.0
+                    }
+                    n += 1
+                }
+                var v = n > 0 ? sum / n : 0
+                if !v.isFinite { v = 0 }
+                v = min(max(v, -1.0), 1.0)
+                d[i] = Int16(v * 32767.0).littleEndian
+            }
+        }
+        withExtendedLifetime(blockBuffer) {}
+
+        let t = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sb))
+        callback(t, rate, out)
     }
 }

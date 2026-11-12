@@ -1,0 +1,8 @@
+build/
+*.xcodeproj
+Payload
+*.ipa
+__pycache__/
+*.pyc
+phonecam_settings.json
+windows/phonecam_version.py

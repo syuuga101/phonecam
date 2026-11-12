@@ -6,9 +6,10 @@ on:
       - "ios/**"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -27,6 +28,7 @@ jobs:
       - name: Build (unsigned)
         working-directory: ios
         run: |
+          VERSION=$(tr -d '[:space:]' < ../VERSION 2>/dev/null || echo 0.0.0)
           xcodebuild \
             -project PhoneCam.xcodeproj \
             -scheme PhoneCam \
@@ -37,6 +39,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             build
 
       - name: Package IPA
@@ -53,11 +57,3 @@ jobs:
           name: PhoneCam-ipa
           path: ios/PhoneCam.ipa
 
-      - name: Publish to release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: PhoneCam 最新版
-          body: mainブランチの最新ビルドです。PhoneCam.ipa をAltStoreで、PhoneCamReceiver.zip をWindowsで使います。
-          files: ios/PhoneCam.ipa

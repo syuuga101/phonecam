@@ -15,10 +15,14 @@ targets:
       path: PhoneCam/Info.plist
       properties:
         CFBundleDisplayName: PhoneCam
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSCameraUsageDescription: 配信用カメラとして使用します
         NSLocalNetworkUsageDescription: Wi-Fi経由でPCと接続するために使用します
+        NSMicrophoneUsageDescription: iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します
+        NSPhotoLibraryAddUsageDescription: 録画した動画を写真アプリに保存するために使用します
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UIStatusBarStyle: UIStatusBarStyleLightContent
@@ -34,3 +38,5 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGNING_REQUIRED: "NO"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"

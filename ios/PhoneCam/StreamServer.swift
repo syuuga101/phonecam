@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import CoreMedia
 
 /// TCP サーバ (ポート 5555)。USB (usbmux 経由のループバック) と Wi-Fi の両方を受け付ける。
 final class StreamServer {
@@ -19,6 +20,8 @@ final class StreamServer {
     private var clientReady = false
     private var generation = 0
     private var pendingVideoFrames = 0
+    private var pendingAudioBytes = 0
+    private var networkDropped = 0
 
     // 受信パーサは queue 上でのみ触る
     private var parser = PacketParser()
@@ -99,6 +102,8 @@ final class StreamServer {
         client = conn
         clientReady = false
         pendingVideoFrames = 0
+        pendingAudioBytes = 0
+        networkDropped = 0
         lock.unlock()
 
         old?.cancel()
@@ -142,6 +147,7 @@ final class StreamServer {
         client = nil
         clientReady = false
         pendingVideoFrames = 0
+        pendingAudioBytes = 0
         lock.unlock()
 
         conn?.cancel()
@@ -163,6 +169,9 @@ final class StreamServer {
                 while let msg = self.parser.next() {
                     if msg.type == PacketType.control {
                         if let obj = try? JSONSerialization.jsonObject(with: msg.payload) as? [String: Any] {
+                            if let ping = obj["ping"] as? NSNumber {
+                                self.sendPong(ping)
+                            }
                             self.onControl?(obj)
                         }
                     }
@@ -190,20 +199,30 @@ final class StreamServer {
 
     /// 映像フレームを送信する。破棄した場合は false。
     /// キーフレーム以外は、未送信フレームが2つ以上溜まっていると破棄する。
-    func sendVideo(_ data: Data, isKey: Bool, hevc: Bool = false) -> Bool {
+    /// captureTime (ホスト時計の秒) を渡すと、送信する場合に限り直前に type 5 のタイミングパケットを送る。
+    func sendVideo(_ data: Data, isKey: Bool, hevc: Bool = false, captureTime: Double? = nil) -> Bool {
         lock.lock()
         guard let conn = client, clientReady else {
             lock.unlock()
             return false
         }
         if !isKey && pendingVideoFrames >= 2 {
+            networkDropped += 1
             lock.unlock()
             return false
         }
         pendingVideoFrames += 1
         let gen = generation
-        lock.unlock()
 
+        // タイミングと映像の順序を保つため、lock を持ったまま続けて送信キューへ積む
+        if let ct = captureTime, ct.isFinite {
+            var payload = Data()
+            payload.reserveCapacity(16)
+            StreamServer.appendDouble(&payload, ct)
+            StreamServer.appendDouble(&payload, StreamServer.hostSeconds())
+            conn.send(content: Packet.encode(type: PacketType.timing, payload: payload),
+                      completion: .contentProcessed({ _ in }))
+        }
         let packet = Packet.encode(type: hevc ? PacketType.videoHevc : PacketType.video, payload: data)
         conn.send(content: packet, completion: .contentProcessed({ [weak self] _ in
             guard let self = self else { return }
@@ -213,7 +232,80 @@ final class StreamServer {
             }
             self.lock.unlock()
         }))
+        lock.unlock()
         return true
+    }
+
+    /// 接続してから送信側で破棄した映像フレーム数
+    func networkDroppedFrames() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return networkDropped
+    }
+
+    /// ping への応答 (type 4)。破棄しない。
+    func sendPong(_ value: NSNumber) {
+        let obj: [String: Any] = ["pong": value, "t": StreamServer.hostSeconds()]
+        guard JSONSerialization.isValidJSONObject(obj),
+              let json = try? JSONSerialization.data(withJSONObject: obj) else { return }
+        lock.lock()
+        guard let conn = client, clientReady else {
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+        conn.send(content: Packet.encode(type: PacketType.pong, payload: json),
+                  completion: .contentProcessed({ _ in }))
+    }
+
+    /// 音声 (type 6)。未送信が約 200ms 分を超えているときは破棄する。
+    func sendAudio(captureTime: Double, sampleRate: Int, pcm: Data) {
+        guard captureTime.isFinite, sampleRate > 0, !pcm.isEmpty else { return }
+        let limit = max(4000, sampleRate * 2 / 5)   // 200ms 分の Int16 モノラル
+        lock.lock()
+        guard let conn = client, clientReady else {
+            lock.unlock()
+            return
+        }
+        if pendingAudioBytes > limit {
+            lock.unlock()
+            return
+        }
+        pendingAudioBytes += pcm.count
+        let gen = generation
+        lock.unlock()
+
+        var payload = Data()
+        payload.reserveCapacity(13 + pcm.count)
+        StreamServer.appendDouble(&payload, captureTime)
+        let sr = UInt32(truncatingIfNeeded: sampleRate)
+        payload.append(UInt8((sr >> 24) & 0xFF))
+        payload.append(UInt8((sr >> 16) & 0xFF))
+        payload.append(UInt8((sr >> 8) & 0xFF))
+        payload.append(UInt8(sr & 0xFF))
+        payload.append(1)
+        payload.append(pcm)
+        let size = pcm.count
+        conn.send(content: Packet.encode(type: PacketType.audio, payload: payload),
+                  completion: .contentProcessed({ [weak self] _ in
+            guard let self = self else { return }
+            self.lock.lock()
+            if self.generation == gen {
+                self.pendingAudioBytes = max(0, self.pendingAudioBytes - size)
+            }
+            self.lock.unlock()
+        }))
+    }
+
+    static func hostSeconds() -> Double {
+        return CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock()))
+    }
+
+    private static func appendDouble(_ data: inout Data, _ v: Double) {
+        let bits = v.bitPattern
+        for shift in stride(from: 56, through: 0, by: -8) {
+            data.append(UInt8((bits >> UInt64(shift)) & 0xFF))
+        }
     }
 
     /// ステータス JSON を送信する (破棄しない)

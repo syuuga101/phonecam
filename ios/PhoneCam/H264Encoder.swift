@@ -5,8 +5,9 @@ import CoreVideo
 
 /// VideoToolbox を使った低遅延 H.264 / HEVC エンコーダ。出力は Annex B 形式。
 final class H264Encoder {
-    /// エンコード済みアクセスユニット (Annex B)、キーフレームかどうか、HEVC かどうか
-    var onEncoded: ((Data, Bool, Bool) -> Void)?
+    /// エンコード済みアクセスユニット (Annex B)、キーフレームかどうか、HEVC かどうか、
+    /// 入力の PTS、エンコード所要時間 (ms)
+    var onEncoded: ((Data, Bool, Bool, CMTime, Double) -> Void)?
 
     private var session: VTCompressionSession?
     private var sessionWidth: Int32 = 0
@@ -134,6 +135,7 @@ final class H264Encoder {
             frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, fps)))
         }
 
+        let startNs = DispatchTime.now().uptimeNanoseconds
         let status = VTCompressionSessionEncodeFrame(
             s,
             imageBuffer: pixelBuffer,
@@ -142,7 +144,7 @@ final class H264Encoder {
             frameProperties: props,
             infoFlagsOut: nil,
             outputHandler: { [weak self] status, _, sampleBuffer in
-                self?.handleOutput(status: status, sampleBuffer: sampleBuffer)
+                self?.handleOutput(status: status, sampleBuffer: sampleBuffer, startNs: startNs)
             }
         )
         if status != noErr {
@@ -277,7 +279,7 @@ final class H264Encoder {
 
     // MARK: - 出力処理
 
-    private func handleOutput(status: OSStatus, sampleBuffer: CMSampleBuffer?) {
+    private func handleOutput(status: OSStatus, sampleBuffer: CMSampleBuffer?, startNs: UInt64) {
         guard status == noErr, let sb = sampleBuffer, CMSampleBufferDataIsReady(sb) else {
             // status が成功でバッファが無いのはフレームが間引かれただけなので数えない
             if status != noErr { noteFailure() }
@@ -358,7 +360,9 @@ final class H264Encoder {
         }
 
         if out.isEmpty { return }
-        onEncoded?(out, isKey, isHevc)
+        let nowNs = DispatchTime.now().uptimeNanoseconds
+        let encodeMs = nowNs >= startNs ? Double(nowNs - startNs) / 1_000_000.0 : 0
+        onEncoded?(out, isKey, isHevc, CMSampleBufferGetPresentationTimeStamp(sb), encodeMs)
     }
 
     /// H.264 / HEVC のパラメータセット取得を 1 つにまとめた薄いラッパ
