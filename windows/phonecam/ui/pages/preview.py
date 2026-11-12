@@ -19,6 +19,8 @@ RATIO_MAX = 1.0
 RATIO_DEFAULT = 2.0 / 3.0
 TICK_MS = 66          # 約15fps で描画 (プレビューは軽く)
 STALE_SEC = 1.5       # これより古い映像は「映像なし」として扱う
+MIN_W = 240           # プレビュー幅の下限 (論理px)
+MAX_H_FRAC = 0.45     # ウィンドウの見えている高さに対する上限
 GRIP = 14             # つまみの大きさ (px)
 
 
@@ -95,6 +97,11 @@ class Preview:
         self._drag = False
         self._width = px(320)
         self.box.bind("<Configure>", lambda e: self.relayout())
+        self._win_h = 0
+        try:
+            self.box.winfo_toplevel().bind("<Configure>", self._on_win, add="+")
+        except Exception:
+            pass
         self.canvas.tag_bind("grip", "<B1-Motion>", self._on_drag)
         self.canvas.tag_bind("grip", "<ButtonRelease-1>", self._on_release)
         self.canvas.tag_bind("grip", "<Enter>", lambda e: self.canvas.config(cursor="size_nw_se"))
@@ -113,11 +120,40 @@ class Preview:
         except Exception:
             pass
 
+    def _on_win(self, e):
+        """ウィンドウの高さが変わったら、高さ上限を反映して引き直す。"""
+        try:
+            if e.widget is self.box.winfo_toplevel() and e.height != self._win_h:
+                self._win_h = e.height
+                self.relayout()
+        except Exception:
+            pass
+
+    def _size(self):
+        """(幅, 高さ): 内容列の幅 x ratio、ただし高さはウィンドウの45%以内、幅は下限240px。"""
+        cw = max(px(160), self.box.winfo_width())
+        mn = min(px(MIN_W), cw)
+        w = max(mn, min(cw, int(cw * self.ratio)))
+        h = int(w * 9 / 16)
+        try:
+            wh = self.box.winfo_toplevel().winfo_height()
+        except Exception:
+            wh = 0
+        if wh > 50:
+            hmax = int(wh * MAX_H_FRAC)
+            if h > hmax:
+                h = hmax
+                w = int(h * 16 / 9)
+        if w < mn:
+            w = mn
+            h = int(w * 9 / 16)
+        return w, h
+
     def relayout(self):
         try:
-            cw = max(px(160), self.box.winfo_width())
-            w = int(cw * self.ratio)
-            h = int(w * 9 / 16)
+            w, h = self._size()
+            if (w, h) == (int(self.canvas["width"]), int(self.canvas["height"])):
+                return
             self._width = w
             self.canvas.config(width=w, height=h)
             self.redraw_static()

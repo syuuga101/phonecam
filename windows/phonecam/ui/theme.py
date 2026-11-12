@@ -36,27 +36,65 @@ _FONT = "Segoe UI"
 _poll_job = None
 
 
+# 文字サイズはすべて pt (tk scaling = DPI/72 なのでDPIに比例する)。ここが唯一のスケール表。
+SIZES = {"caption": 9, "body": 10, "strong": 10, "large": 11, "subtitle": 14, "title": 20,
+         "title_large": 28, "display": 42}
+# sv-ttk の名前付きフォント -> (サイズ名, 太さ)
+_SV_FONTS = {
+    "SunValleyCaptionFont": ("caption", "normal"),
+    "SunValleyBodyFont": ("body", "normal"),
+    "SunValleyBodyStrongFont": ("strong", "bold"),
+    "SunValleyBodyLargeFont": ("large", "normal"),
+    "SunValleySubtitleFont": ("subtitle", "bold"),
+    "SunValleyTitleFont": ("title", "bold"),
+    "SunValleyTitleLargeFont": ("title_large", "bold"),
+    "SunValleyDisplayFont": ("display", "bold"),
+}
+_JA_FONTS = ("Yu Gothic UI", "Meiryo UI", "Segoe UI")
+_OTHER_FONTS = ("Segoe UI Variable Text", "Segoe UI")
+
+
+def _ui_language():
+    try:
+        from phonecam.i18n import get_language, resolve_language
+        return resolve_language(get_language())
+    except Exception:
+        return "ja"
+
+
 def _pick_font():
+    """UI の言語でフォントを選ぶ。日本語: Yu Gothic UI > Meiryo UI > Segoe UI (Segoe UI Variable は
+    日本語グリフが無く文字ごとにフォールバックして字間が崩れるので使わない)。"""
     global _FONT
+    cands = _JA_FONTS if str(_ui_language()).lower().startswith("ja") else _OTHER_FONTS
     try:
         from tkinter import font as tkfont
-        fams = set(tkfont.families())
-        for name in ("Segoe UI Variable Text", "Segoe UI"):
+        fams = set(tkfont.families(root=_root))
+        for name in cands:
             if name in fams:
                 _FONT = name
                 return
     except Exception:
         pass
-    _FONT = "Segoe UI"
+    _FONT = cands[-1]
 
 
 def font_family():
     return _FONT
 
 
-def font(size=9, weight="normal"):
-    """(family, size, weight) の Tk フォント指定。"""
-    return (_FONT, size, weight)
+def size(name):
+    """名前 (caption/body/strong/large/subtitle/title/...) -> pt。"""
+    return SIZES.get(name, SIZES["body"])
+
+
+def font(size=None, weight="normal"):
+    """(family, pt, weight) の Tk フォント指定。size は pt の数値か SIZES の名前 (省略で body)。"""
+    if size is None:
+        size = SIZES["body"]
+    elif isinstance(size, str):
+        size = SIZES.get(size, SIZES["body"])
+    return (_FONT, int(size), weight)
 
 
 def system_theme():
@@ -99,14 +137,34 @@ def off_change(cb):
 
 
 def _apply_fonts():
+    """sv-ttk は名前付きフォントを負のピクセル値で定義し DPI で拡大されない。set_theme のたびに pt へ直す。"""
     try:
         from tkinter import font as tkfont
-        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont", "TkCaptionFont",
-                     "TkTooltipFont", "SunValleyBodyFont", "SunValleyCaptionFont"):
-            try:
-                tkfont.nametofont(name, root=_root).configure(family=_FONT)
-            except Exception:
-                pass
+    except Exception:
+        return
+    body = SIZES["body"]
+    for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont", "TkTooltipFont", "TkIconFont"):
+        try:
+            tkfont.nametofont(name, root=_root).configure(family=_FONT, size=body)
+        except Exception:
+            pass
+    try:
+        tkfont.nametofont("TkCaptionFont", root=_root).configure(family=_FONT, size=SIZES["caption"])
+    except Exception:
+        pass
+    try:
+        f = tkfont.nametofont("TkFixedFont", root=_root)
+        f.configure(size=body)
+    except Exception:
+        pass
+    for name, (sz, weight) in _SV_FONTS.items():
+        try:
+            tkfont.nametofont(name, root=_root).configure(family=_FONT, size=SIZES[sz], weight=weight)
+        except Exception:
+            pass
+    try:
+        st = ttk.Style(_root)
+        st.configure(".", font=font("body"))
     except Exception:
         pass
 

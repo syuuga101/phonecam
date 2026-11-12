@@ -26,6 +26,17 @@ def enable_dpi_awareness():
         return False
 
 
+def set_app_user_model_id(app_id="PhoneCam.Receiver"):
+    """タスクバーのアイコンを PhoneCam のものにする (Tk 作成前に呼ぶ)。"""
+    if os.name != "nt":
+        return False
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        return True
+    except Exception:
+        return False
+
+
 def system_dpi(root=None):
     """実際のDPI (取れなければ 96)。"""
     if os.name == "nt":
@@ -52,7 +63,7 @@ def system_dpi(root=None):
 def apply_ui_scale(root):
     """tk の scaling を実際のDPIに合わせ (フォントの大きさがそろう)、UI_SCALE を設定する。"""
     global UI_SCALE
-    dpi = system_dpi(root)
+    dpi = max(72, system_dpi(root))
     try:
         root.tk.call("tk", "scaling", dpi / 72.0)
     except Exception:

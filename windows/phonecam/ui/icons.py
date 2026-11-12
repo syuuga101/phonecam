@@ -224,3 +224,36 @@ def app_icon(size=20):
     if ph is not None:
         _cache[key] = ph
     return ph
+
+
+_window_icons = []   # PhotoImage を GC させない
+
+
+def set_window_icon(root):
+    """ウィンドウ/タスバーのアイコンを PhoneCam にする (iconphoto + 可能なら iconbitmap)。"""
+    p = _find_app_icon()
+    if not p or Image is None:
+        return False
+    ok = False
+    try:
+        base = Image.open(p).convert("RGBA")
+        photos = []
+        for sz in (16, 32, 48, 64, 128, 256):
+            photos.append(_to_photo(base.resize((sz, sz), Image.LANCZOS)))
+        _window_icons.extend(photos)
+        root.iconphoto(True, *photos)
+        ok = True
+    except Exception:
+        pass
+    try:
+        ico = os.path.join(os.path.dirname(p), "icon.ico")
+        if not os.path.isfile(ico) and os.name == "nt":
+            import tempfile
+            ico = os.path.join(tempfile.gettempdir(), "phonecam_icon.ico")
+            Image.open(p).convert("RGBA").save(ico, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (256, 256)])
+        if os.name == "nt" and os.path.isfile(ico):
+            root.iconbitmap(default=ico)
+            ok = True
+    except Exception:
+        pass
+    return ok

@@ -115,24 +115,24 @@ def _build_header(app, parent):
     dot = tk.Canvas(top, width=px(10), height=px(10), highlightthickness=0, borderwidth=0)
     dot.pack(side="left", padx=(0, 8))
     app.conn_state_var = tk.StringVar(value=t("connection.state.off"))
-    ttk.Label(top, textvariable=app.conn_state_var, font=("Segoe UI Semibold", 14)).pack(side="left")
+    ttk.Label(top, textvariable=app.conn_state_var, font=theme.font(14, "bold")).pack(side="left")
     app.conn_device_var = tk.StringVar(value="")
     _dim(ttk.Label(top, textvariable=app.conn_device_var)).pack(side="left", padx=(10, 0))
     app.conn_sub_var = tk.StringVar(value="")
     sub = _dim(ttk.Label(left, textvariable=app.conn_sub_var))
     sub.pack(anchor="w", pady=(2, 0))
-    err = ttk.Label(left, textvariable=app.error_var, foreground=theme.colors()["live"], wraplength=px(480), justify="left")
+    err = ttk.Label(left, textvariable=app.error_var, foreground=theme.colors()["live"], wraplength=px(420), justify="left")
     err.pack(anchor="w")
 
     btns = ttk.Frame(box)
-    btns.pack(side="right")
-    app.stream_btn = ttk.Button(btns, text=t("connection.button.start"), width=10, command=app._stream_button)
+    btns.pack(side="right", anchor="n", padx=(px(12), 0))
+    app.stream_btn = ttk.Button(btns, text=t("connection.button.start"), width=9, command=app._stream_button)
     try:
         app.stream_btn.configure(style="Accent.TButton")
     except Exception:
         pass
     app.stream_btn.pack(side="left", padx=(0, 8))
-    app.connect_btn = ttk.Button(btns, text=t("connection.button.connect"), width=10, command=app.toggle_connect)
+    app.connect_btn = ttk.Button(btns, text=t("connection.button.connect"), width=9, command=app.toggle_connect)
     app.connect_btn.pack(side="left")
 
     def recolor(*_):
@@ -168,10 +168,10 @@ def _build_numbers(app, parent):
     for i, key in enumerate(("res", "latency", "thermal", "battery")):
         box.columnconfigure(i, weight=1, uniform="num")
         cell = ttk.Frame(box)
-        cell.grid(row=0, column=i, sticky="w")
-        _dim(ttk.Label(cell, text=t("connection.num.%s" % key), font=("Segoe UI", 9))).pack(anchor="w")
+        cell.grid(row=0, column=i, sticky="w", padx=(0, px(8)))
+        _dim(ttk.Label(cell, text=t("connection.num.%s" % key), font=theme.font(9))).pack(anchor="w")
         var = tk.StringVar(value="-")
-        ttk.Label(cell, textvariable=var).pack(anchor="w")
+        ttk.Label(cell, textvariable=var, font=theme.font(11)).pack(anchor="w", pady=(px(2), 0))
         app._num_vars[key] = var
 
 
@@ -242,7 +242,7 @@ def _build_connection(app, parent):
     app.pair_var = tk.StringVar(value=app.settings.get("pair_code", ""))
     app.pair_var.trace_add("write", lambda *_: app._pair_code_edited())
     ttk.Entry(r, textvariable=app.pair_var, width=8, justify="center",
-              font=("Consolas", 20)).pack(side="right")
+              font=theme.font(14, "bold")).pack(side="right")
 
 
 def _build_run_control(app, parent):

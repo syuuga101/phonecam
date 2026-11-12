@@ -25,7 +25,7 @@ from phonecam.core.stats import ThermalLog
 from phonecam.core.stream import StreamController
 from phonecam.core.vcam import CAM_RELEASE_HOLD_SEC
 from phonecam.core.version import APP_VERSION
-from phonecam.ui.dpi import apply_ui_scale, enable_dpi_awareness, px
+from phonecam.ui.dpi import apply_ui_scale, enable_dpi_awareness, px, set_app_user_model_id
 from phonecam.i18n import set_language, t
 from phonecam.ui import icons, theme
 from phonecam.ui.labels import METER_MIN_DB, MODE3_LABELS, PHONE_NOTE_SECONDS, THROTTLE_MS
@@ -109,7 +109,7 @@ class _Nav(_FrameWrapper):
             row = tk.Frame(self.frame, cursor="hand2", takefocus=1)
             bar = tk.Frame(row, width=px(3))
             ic = tk.Label(row, borderwidth=0)
-            tx = tk.Label(row, text=t("nav." + key), anchor="w", borderwidth=0, font=theme.font(10))
+            tx = tk.Label(row, text=t("nav." + key), anchor="w", borderwidth=0, font=theme.font("body"))
             row.pack(fill="x", padx=px(8), pady=px(1))
             bar.pack(side="left", fill="y", pady=px(8))
             ic.pack(side="left", padx=(px(10), px(12)), pady=px(8))
@@ -220,6 +220,7 @@ class App:
                 self.setup = None
 
         root.title("PhoneCam")
+        icons.set_window_icon(root)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         root.minsize(px(560), px(560))
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
@@ -311,7 +312,7 @@ class App:
         # 熱警告バナー (どのページを開いていても見えるよう下部に表示)
         self.warn_var = tk.StringVar(value="")
         self.warn_label = ttk.Label(right, textvariable=self.warn_var, foreground=theme.colors()["live"],
-                                    font=theme.font(9, "bold"), wraplength=px(560), justify="left", padding=(14, 6))
+                                    font=theme.font("caption", "bold"), wraplength=px(560), justify="left", padding=(14, 6))
         theme.on_change(lambda: self.warn_label.configure(foreground=theme.colors()["live"]))
         self.nb = _ContentArea(right, self._page_selected)
         self.nb.pack(fill="both", expand=True)
@@ -545,7 +546,7 @@ class App:
             pass
         try:
             if self._toast_label is None:
-                self._toast_label = tk.Label(self.root, font=theme.font(11, "bold"),
+                self._toast_label = tk.Label(self.root, font=theme.font("large", "bold"),
                                              padx=18, pady=8, borderwidth=0)
             _c = theme.colors()  # 反転配色 (ライト=暗い帯 / ダーク=明るい帯)
             self._toast_label.config(text=text, bg=_c["text"], fg=_c["bg"])
@@ -699,6 +700,7 @@ def main():
     if tk is None:
         print(t("shell.no_tk"))
         return 1
+    set_app_user_model_id()  # タスクバーで python.exe ではなく PhoneCam として扱わせる
     enable_dpi_awareness()  # Tk を作る前に (作ったあとでは効かない)
     root = tk.Tk()
     apply_ui_scale(root)

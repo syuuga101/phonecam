@@ -62,18 +62,42 @@ def _style_ok(style):
         return False
 
 
+MAX_CONTENT_W = 880   # 内容列の最大幅 (論理px。Windows 11 設定アプリ相当)。実際は px() で DPI 倍する
+PAGE_PAD_X = 24
+
+
 def page(parent):
-    """スクロール可能な内容列 (左右余白24px) を parent に作り、積む先の frame を返す。
-    返り値の属性: .canvas (Canvas), .host (parent)"""
+    """スクロール可能な内容列を parent に作り、積む先の frame を返す。
+    内容列は最大 MAX_CONTENT_W (論理px x DPI) で中央寄せ、それより窓が狭ければ窓幅に縮む (左右余白24px)。
+    返り値の属性/メソッド:
+      .canvas (Canvas), .host (parent)
+      .content_width() -> int: 実際の内容幅 (実px、左右余白を除く。まだ配置前は 0)
+      <<ContentWidth>>: 内容幅が変わるたびに返り値の frame に飛ぶ仮想イベント (bind して .content_width() を読む)
+    """
     canvas = tk.Canvas(parent, highlightthickness=0, borderwidth=0, background=theme.colors()["bg"])
     vsb = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=vsb.set)
     vsb.pack(side="right", fill="y")
     canvas.pack(side="left", fill="both", expand=True)
-    body = ttk.Frame(canvas, padding=(px(24), px(8), px(24), px(24)))
-    win = canvas.create_window((0, 0), window=body, anchor="nw")
-    body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+    padx = px(PAGE_PAD_X)
+    body = ttk.Frame(canvas, padding=(padx, px(8), padx, px(24)))
+    win = canvas.create_window((0, 0), window=body, anchor="n")
+    state = {"w": 0}
+    body.bind("<Configure>", lambda e: canvas.configure(scrollregion=(0, 0, canvas.winfo_width(), canvas.bbox("all")[3] if canvas.bbox("all") else 0)))
+
+    def on_canvas(e):
+        col = min(e.width, px(MAX_CONTENT_W) + 2 * padx)
+        canvas.coords(win, e.width // 2, 0)
+        canvas.itemconfigure(win, width=col)
+        inner = max(0, col - 2 * padx)
+        canvas.configure(scrollregion=(0, 0, e.width, canvas.bbox("all")[3] if canvas.bbox("all") else 0))
+        if inner != state["w"]:
+            state["w"] = inner
+            try:
+                body.event_generate("<<ContentWidth>>")
+            except Exception:
+                pass
+    canvas.bind("<Configure>", on_canvas)
     canvas.configure(yscrollincrement=px(20))
 
     def recolor():
@@ -84,6 +108,7 @@ def page(parent):
     _install_wheel(canvas)
     body.canvas = canvas
     body.host = parent
+    body.content_width = lambda: state["w"]
     return body
 
 
@@ -92,7 +117,7 @@ def section(parent, title):
     outer = ttk.Frame(parent)
     outer.pack(fill="x", pady=(px(14), 0))
     if title:
-        ttk.Label(outer, text=title, font=theme.font(10, "bold")).pack(anchor="w", pady=(0, px(6)), padx=px(2))
+        ttk.Label(outer, text=title, font=theme.font("strong", "bold")).pack(anchor="w", pady=(0, px(6)), padx=px(2))
     style = "Card.TFrame" if _style_ok("Card.TFrame") else "TFrame"
     card = ttk.Frame(outer, style=style, padding=px(12))
     card.pack(fill="x")
@@ -159,7 +184,7 @@ def row(card, icon, title, hint=None):
     title_lbl = ttk.Label(texts, text=title)
     title_lbl.pack(anchor="w")
     if hint:
-        h = ttk.Label(texts, text=hint, foreground=theme.colors()["text2"], font=theme.font(8))
+        h = ttk.Label(texts, text=hint, foreground=theme.colors()["text2"], font=theme.font("caption"))
         h.pack(anchor="w")
         theme.on_change(lambda: h.configure(foreground=theme.colors()["text2"]))
     fr.title_label = title_lbl
