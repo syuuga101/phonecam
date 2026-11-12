@@ -7,7 +7,7 @@ enum AppInfo {
     static let guideURL = URL(string: "https://github.com/syuuga101/phonecam/tree/main/docs/guide")!
     /// 仮の URL (Crowdin プロジェクト作成後に差し替える)
     static let translateURL = URL(string: "https://crowdin.com/project/phonecam")!
-    static let license = "GPL-2.0以降"
+    static var license: String { String(localized: "GPL-2.0以降") }
 
     static var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String

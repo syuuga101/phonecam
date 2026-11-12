@@ -278,7 +278,7 @@ final class Recorder {
             return false
         }
         if Recorder.freeBytes() < Recorder.minFreeBytes {
-            errorText = "空き容量が足りないため録画を停止しました"
+            errorText = String(localized: "空き容量が足りないため録画を停止しました")
             lk.unlock()
             onChanged?()
             return false
@@ -420,7 +420,7 @@ final class Recorder {
         if Date().timeIntervalSince(lastSpaceCheck) >= 1.0 {
             lastSpaceCheck = Date()
             if Recorder.freeBytes() < Recorder.minFreeBytes {
-                failAndStop("空き容量が足りないため録画を停止しました")
+                failAndStop(String(localized: "空き容量が足りないため録画を停止しました"))
                 return
             }
         }
@@ -441,7 +441,7 @@ final class Recorder {
 
         guard let wr = writer, let vi = videoInput, let ad = adaptor else { return }
         if wr.status == .failed {
-            let msg = "録画に失敗しました"
+            let msg = String(localized: "録画に失敗しました")
             failAndStop(msg)
             return
         }
@@ -528,7 +528,7 @@ final class Recorder {
                 ]
             )
             guard wr.canAdd(vi) else {
-                failAndStop("録画を開始できませんでした")
+                failAndStop(String(localized: "録画を開始できませんでした"))
                 return false
             }
             wr.add(vi)
@@ -550,7 +550,7 @@ final class Recorder {
             }
 
             guard wr.startWriting() else {
-                failAndStop("録画を開始できませんでした")
+                failAndStop(String(localized: "録画を開始できませんでした"))
                 return false
             }
             wr.startSession(atSourceTime: pts)
@@ -570,7 +570,7 @@ final class Recorder {
             onChanged?()
             return true
         } catch {
-            failAndStop("録画を開始できませんでした")
+            failAndStop(String(localized: "録画を開始できませんでした"))
             return false
         }
     }
@@ -605,7 +605,7 @@ final class Recorder {
                     }
                 }
             } else {
-                self.setError("録画ファイルの保存に失敗しました")
+                self.setError(String(localized: "録画ファイルの保存に失敗しました"))
             }
             self.onChanged?()
         }
@@ -638,7 +638,7 @@ final class Recorder {
     private func saveToPhotoLibrary(_ url: URL) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
             guard status == .authorized || status == .limited else {
-                self?.setError("写真への保存が許可されていません")
+                self?.setError(String(localized: "写真への保存が許可されていません"))
                 self?.onChanged?()
                 return
             }
@@ -649,7 +649,7 @@ final class Recorder {
                 request.addResource(with: .video, fileURL: url, options: options)
             }, completionHandler: { success, _ in
                 if !success {
-                    self?.setError("写真への保存に失敗しました")
+                    self?.setError(String(localized: "写真への保存に失敗しました"))
                     self?.onChanged?()
                 }
             })

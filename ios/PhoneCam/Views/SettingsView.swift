@@ -154,10 +154,10 @@ struct SettingsView: View {
 // MARK: - 行ラベル (左に 28pt 幅のアイコン列)
 
 private struct SettingsLabel: View {
-    let title: String
+    let title: LocalizedStringKey
     let symbol: String
 
-    init(_ title: String, symbol: String) {
+    init(_ title: LocalizedStringKey, symbol: String) {
         self.title = title
         self.symbol = symbol
     }
@@ -179,7 +179,7 @@ private struct LanguageSettingsView: View {
     private enum Choice: String, CaseIterable, Identifiable {
         case system, ja, en
         var id: String { rawValue }
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .system: return "システムに合わせる"
             case .ja: return "日本語"

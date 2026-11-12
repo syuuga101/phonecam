@@ -274,10 +274,10 @@ struct ContentView: View {
     }
 
     var statusText: String {
-        if !model.isConnected { return "待機中" }
+        if !model.isConnected { return String(localized: "待機中") }
         let kind = model.connectionKind
-        if model.streamActiveUI { return "配信中 · \(kind)" }
-        return "待機中（カメラ停止）· \(kind)"
+        if model.streamActiveUI { return String(localized: "配信中 · \(kind)") }
+        return String(localized: "待機中（カメラ停止）· \(kind)")
     }
 
     private var statusHeader: some View {
@@ -300,7 +300,7 @@ struct ContentView: View {
     static func lensName(_ l: String) -> String {
         switch l {
         case "ultrawide": return "0.5×"
-        case "front": return "前面"
+        case "front": return String(localized: "前面")
         default: return "1×"
         }
     }

@@ -31,9 +31,9 @@ struct LiveStatusPill: View {
 
 extension ContentView {
     var blackPillText: String {
-        if model.isConnected && model.streamActiveUI { return "配信中" }
-        if model.recActive { return "録画中" }
-        return "待機中"
+        if model.isConnected && model.streamActiveUI { return String(localized: "配信中") }
+        if model.recActive { return String(localized: "録画中") }
+        return String(localized: "待機中")
     }
 
     /// 真っ黒の省電力画面 (タップで解除)

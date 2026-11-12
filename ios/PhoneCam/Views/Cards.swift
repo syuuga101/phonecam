@@ -31,7 +31,7 @@ struct RowIcon: View {
 
 struct InfoRow: View {
     let symbol: String
-    let title: String
+    let title: LocalizedStringKey
     let value: String
 
     var body: some View {
@@ -54,7 +54,7 @@ extension ContentView {
     var infoSection: some View {
         Section {
             InfoRow(symbol: "cable.connector", title: "接続",
-                    value: model.isConnected ? model.connectionKind : "未接続")
+                    value: model.isConnected ? model.connectionKind : String(localized: "未接続"))
             if model.wifiAllowed {
                 InfoRow(symbol: "wifi", title: "Wi-Fi アドレス", value: model.wifiAddress)
             }

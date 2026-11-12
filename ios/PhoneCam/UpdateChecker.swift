@@ -231,7 +231,7 @@ struct UpdateNotesSheet: View {
                         .foregroundColor(Color(white: 0.55))
                     ScrollView {
                         let text = UpdateChecker.plainText(r.body)
-                        Text(text.isEmpty ? "更新内容の記載はありません。" : text)
+                        Text(text.isEmpty ? String(localized: "更新内容の記載はありません。") : text)
                             .font(.system(size: 15))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity, alignment: .leading)

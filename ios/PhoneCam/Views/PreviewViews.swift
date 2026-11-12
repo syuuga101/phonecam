@@ -245,8 +245,8 @@ struct PreviewPanel: View {
     private var badgeText: String {
         let landscape = (model.rotationAngle == 0 || model.rotationAngle == 180)
         let live = model.isConnected && model.streamActiveUI
-        let dir = landscape ? "横向き" : "縦向き"
-        return live ? "\(dir)で配信中" : "\(dir) · 待機中"
+        let dir = landscape ? String(localized: "横向き") : String(localized: "縦向き")
+        return live ? String(localized: "\(dir)で配信中") : String(localized: "\(dir) · 待機中")
     }
 
     var body: some View {
@@ -319,7 +319,7 @@ struct LevelIndicator: View {
                     .fill(tint)
                     .frame(width: 120, height: 1.5)
                     .rotationEffect(.degrees(-deg))
-                Text(level ? "水平 · " + String(format: "%.1f°", deg) : String(format: "%.1f°", deg))
+                Text(level ? String(localized: "水平") + " · " + String(format: "%.1f°", deg) : String(format: "%.1f°", deg))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundColor(tint)
                     .offset(y: 16)

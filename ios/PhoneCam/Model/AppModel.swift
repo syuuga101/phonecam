@@ -18,7 +18,7 @@ struct OutputCanvas: Equatable {
 final class AppModel: ObservableObject {
     @Published var isConnected = false
     @Published var connectionKind = ""
-    @Published var wifiAddress = "未接続"
+    @Published var wifiAddress = String(localized: "未接続")
     @Published var formatText = "-"
     @Published var bitrateText = "-"
     @Published var sentFps = 0
@@ -34,14 +34,14 @@ final class AppModel: ObservableObject {
     @Published var dimScreen = false
     @Published var errorText: String?
     @Published var rotationAngle = 0
-    @Published var thermalText = "正常"
+    @Published var thermalText = String(localized: "正常")
     @Published var batteryText = "-"
     @Published var screenBlack = false
     @Published var autoBlackSeconds = 0
     @Published var recActive = false
     @Published var recSeconds = 0.0
     @Published var recError = ""
-    @Published var micText = "オフ"
+    @Published var micText = String(localized: "オフ")
     @Published var wifiAllowed = false
     @Published var pairingCode = ""
     // 手元操作 (すべてメインスレッドで更新する)
@@ -222,7 +222,7 @@ final class AppModel: ObservableObject {
                 let enabled = (mic["enabled"] as? Bool) ?? false
                 let available = (mic["available"] as? Bool) ?? true
                 micEnabledNow = enabled
-                micTextNow = enabled ? (available ? "オン" : "オン (許可されていません)") : "オフ"
+                micTextNow = enabled ? (available ? String(localized: "オン") : String(localized: "オン (許可されていません)")) : String(localized: "オフ")
             }
             DispatchQueue.main.async {
                 if let t = micTextNow { self.micText = t }
@@ -294,7 +294,7 @@ final class AppModel: ObservableObject {
                 self.streamActiveUI = true
                 self.isConnected = true
                 self.connectionKind = kind
-                self.showToast("PCとつながりました（\(kind)）", haptic: .success)
+                self.showToast(String(localized: "PCとつながりました（\(kind)）"), haptic: .success)
                 // 保存済みの「真っ黒」を再適用する (PC も接続時に再送する)
                 if UserDefaults.standard.bool(forKey: "screenBlack") {
                     self.setScreenBlack(true, persist: false)
@@ -319,7 +319,7 @@ final class AppModel: ObservableObject {
                 self.isConnected = false
                 self.connectionKind = ""
                 self.outputCanvas = nil
-                self.showToast("PCとの接続が切れました", haptic: .warning)
+                self.showToast(String(localized: "PCとの接続が切れました"), haptic: .warning)
                 self.sentFps = 0
                 // 切断したら省電力を解除する (保存値は残す)
                 self.setScreenBlack(false, persist: false)
@@ -436,7 +436,7 @@ final class AppModel: ObservableObject {
             let ip = wifiOn ? AppModel.wifiIPv4() : nil
             DispatchQueue.main.async {
                 self.sentFps = max(0, delta)
-                self.wifiAddress = wifiOn ? (ip.map { "\($0):5555" } ?? "未接続") : "オフ"
+                self.wifiAddress = wifiOn ? (ip.map { "\($0):5555" } ?? String(localized: "未接続")) : String(localized: "オフ")
             }
         }
         t.resume()
@@ -457,11 +457,11 @@ final class AppModel: ObservableObject {
 
     private static func thermalLabel(_ s: ProcessInfo.ThermalState) -> String {
         switch s {
-        case .nominal: return "正常"
-        case .fair: return "やや高い"
-        case .serious: return "高い"
-        case .critical: return "危険"
-        @unknown default: return "正常"
+        case .nominal: return String(localized: "正常")
+        case .fair: return String(localized: "やや高い")
+        case .serious: return String(localized: "高い")
+        case .critical: return String(localized: "危険")
+        @unknown default: return String(localized: "正常")
         }
     }
 
@@ -624,7 +624,7 @@ final class AppModel: ObservableObject {
         security.setWifiAllowed(on)
         wifiAllowed = on
         if !on {
-            wifiAddress = "オフ"
+            wifiAddress = String(localized: "オフ")
             server.disconnectNonLoopback()
             audioServer.disconnectNonLoopback()
         }

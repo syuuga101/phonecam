@@ -135,7 +135,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             guard let self = self else { return }
             self.sessionQueue.async {
                 guard granted else {
-                    self.onError?("カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。")
+                    self.onError?(String(localized: "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"))
                     return
                 }
                 self.started = true
@@ -513,11 +513,11 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     /// レンズ / 解像度 / fps が変わったときの再構成。終わったら全設定を再適用する。
     private func reconfigure() {
         guard var dev = pickDevice() else {
-            onError?("使用できるカメラが見つかりません。")
+            onError?(String(localized: "使用できるカメラが見つかりません。"))
             return
         }
         guard var choice = chooseFormat(dev) else {
-            onError?("使用できるカメラフォーマットが見つかりません。")
+            onError?(String(localized: "使用できるカメラフォーマットが見つかりません。"))
             return
         }
 
@@ -545,10 +545,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
                 input = newInput
                 added = true
             } else {
-                onError?("カメラ入力を追加できませんでした。")
+                onError?(String(localized: "カメラ入力を追加できませんでした。"))
             }
         } catch {
-            onError?("カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。")
+            onError?(String(localized: "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"))
         }
         if !added, let old = oldInput, session.canAddInput(old) {
             // 追加に失敗したときは元の入力へ戻す (フォーマットも元のカメラ用に選び直す)
@@ -590,7 +590,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
             dev.unlockForConfiguration()
         } catch {
-            onError?("カメラの設定を変更できませんでした。")
+            onError?(String(localized: "カメラの設定を変更できませんでした。"))
         }
 
         if let conn = output.connection(with: .video) {
