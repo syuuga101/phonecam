@@ -59,6 +59,10 @@ except Exception:  # pragma: no cover
     messagebox = None
 
 PHONE_PORT = 5555
+AUDIO_PORT = 5556              # 音声専用チャンネル (v1.4): 映像の後ろで待たされない
+MAIN_RCVBUF = 512 * 1024       # 映像の受信バッファ。大きいと詰まった映像がここに溜まって遅延になる
+AUDIO_RCVBUF = 64 * 1024
+AUDIO_RETRY_SEC = 2.0
 USBMUX_ADDR = ("127.0.0.1", 27015)
 RECONNECT_SEC = 2.0
 
@@ -507,8 +511,10 @@ def usbmux_recv(sock):
     return plistlib.loads(body)
 
 
-def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0):
-    """usbmux 経由で USB 接続した iPhone のポートへ接続し、トンネル化したソケットを返す。"""
+def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id=None, info=None):
+    """usbmux 経由で USB 接続した iPhone のポートへ接続し、トンネル化したソケットを返す。
+    device_id を渡すとそのデバイスへ接続する (音声チャンネルを映像と同じ iPhone に繋ぐため)。
+    info (dict) には接続した device_id を入れる。"""
     try:
         sock = socket.create_connection(mux_addr, timeout=timeout)
     except OSError:
@@ -530,7 +536,13 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0):
             raise PhoneCamError(
                 "iPhoneがUSBで見つかりません。ケーブルとロック解除・このコンピュータを信頼を確認"
             )
-        device_id = devices[0]["DeviceID"]
+        ids = [d["DeviceID"] for d in devices]
+        if device_id is None or device_id not in ids:
+            if device_id is not None:
+                raise PhoneCamError("iPhoneがUSBで見つかりません")
+            device_id = ids[0]
+        if info is not None:
+            info["device_id"] = device_id
 
         req = dict(base)
         req["MessageType"] = "Connect"
@@ -1207,8 +1219,57 @@ class LinearResampler:
 DEFAULT_DEVICE_LABEL = "システム既定"
 SYSTEM_DEFAULT_KEY = "__default__"
 CABLE_KEYWORD = "CABLE Input"
-AUDIO_BASE_MS = 40.0
-AUDIO_SLACK_MS = 60.0
+AUDIO_START_MS = 20.0       # ジッターを測る前の目標 (これにユーザーの遅延設定を足す)
+AUDIO_MIN_MS = 15.0         # 適応目標の下限
+AUDIO_MAX_MS = 120.0        # 適応目標の上限 (ユーザーの遅延設定は別に足す)
+AUDIO_JITTER_FACTOR = 2.5
+AUDIO_JITTER_ALPHA = 1.0 / 16.0
+AUDIO_JITTER_MIN_PACKETS = 10   # この数だけ測ってから適応に切り替える
+AUDIO_SLACK_MS = 40.0       # 目標をこれ以上超えて溜まったら目標まで捨てる
+AUDIO_LAT_SAMPLES = 50
+
+
+def adaptive_audio_target_ms(jitter_ms, delay_ms=0.0):
+    """ジッター (パケット到着間隔の揺れ、EWMA, ms) から再生バッファの目標 [ms] を決める。
+    未計測 (None) のときは 20ms + ユーザー遅延。"""
+    if jitter_ms is None:
+        base = AUDIO_START_MS
+    else:
+        base = min(AUDIO_MAX_MS, max(AUDIO_MIN_MS, AUDIO_JITTER_FACTOR * float(jitter_ms)))
+    return base + float(delay_ms)
+
+
+def audio_latency_ms(now_pc, capture_phone, offset, buffered_ms):
+    """音声パケット1つの「iPhoneで録ってから PC の再生バッファを出るまで」の見込み [ms]。
+    offset: iPhone時刻 ≈ PC時刻(perf_counter) + offset。offset が無ければ None。"""
+    if offset is None:
+        return None
+    capture_pc = capture_phone - offset
+    return max(0.0, (now_pc - capture_pc) * 1000.0 + float(buffered_ms))
+
+
+VBCABLE_PANEL_EXE = "VBCABLE_ControlPanel.exe"
+VBCABLE_LATENCY_HINT = ("VB-CABLEのコントロールパネルで \"Max Latency\" を 7168 → 2048 などに下げると、さらに遅延が減ります"
+                        "（音が途切れる場合は戻してください）。管理者として開きます。変更の反映にはPCの再起動が必要なことがあります")
+VBCABLE_PANEL_MISSING = "VB-CABLEのコントロールパネルが見つかりません（VB-CABLEが入っていないか、別の場所にあります）"
+
+
+def find_vbcable_control_panel(env=None, isfile=None):
+    """VB-CABLE のコントロールパネル (VBCABLE_ControlPanel.exe) を Program Files から探す。無ければ None。"""
+    env = os.environ if env is None else env
+    isfile = os.path.isfile if isfile is None else isfile
+    roots = []
+    for key, default in (("ProgramW6432", r"C:\Program Files"), ("ProgramFiles", r"C:\Program Files"),
+                         ("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+        for r in (env.get(key), default):
+            if r and r not in roots:
+                roots.append(r)
+    for r in roots:
+        for sub in ("VB\\CABLE", "VB\\VBCABLE", "VB-Audio\\Cable"):
+            path = r.rstrip("\\/") + "\\" + sub + "\\" + VBCABLE_PANEL_EXE
+            if isfile(path):
+                return path
+    return None
 
 
 def list_output_devices(sd_mod=None):
@@ -1273,6 +1334,13 @@ class AudioEngine:
         self.device_name = ""
         self.dropped_samples = 0
         self.underruns = 0
+        self.offset_fn = None          # () -> iPhone時刻 - PC時刻 の推定 (LatencyTracker.offset)。無ければ None
+        self._feed_lock = threading.Lock()   # 専用チャンネルと映像チャンネルの切替で2つのスレッドから呼ばれ得る
+        self._jitter = None            # パケット到着間隔の揺れ (EWMA, ms)
+        self._jitter_n = 0
+        self._last_arrival = None
+        self._last_dur = 0.0
+        self._lat = deque(maxlen=AUDIO_LAT_SAMPLES)
 
     # -- バッファ -------------------------------------------------------------
     def setup(self, rate):
@@ -1283,6 +1351,7 @@ class AudioEngine:
             self._primed = False
             self._resampler = None
             self._src_rate = 0
+        self._reset_stats()
 
     def flush(self):
         with self._lock:
@@ -1291,26 +1360,67 @@ class AudioEngine:
             self._primed = False
             self._resampler = None
             self._src_rate = 0
+        self._reset_stats()
+
+    def _reset_stats(self):
+        self._jitter = None
+        self._jitter_n = 0
+        self._last_arrival = None
+        self._lat.clear()
+
+    def jitter_ms(self):
+        """測定済みのジッター (ms)。測り始めて間もないときは None。"""
+        return self._jitter if self._jitter_n >= AUDIO_JITTER_MIN_PACKETS else None
 
     def _target(self, delay_ms):
-        return int(self.rate * (AUDIO_BASE_MS + delay_ms) / 1000.0)
+        ms = adaptive_audio_target_ms(self.jitter_ms(), delay_ms)
+        return int(self.rate * ms / 1000.0)
 
-    def feed(self, payload):
+    def target_ms(self):
+        return adaptive_audio_target_ms(self.jitter_ms(), float(self._get_params()[2]))
+
+    def _note_arrival(self, now, dur_ms):
+        """到着間隔が直前のパケットの長さからどれだけずれたかを EWMA で集計する。"""
+        last = self._last_arrival
+        if last is not None:
+            dev = abs((now - last) * 1000.0 - self._last_dur)
+            if self._jitter is None:
+                self._jitter = dev
+            else:
+                self._jitter += (dev - self._jitter) * AUDIO_JITTER_ALPHA
+            self._jitter_n += 1
+        self._last_arrival = now
+        self._last_dur = dur_ms
+
+    def latency_ms(self):
+        """直近の音声遅延の平均 [ms] (PCの出力バッファを出るまで)。測れていなければ None。"""
+        lat = list(self._lat)
+        return sum(lat) / len(lat) if lat else None
+
+    def feed(self, payload, now=None):
         """ネットワークスレッドから呼ぶ。解析 → リサンプル → 追加。"""
         if self.ring is None:
             return
         parsed = parse_audio(payload)
         if parsed is None:
             return
-        _capture, src_rate, pcm = parsed
+        capture, src_rate, pcm = parsed
+        if now is None:
+            now = time.perf_counter()
         peak = float(np.abs(pcm).max()) if len(pcm) else 0.0
         if peak > self._peak:
             self._peak = peak
-        if self._resampler is None or self._src_rate != src_rate:
-            self._resampler = LinearResampler(src_rate, self.rate)
-            self._src_rate = src_rate
-        x = self._resampler.process(pcm)
-        self.push(x)
+        with self._feed_lock:
+            self._note_arrival(now, len(pcm) * 1000.0 / src_rate)
+            offset = self.offset_fn() if self.offset_fn is not None else None
+            lat = audio_latency_ms(now, capture, offset, self.buffered_ms())
+            if lat is not None and lat < 5000.0:
+                self._lat.append(lat)
+            if self._resampler is None or self._src_rate != src_rate:
+                self._resampler = LinearResampler(src_rate, self.rate)
+                self._src_rate = src_rate
+            x = self._resampler.process(pcm)
+            self.push(x)
 
     def push(self, x):
         delay = float(self._get_params()[2])
@@ -1321,7 +1431,7 @@ class AudioEngine:
                 return
             ring.write(x)
             if ring.count > target + int(self.rate * AUDIO_SLACK_MS / 1000.0):
-                self.dropped_samples += ring.drop(ring.count - target)
+                self.dropped_samples += ring.drop(ring.count - target)  # 溜まりすぎ: 目標まで古い方を捨てる
 
     def pull(self, frames):
         """出力コールバック用: frames 個の mono float32 を返す。足りなければ無音。"""
@@ -1402,15 +1512,20 @@ class AudioEngine:
                 if ch < 1 or ch in tried:
                     continue
                 tried.append(ch)
-                try:
-                    stream = sd.OutputStream(
-                        device=dev["index"], samplerate=dev["rate"], channels=ch, dtype="float32",
-                        latency="low", callback=self._callback, finished_callback=self._finished)
-                    stream.start()
+                # 5ms ごとのコールバック (小さいブロック)。デバイスが受け付けなければ既定のブロックサイズで再挑戦
+                for blocksize in (max(32, int(dev["rate"]) // 200), 0):
+                    try:
+                        stream = sd.OutputStream(
+                            device=dev["index"], samplerate=dev["rate"], channels=ch, dtype="float32",
+                            blocksize=blocksize, latency="low", callback=self._callback,
+                            finished_callback=self._finished)
+                        stream.start()
+                        break
+                    except Exception as e:  # 次のブロックサイズ / チャンネル数で再挑戦
+                        last = e
+                        stream = None
+                if stream is not None:
                     break
-                except Exception as e:  # 次のチャンネル数で再挑戦
-                    last = e
-                    stream = None
             if stream is None:
                 raise last or RuntimeError("開けませんでした")
         except Exception as e:
@@ -1464,6 +1579,9 @@ class SharedState:
         self.codec_in_use = "-"      # 実際に受信している映像のコーデック ("h264" / "hevc")
         self.decoder = "-"           # "hw" / "sw"
         self.decoder_note = ""       # ハードウェアが使えなかった理由など
+        self.audio_path = "-"        # "dedicated" (専用チャンネル) / "shared" (映像と共用) / "-"
+        self.thin_total = 0          # PCの処理が追いつかず間引いたフレーム数 (デコード省略 + 出力で上書き)
+        self.thin_last = 0.0         # 最後に間引いた時刻 (time.monotonic)
 
     def update(self, **kw):
         with self._lock:
@@ -1483,6 +1601,9 @@ class SharedState:
                 "codec_in_use": self.codec_in_use,
                 "decoder": self.decoder,
                 "decoder_note": self.decoder_note,
+                "audio_path": self.audio_path,
+                "thin_total": self.thin_total,
+                "thin_last": self.thin_last,
             }
 
 
@@ -2047,6 +2168,125 @@ class VirtualCamOutput:
 
 
 # ---------------------------------------------------------------------------
+# 映像を詰まらせないための部品 (受信/デコード → 出力 の受け渡しと遅れ検出)
+# ---------------------------------------------------------------------------
+
+LAG_LIMIT_MS = 100.0      # これ以上遅れたら、次のキーフレームまでデコードを省略する
+LAG_SUSTAIN = 3           # 遅れ(通信側の計測)が何パケット続いたら遅れとみなすか
+LAG_BASELINE_FRAMES = 300  # 通信時間の「いつもの値」を見積もる範囲
+KEYFRAME_MIN_INTERVAL = 1.0
+THIN_NOTICE_SEC = 3.0     # 間引いた後、この時間は「間引いています」を表示する
+
+
+class FrameMailbox:
+    """最新の1フレームだけを持つ受け渡し箱。出力が遅れたら古いフレームを上書きして捨てる (数える)。"""
+
+    def __init__(self):
+        self._cond = threading.Condition()
+        self._item = None
+        self.closed = False
+        self.skipped = 0
+        self.put_count = 0
+
+    def put(self, item):
+        """入れる。まだ取られていない前のフレームを上書きしたら True。"""
+        with self._cond:
+            replaced = self._item is not None
+            if replaced:
+                self.skipped += 1
+            self._item = item
+            self.put_count += 1
+            self._cond.notify()
+            return replaced
+
+    def get(self, timeout=None):
+        """最新のフレームを取り出す。タイムアウトまたは閉じられて空なら None (closed で区別する)。"""
+        with self._cond:
+            if self._item is None and not self.closed:
+                self._cond.wait(timeout)
+            item, self._item = self._item, None
+            return item
+
+    def close(self):
+        with self._cond:
+            self.closed = True
+            self._cond.notify_all()
+
+
+def _nal_types(payload, codec):
+    """Annex B のパケットに含まれる NAL 種別を順に返す。"""
+    n = len(payload)
+    i = payload.find(b"\x00\x00\x01")
+    while 0 <= i < n - 3:
+        b = payload[i + 3]
+        yield ((b >> 1) & 0x3F) if codec == "hevc" else (b & 0x1F)
+        i = payload.find(b"\x00\x00\x01", i + 3)
+
+
+def is_keyframe_packet(codec, payload):
+    """デコードせずにキーフレーム (IDR/IRAP) か判定する。H.264: NAL 5 / HEVC: NAL 16〜21。"""
+    try:
+        for t in _nal_types(payload, codec):
+            if codec == "hevc":
+                if 16 <= t <= 21:
+                    return True
+            elif t == 5:
+                return True
+    except Exception:
+        return False
+    return False
+
+
+class BacklogGuard:
+    """デコードが映像に追いついていないか見張る。次のどちらかなら「遅れ」とする。
+    - デコード時間が、iPhoneがフレームを作る間隔より長い状態が積み上がった量 (debt, ≒ 未処理パケットの滞留時間) が 100ms 超
+    - 時計のずれを使って測った通信側の遅れが、いつもの値より 100ms 超の状態が数パケット続く
+    遅れたらキーフレームが来るまで非キーフレームのデコードを省略する (decide)。"""
+
+    def __init__(self, lag_ms=LAG_LIMIT_MS, sustain=LAG_SUSTAIN, window=LAG_BASELINE_FRAMES):
+        self.lag_ms = float(lag_ms)
+        self.sustain = int(sustain)
+        self._comm = deque(maxlen=window)
+        self.debt = 0.0
+        self.excess = 0.0
+        self._over = 0
+        self.lagging = False
+        self.skipped = 0
+
+    def note_arrival(self, comm_ms):
+        """パケット到着時の通信時間 (ms, 時計のずれ込み)。None なら無視する。"""
+        if comm_ms is None:
+            return
+        self._comm.append(comm_ms)
+        self.excess = comm_ms - min(self._comm)
+        self._over = self._over + 1 if self.excess > self.lag_ms else 0
+
+    def note_decode(self, decode_ms, interval_ms):
+        """1フレームのデコード時間と、iPhoneがフレームを作る間隔 (ms)。"""
+        self.debt = max(0.0, self.debt + decode_ms - max(1.0, interval_ms))
+
+    def behind(self):
+        return self.debt > self.lag_ms or self._over >= self.sustain
+
+    def resume(self):
+        self.lagging = False
+        self.debt = 0.0
+        self._over = 0
+
+    def decide(self, is_key):
+        """このパケットをデコードするなら True、省略するなら False。is_key() はキーフレーム判定 (遅れているときだけ呼ぶ)。"""
+        if not self.lagging:
+            if not self.behind():
+                return True
+            self.lagging = True
+        if is_key():
+            self.resume()
+            return True
+        self.skipped += 1
+        return False
+
+
+# ---------------------------------------------------------------------------
 # 接続 + デコード スレッド
 # ---------------------------------------------------------------------------
 
@@ -2199,6 +2439,16 @@ class Link:
         self._send_lock = threading.Lock()
         self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
         self._decoder_key = None
+        self._device_id = None     # USB 接続した iPhone の usbmux デバイスID (音声チャンネルも同じ iPhone へ)
+        self._audio_sock = None
+        self._kf_lock = threading.Lock()
+        self._last_kf_req = 0.0    # 最後にキーフレームを要求した時刻 (monotonic)
+        self._out_error = None
+        self._decode_avg = 0.0
+        self._fps_count = 0
+        self._fps_t0 = time.time()
+        if self.audio is not None:
+            self.audio.offset_fn = self.latency.offset
 
     # -- 公開 API --------------------------------------------------------
     def start(self):
@@ -2210,22 +2460,22 @@ class Link:
     def stop(self):
         t = self._thread
         self._stop.set()
-        sock = self._sock
-        if sock is not None:
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-            except Exception:
-                pass
-            try:
-                sock.close()
-            except Exception:
-                pass
+        for sock in (self._sock, self._audio_sock):
+            if sock is not None:
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass
+                try:
+                    sock.close()
+                except Exception:
+                    pass
         if t is not None and t.is_alive() and t is not threading.current_thread():
             t.join(timeout=3.0)
         self._thread = None
         self.vcam.park()
         self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-",
-                          codec_in_use="-", decoder="-", decoder_note="")
+                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-")
         self._decoder_key = None
         self.latency.reset()
 
@@ -2242,18 +2492,44 @@ class Link:
             return False
 
     # -- 内部 -------------------------------------------------------------
-    def _connect(self):
+    def _connect(self, port=PHONE_PORT, info=None):
         mode, ip = self.get_mode_ip()
         if mode == "usb":
-            return usbmux_connect()
-        return wifi_connect(ip)
+            if port == PHONE_PORT and info is None:
+                return usbmux_connect()
+            return usbmux_connect(port=port, device_id=(self._device_id if port != PHONE_PORT else None), info=info)
+        return wifi_connect(ip, port=port)
+
+    @staticmethod
+    def _tune_socket(sock, rcvbuf):
+        """TCP_NODELAY と受信バッファの上限。受信バッファが大きいと、PCが遅れたとき映像がそこに溜まって遅延が増える。"""
+        try:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except Exception:
+            pass
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, int(rcvbuf))
+        except Exception:
+            pass
+
+    def request_keyframe(self, force=False):
+        """キーフレームを要求する。force でなければ 1 秒に 1 回まで。要求したら True。"""
+        now = time.monotonic()
+        with self._kf_lock:
+            if not force and now - self._last_kf_req < KEYFRAME_MIN_INTERVAL:
+                return False
+            self._last_kf_req = now
+        self.send_control({"keyframe": True})
+        return True
 
     def _run(self):
         stop = self._stop
         while not stop.is_set():
             self.state.update(status_text="接続中…", connected=False)
             try:
-                sock = self._connect()
+                info = {}
+                sock = self._connect(info=info)
+                self._device_id = info.get("device_id")
             except PhoneCamError as e:
                 self.state.update(status_text="待機中（再接続を試行します）", error_text=str(e), connected=False)
                 stop.wait(RECONNECT_SEC)
@@ -2264,10 +2540,7 @@ class Link:
                 continue
 
             sock.settimeout(1.0)
-            try:
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            except Exception:
-                pass
+            self._tune_socket(sock, MAIN_RCVBUF)
             self._sock = sock
             try:
                 self._session(sock, stop)
@@ -2292,7 +2565,8 @@ class Link:
             raise PhoneCamError("av / numpy がインストールされていません。install.bat を実行してください")
         decoders = DecoderManager(make_decoder, hw=self._hw_wanted())
         self._decoder_key = None
-        self.state.update(status_text="接続済み", connected=True, error_text="")
+        self.state.update(status_text="接続済み", connected=True, error_text="", audio_path="shared",
+                          thin_total=0, thin_last=0.0)
 
         # 保存済み設定を全部送る + キーフレーム要求
         full = build_control(self.settings, "all")
@@ -2314,10 +2588,64 @@ class Link:
         pending_timing = None  # 次の映像パケットに対応する (captureTime, sendTime)
         ping_stop = threading.Event()
         threading.Thread(target=self._ping_loop, args=(ping_stop,), name="phonecam-ping", daemon=True).start()
+        if self.audio is not None:
+            threading.Thread(target=self._audio_channel_loop, args=(ping_stop, stop), name="phonecam-audio-ch",
+                             daemon=True).start()
         try:
             self._receive_loop(sock, stop, decoders, fitter, last_kf, frame_count, fps_t0, decode_avg, pending_timing)
         finally:
-            ping_stop.set()
+            ping_stop.set()  # 映像の接続が閉じたら音声チャンネルも閉じる
+            asock = self._audio_sock
+            if asock is not None:
+                try:
+                    asock.close()
+                except Exception:
+                    pass
+
+    # -- 音声チャンネル (ポート 5556) -------------------------------------
+    def _audio_channel_loop(self, sess_stop, stop):
+        """映像の接続が続く間、音声専用チャンネルを 2 秒ごとに繋ぎ直す。繋がらなければ (古いiPhoneアプリ)
+        何も表示せず、映像チャンネルで届く音声をそのまま使う。"""
+        while not sess_stop.is_set() and not stop.is_set():
+            asock = None
+            try:
+                asock = self._connect(port=AUDIO_PORT)
+                asock.settimeout(1.0)
+                self._tune_socket(asock, AUDIO_RCVBUF)
+                self._audio_sock = asock
+                try:
+                    asock.sendall(encode_msg(MSG_CONTROL, json.dumps({"hello": "audio"}).encode("utf-8")))
+                except Exception:
+                    pass
+                self.state.update(audio_path="dedicated")
+                self._audio_read_loop(asock, sess_stop, stop)
+            except Exception:
+                pass  # ポートが開いていない/切断: 静かに再試行
+            finally:
+                self._audio_sock = None
+                if asock is not None:
+                    try:
+                        asock.close()
+                    except Exception:
+                        pass
+                if not sess_stop.is_set():
+                    self.state.update(audio_path="shared")
+            if sess_stop.wait(AUDIO_RETRY_SEC):
+                break
+
+    def _audio_read_loop(self, asock, sess_stop, stop):
+        class _Either:
+            def is_set(self_inner):
+                return sess_stop.is_set() or stop.is_set()
+        either = _Either()
+        while not either.is_set():
+            msg_type, payload = read_msg(asock, either)
+            if msg_type == MSG_AUDIO and self.audio is not None:
+                try:
+                    self.audio.feed(payload)
+                except Exception:
+                    pass
+            # それ以外 (type 10 など) は無視する
 
     def _hw_wanted(self):
         return bool(self.settings.get("hw_decode", True)) and not self.hw_disabled
@@ -2347,36 +2675,22 @@ class Link:
             if ping_stop.wait(1.0):
                 break
 
-    def _receive_loop(self, sock, stop, decoders, fitter, last_kf, frame_count, fps_t0, decode_avg, pending_timing):
-        while not stop.is_set():
-            msg_type, payload = read_msg(sock, stop)
-            t_recv = time.perf_counter()
-            codec_name = codec_for_msg(msg_type)
-            if codec_name is not None:
-                timing, pending_timing = pending_timing, None
-                t0 = t_recv
-                decoders.hw_wanted = bool(self.settings.get("hw_decode", True))  # 設定の切替をすぐ反映する
-                decoders.hw_disabled = self.hw_disabled
-                try:
-                    decoder, switched = decoders.get(codec_name)
-                    if switched:
-                        last_kf = time.time()
-                        self.send_control({"keyframe": True})
-                    self._report_decoder(decoders, codec_name)
-                    frames = decoder.decode(av.Packet(payload))
-                except Exception:
-                    if decoders.note_error():
-                        self.hw_disabled = True  # ソフトウェアで作り直して続ける
-                    now = time.time()
-                    if now - last_kf >= 1.0:
-                        last_kf = now
-                        self.send_control({"keyframe": True})
+    def _note_thinned(self, mailbox, guard):
+        total = guard.skipped + mailbox.skipped
+        if total != self.state.thin_total:
+            self.state.update(thin_total=total, thin_last=time.monotonic())
+
+    def _output_loop(self, mailbox, decoders, fitter):
+        """出力スレッド: 最新フレームを取り出し、サイズ合わせ・反転・仮想カメラへの送信を行う。
+        受信/デコードのスレッドはここを待たない (遅れたら mailbox が古いフレームを捨てる)。"""
+        try:
+            while True:
+                item = mailbox.get(0.5)
+                if item is None:
+                    if mailbox.closed:
+                        break
                     continue
-                dt = (time.perf_counter() - t0) * 1000.0
-                decode_avg = dt if decode_avg == 0.0 else decode_avg * 0.9 + dt * 0.1
-                if not frames:
-                    continue
-                frame = frames[-1]
+                frame, timing, t_recv = item
                 self.vcam.apply_pending_reset()
                 fmt = self.vcam.frame_format()
                 try:
@@ -2387,8 +2701,7 @@ class Link:
                     # ハードウェアのフレームを変換できない: ソフトウェアに切り替えて続ける
                     decoders.disable_hw("ハードウェアのフレームを変換できませんでした")
                     self.hw_disabled = True
-                    last_kf = time.time()
-                    self.send_control({"keyframe": True})
+                    self.request_keyframe(force=True)
                     continue
                 decoders.note_ok()
                 if self.settings.get(mirror_key(self.settings)):
@@ -2400,47 +2713,112 @@ class Link:
                 self.vcam.send(img, fps_val)
                 if timing is not None:
                     self.latency.add_frame(timing[0], timing[1], t_recv, time.perf_counter())
-                frame_count += 1
+                self._fps_count += 1
                 now = time.time()
-                if now - fps_t0 >= 1.0:
+                if now - self._fps_t0 >= 1.0:
                     out_w, out_h = img.shape[1], img.shape[0]
                     if (frame.width, frame.height) == (out_w, out_h):
                         res_text = "%dx%d" % (out_w, out_h)
                     else:
                         res_text = "受信 %dx%d → 出力 %dx%d" % (frame.width, frame.height, out_w, out_h)
                     self.state.update(
-                        recv_fps=frame_count / (now - fps_t0),
-                        decode_ms=decode_avg,
+                        recv_fps=self._fps_count / (now - self._fps_t0),
+                        decode_ms=self._decode_avg,
                         resolution=res_text,
                     )
-                    frame_count = 0
-                    fps_t0 = now
-            elif msg_type == MSG_STATUS:
-                try:
-                    st = json.loads(payload.decode("utf-8"))
-                    if isinstance(st, dict):
-                        self.state.update(phone_status=st)
-                except Exception:
-                    pass
-                # カメラ停止中は映像が来ない (タイムアウトにはしない)。表示だけ 0 に戻す
-                now = time.time()
-                if now - fps_t0 >= 2.0:
-                    self.state.update(recv_fps=0.0)
-                    frame_count = 0
-                    fps_t0 = now
-            elif msg_type == MSG_TIMING:
-                pending_timing = parse_timing(payload)
-            elif msg_type == MSG_PONG:
-                p = parse_pong(payload)
-                if p is not None:
-                    self.latency.add_pong(p[0] / 1000.0, t_recv, p[1])
-            elif msg_type == MSG_AUDIO:
-                if self.audio is not None:
+                    self._fps_count = 0
+                    self._fps_t0 = now
+        except Exception as e:
+            self._out_error = e  # 受信スレッドが次のパケットで取り出して再接続する
+
+    def _receive_loop(self, sock, stop, decoders, fitter, last_kf, frame_count, fps_t0, decode_avg, pending_timing):
+        """受信スレッド: パケットを読んでデコードするだけ (順番を守る必要があるため)。
+        デコードしたフレームは出力スレッドへ「最新の1枚」として渡す。pong など軽いものはここで即処理する。"""
+        self._fps_count = frame_count
+        self._fps_t0 = fps_t0
+        self._decode_avg = decode_avg
+        self._out_error = None
+        mailbox = FrameMailbox()
+        guard = BacklogGuard()
+        worker = threading.Thread(target=self._output_loop, args=(mailbox, decoders, fitter),
+                                  name="phonecam-output", daemon=True)
+        worker.start()
+        prev_capture = None
+        try:
+            while not stop.is_set():
+                msg_type, payload = read_msg(sock, stop)
+                t_recv = time.perf_counter()
+                if self._out_error is not None:
+                    raise self._out_error
+                codec_name = codec_for_msg(msg_type)
+                if codec_name is not None:
+                    timing, pending_timing = pending_timing, None
+                    # フレームを作る間隔と、通信の遅れ (時計のずれ込み) を見積もる
+                    interval_ms = 1000.0 / float(self.state.phone_status.get("fps", 30) or 30)
+                    if timing is not None:
+                        if prev_capture is not None and 0.0 < timing[0] - prev_capture < 0.5:
+                            interval_ms = (timing[0] - prev_capture) * 1000.0
+                        prev_capture = timing[0]
+                        off = self.latency.offset()
+                        guard.note_arrival(((t_recv + off) - timing[1]) * 1000.0 if off is not None else None)
+                    if not guard.decide(lambda: is_keyframe_packet(codec_name, payload)):
+                        # 遅れているので、次のキーフレームまでデコードを省略して追いつく
+                        self.request_keyframe()
+                        self._note_thinned(mailbox, guard)
+                        continue
+                    t0 = t_recv
+                    decoders.hw_wanted = bool(self.settings.get("hw_decode", True))  # 設定の切替をすぐ反映する
+                    decoders.hw_disabled = self.hw_disabled
                     try:
-                        self.audio.feed(payload)
+                        decoder, switched = decoders.get(codec_name)
+                        if switched:
+                            self.request_keyframe(force=True)
+                        self._report_decoder(decoders, codec_name)
+                        frames = decoder.decode(av.Packet(payload))
+                    except Exception:
+                        if decoders.note_error():
+                            self.hw_disabled = True  # ソフトウェアで作り直して続ける
+                        self.request_keyframe()
+                        continue
+                    dt = (time.perf_counter() - t0) * 1000.0
+                    self._decode_avg = dt if self._decode_avg == 0.0 else self._decode_avg * 0.9 + dt * 0.1
+                    guard.note_decode(dt, interval_ms)
+                    if guard.behind() and not guard.lagging:
+                        self.request_keyframe()  # 遅れ始めた: 次のパケットから省略に入るので、先にキーフレームを要求
+                    if not frames:
+                        continue
+                    mailbox.put((frames[-1], timing, t_recv))
+                    self._note_thinned(mailbox, guard)
+                elif msg_type == MSG_STATUS:
+                    try:
+                        st = json.loads(payload.decode("utf-8"))
+                        if isinstance(st, dict):
+                            self.state.update(phone_status=st)
                     except Exception:
                         pass
-            # それ以外の種別は無視する (将来の拡張用)
+                    # カメラ停止中は映像が来ない (タイムアウトにはしない)。表示だけ 0 に戻す
+                    now = time.time()
+                    if now - self._fps_t0 >= 2.0:
+                        self.state.update(recv_fps=0.0)
+                        self._fps_count = 0
+                        self._fps_t0 = now
+                elif msg_type == MSG_TIMING:
+                    pending_timing = parse_timing(payload)
+                elif msg_type == MSG_PONG:
+                    p = parse_pong(payload)
+                    if p is not None:
+                        self.latency.add_pong(p[0] / 1000.0, t_recv, p[1])
+                elif msg_type == MSG_AUDIO:
+                    if self.audio is not None:
+                        try:
+                            self.audio.feed(payload)
+                        except Exception:
+                            pass
+                # それ以外の種別は無視する (将来の拡張用)
+        finally:
+            mailbox.close()
+            if worker is not threading.current_thread():
+                worker.join(timeout=2.0)
 
 
 # ---------------------------------------------------------------------------
@@ -2459,6 +2837,8 @@ OUTPUT_SIZE_LABELS = [("720p", "1280×720（HD）"), ("1080p", "1920×1080（フ
 CANVAS_LABELS = [("follow", "向きの設定に合わせる"), ("landscape", "横長で固定"), ("portrait", "縦長で固定"),
                  ("native", "映像のサイズそのまま（サイズが変わるとOBS・Discordで再読み込みが必要）")]
 DECODER_LABELS = {"hw": "ハードウェア", "sw": "ソフトウェア"}
+AUDIO_PATH_LABELS = {"dedicated": "専用（低遅延）", "shared": "映像と共用"}
+THIN_TEXT = "PCの処理が追いつかないためフレームを間引いています"
 CAM_REG_EXPLAIN = ("OBSやDiscordのカメラ一覧に「PhoneCam」を出すための登録です。普段はそのままで大丈夫です。"
                    "新しいバージョンにして「更新が必要」と出たときは「登録する（更新）」を押してください。"
                    "「登録を解除」はPhoneCamを使わなくなったとき（アンインストール）に使います。")
@@ -3562,13 +3942,40 @@ class App:
         self.audio_err_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.audio_err_var, foreground="#c0392b", wraplength=px(520), justify="left").grid(
             row=8, column=0, columnspan=3, sticky="w", pady=(2, 0))
-        self._hint(f, 9, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
-                         "OBSやDiscordでマイクとして「CABLE Output」を選べます", pady=(6, 0))
-        self._hint(f, 10, "初めて使うときは、iPhoneでマイクの許可が必要です")
+        ttk.Label(f, text="音声経路").grid(row=9, column=0, sticky="w", pady=(6, 2))
+        self.audio_path_var = tk.StringVar(value="-")
+        ttk.Label(f, textvariable=self.audio_path_var).grid(row=9, column=1, columnspan=2, sticky="w", padx=6, pady=(6, 2))
+        ttk.Label(f, text="音声の遅延（PCの出力まで）").grid(row=10, column=0, sticky="w", pady=2)
+        self.audio_lat_var = tk.StringVar(value="-")
+        ttk.Label(f, textvariable=self.audio_lat_var, font=("", 9, "bold")).grid(row=10, column=1, columnspan=2, sticky="w", padx=6)
+        self._hint(f, 11, "VB-CABLE内部の遅延は含みません")
+        self.vbcable_btn = ttk.Button(f, text="VB-CABLEの遅延設定を開く", command=self._open_vbcable_panel)
+        self.vbcable_btn.grid(row=12, column=0, columnspan=3, sticky="w", pady=(6, 2))
+        self._vbcable_path = find_vbcable_control_panel() if os.name == "nt" else None
+        if self._vbcable_path is None:
+            self._set_enabled(self.vbcable_btn, False)
+        self._hint(f, 13, VBCABLE_LATENCY_HINT)
+        self._hint(f, 14, "VB-CABLE（無料）をインストールして出力先を「CABLE Input」にすると、"
+                          "OBSやDiscordでマイクとして「CABLE Output」を選べます", pady=(6, 0))
+        self._hint(f, 15, "初めて使うときは、iPhoneでマイクの許可が必要です")
         if not AUDIO_AVAILABLE:
             self.audio_err_var.set("音声ライブラリ(sounddevice)が見つかりません。install.bat を実行してください")
             for w in (self.mic_cb, self.audio_dev_cb, self.vol_scale, self.mute_cb, self.delay_scale):
                 self._set_enabled(w, False)
+
+    def _open_vbcable_panel(self):
+        """VB-CABLE のコントロールパネルを管理者として開く (Max Latency の変更に管理者権限が要る)。"""
+        path = find_vbcable_control_panel() if os.name == "nt" else None
+        if path is None:
+            self.audio_err_var.set(VBCABLE_PANEL_MISSING)
+            return
+        try:
+            os.startfile(path, "runas")
+        except Exception:
+            try:
+                os.startfile(path)
+            except Exception as e:
+                self.audio_err_var.set("VB-CABLEのコントロールパネルを開けませんでした（%s）" % e)
 
     def _mic_toggled(self):
         self._changed("mic_enabled", bool(self.mic_var.get()), "mic")
@@ -3618,7 +4025,10 @@ class App:
             ttk.Label(f, textvariable=var, wraplength=px(340), justify="left").grid(row=row, column=1, sticky="w", padx=6)
             self.pc_vars[key] = var
         self.watch_var = self.pc_vars["watch"]
-        self._hint(f, 4, "「使用中の検出」は、OBSやDiscordが専用カメラを開いているかをPhoneCamが見ている結果です。"
+        self.thin_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self.thin_var, foreground="#c0392b", wraplength=px(480), justify="left").grid(
+            row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        self._hint(f, 5, "「使用中の検出」は、OBSやDiscordが専用カメラを開いているかをPhoneCamが見ている結果です。"
                          "「未使用」のままカメラが動かないときは、アプリ側でカメラを一度オフ→オンにしてください", pady=(6, 0))
 
     def _update_pc_status(self, snap):
@@ -3637,6 +4047,11 @@ class App:
         self.pc_vars["decoder"].set(text)
         size = canvas_size(self.settings)
         self.pc_vars["out"].set("%dx%d" % size if size else "映像のサイズそのまま")
+        thin = snap.get("thin_total", 0)
+        if connected and thin and time.monotonic() - snap.get("thin_last", 0.0) < THIN_NOTICE_SEC:
+            self.thin_var.set("%s（%d コマ）" % (THIN_TEXT, thin))
+        else:
+            self.thin_var.set("")
 
     def _build_latency(self, parent):
         f = self._section(parent, "遅延（直近の平均）")
@@ -3957,11 +4372,17 @@ class App:
                 self.audio_err_var.set("")
                 info = "出力先: %s" % self.audio.device_name if self.audio.running else ""
                 if self.audio.running and connected and mic.get("sampleRate"):
-                    info += "　（iPhone %d Hz / 溜まり %d ms）" % (mic["sampleRate"], round(self.audio.buffered_ms()))
+                    info += "　（iPhone %d Hz / 溜まり %d ms / 目標 %d ms）" % (
+                        mic["sampleRate"], round(self.audio.buffered_ms()), round(self.audio.target_ms()))
                 self.audio_info_var.set(info)
         elif AUDIO_AVAILABLE:
             self.audio_err_var.set("")
             self.audio_info_var.set("")
+        # 音声経路と遅延
+        path = snap.get("audio_path")
+        self.audio_path_var.set(AUDIO_PATH_LABELS.get(path, "-") if connected else "-")
+        lat = self.audio.latency_ms() if (AUDIO_AVAILABLE and connected and self.audio.running) else None
+        self.audio_lat_var.set("%d ms" % round(lat) if lat is not None else "-")
 
     def _housekeeping(self):
         """1秒ごと: 音声ストリームが止まっていたら、3秒以上あけて開き直す。"""

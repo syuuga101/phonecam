@@ -1773,6 +1773,9 @@ class SetupWizard:
                                  "Shiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。"
                                  "（この方法だと、アプリの更新は自分で入れ直します）",
                       self.body, font=(FONT, 9)).pack(fill="x")
+        wrapped_label(self.body, "インストール時に「AltServer.ServerError 2005」が出たときは、AltStoreの「My Apps」で"
+                                 "AltStoreを一度「Refresh」してから、もう一度インストールしてください。",
+                      self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
         ipa = ipa_url()
         self.dl_btn = make_button(self.body, "PhoneCam.ipaをダウンロード", self._download_ipa,
                                   state="normal" if ipa else "disabled")

@@ -52,6 +52,8 @@ final class AppModel: ObservableObject {
     let camera = CameraController()
     private let encoder = H264Encoder()
     private let server = StreamServer()
+    /// 低遅延の音声専用チャンネル (5556)。映像の滞留に巻き込まれない
+    private let audioServer = StreamServer(port: StreamServer.audioPort, ignoreIncoming: true, audioCapMs: 60)
     private let effects = EffectsProcessor()
     private let recorder = Recorder()
     private let scaler = FrameDownscaler()   // videoQueue 上でのみ使う
@@ -142,7 +144,12 @@ final class AppModel: ObservableObject {
             let isActive = self.active && self.streamActive
             self.stateLock.unlock()
             if isActive {
-                self.server.sendAudio(captureTime: captureTime, sampleRate: sampleRate, pcm: pcm)
+                // 音声チャンネルのクライアントがいて、メインも接続中ならそちらだけに送る
+                if self.audioServer.hasClient && self.server.hasClient {
+                    self.audioServer.sendAudio(captureTime: captureTime, sampleRate: sampleRate, pcm: pcm)
+                } else {
+                    self.server.sendAudio(captureTime: captureTime, sampleRate: sampleRate, pcm: pcm)
+                }
             }
         }
         camera.onAudioSample = { [weak self] sampleBuffer in
@@ -225,8 +232,15 @@ final class AppModel: ObservableObject {
                 }
             }
         }
+        audioServer.onClientConnected = { [weak self] _ in
+            self?.timerQueue.async { self?.sendFullStatus() }
+        }
+        audioServer.onClientDisconnected = { [weak self] in
+            self?.timerQueue.async { self?.sendFullStatus() }
+        }
         server.onClientDisconnected = { [weak self] in
             guard let self = self else { return }
+            self.audioServer.disconnectClient()   // メイン切断時は音声チャンネルも閉じる
             self.stateLock.lock()
             self.active = false
             self.stateLock.unlock()
@@ -283,6 +297,7 @@ final class AppModel: ObservableObject {
         // 起動時は未接続なので黒画面にはしない (保存値は接続時に再適用する)
 
         server.start()
+        audioServer.start()
         updateCameraRunning()   // camera.start() より前に要求を積む (最初は停止)
         camera.start()
         startTimer()
@@ -401,6 +416,7 @@ final class AppModel: ObservableObject {
         let streamOn = streamActive
         stateLock.unlock()
         s["streamActive"] = streamOn
+        s["audioChannel"] = audioServer.hasClient
         s["sentFps"] = fpsOut
         s["networkDroppedFrames"] = server.networkDroppedFrames()
         s["encodeMs"] = encMs

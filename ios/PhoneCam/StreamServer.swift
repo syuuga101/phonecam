@@ -2,9 +2,23 @@ import Foundation
 import Network
 import CoreMedia
 
-/// TCP サーバ (ポート 5555)。USB (usbmux 経由のループバック) と Wi-Fi の両方を受け付ける。
+/// TCP サーバ。メイン (5555) と音声専用チャンネル (5556) の両方にこのクラスを使う。
+/// USB (usbmux 経由のループバック) と Wi-Fi の両方を受け付ける。
 final class StreamServer {
     static let port: UInt16 = 5555
+    static let audioPort: UInt16 = 5556
+
+    private let port: UInt16
+    /// true の間は受信データを読み捨てる (音声チャンネル用。接続の健全性のため読み続ける)
+    private let ignoreIncoming: Bool
+    /// 未送信の音声をこの時間 (ms) 分までに制限する
+    private let audioCapMs: Int
+
+    init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200) {
+        self.port = port
+        self.ignoreIncoming = ignoreIncoming
+        self.audioCapMs = max(10, audioCapMs)
+    }
 
     var onControl: (([String: Any]) -> Void)?
     var onClientConnected: ((String) -> Void)?
@@ -22,6 +36,7 @@ final class StreamServer {
     private var pendingVideoFrames = 0
     private var pendingAudioBytes = 0
     private var networkDropped = 0
+    private var audioDropped = 0
 
     // 受信パーサは queue 上でのみ触る
     private var parser = PacketParser()
@@ -56,8 +71,8 @@ final class StreamServer {
         let params = NWParameters(tls: nil, tcp: tcpOptions)
         params.allowLocalEndpointReuse = true
 
-        guard let port = NWEndpoint.Port(rawValue: StreamServer.port),
-              let newListener = try? NWListener(using: params, on: port) else {
+        guard let nwPort = NWEndpoint.Port(rawValue: self.port),
+              let newListener = try? NWListener(using: params, on: nwPort) else {
             scheduleRestart()
             return
         }
@@ -104,6 +119,7 @@ final class StreamServer {
         pendingVideoFrames = 0
         pendingAudioBytes = 0
         networkDropped = 0
+        audioDropped = 0
         lock.unlock()
 
         old?.cancel()
@@ -164,7 +180,7 @@ final class StreamServer {
             self.lock.unlock()
             guard current else { return }
 
-            if let data = data, !data.isEmpty {
+            if let data = data, !data.isEmpty, !self.ignoreIncoming {
                 self.parser.append(data)
                 while let msg = self.parser.next() {
                     if msg.type == PacketType.control {
@@ -198,7 +214,7 @@ final class StreamServer {
     // MARK: - 送信 (どのスレッドからでも可)
 
     /// 映像フレームを送信する。破棄した場合は false。
-    /// キーフレーム以外は、未送信フレームが2つ以上溜まっていると破棄する。
+    /// キーフレーム以外は、前のフレームが未送信 (送信完了前) だと破棄する。キーフレームは破棄しない。
     /// captureTime (ホスト時計の秒) を渡すと、送信する場合に限り直前に type 5 のタイミングパケットを送る。
     func sendVideo(_ data: Data, isKey: Bool, hevc: Bool = false, captureTime: Double? = nil) -> Bool {
         lock.lock()
@@ -206,7 +222,7 @@ final class StreamServer {
             lock.unlock()
             return false
         }
-        if !isKey && pendingVideoFrames >= 2 {
+        if !isKey && pendingVideoFrames >= 1 {
             networkDropped += 1
             lock.unlock()
             return false
@@ -258,16 +274,38 @@ final class StreamServer {
                   completion: .contentProcessed({ _ in }))
     }
 
-    /// 音声 (type 6)。未送信が約 200ms 分を超えているときは破棄する。
+    /// クライアントが接続済みか
+    var hasClient: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return client != nil && clientReady
+    }
+
+    /// クライアントを切断する (リスナーは維持)。どのスレッドからでも可。
+    func disconnectClient() {
+        queue.async { [weak self] in
+            self?.dropClient(generation: nil)
+        }
+    }
+
+    /// 音声チャンネルで破棄した音声パケット数
+    func audioDroppedPackets() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return audioDropped
+    }
+
+    /// 音声 (type 6)。未送信が audioCapMs 分を超えているときは (新しい方を) 破棄する。
     func sendAudio(captureTime: Double, sampleRate: Int, pcm: Data) {
         guard captureTime.isFinite, sampleRate > 0, !pcm.isEmpty else { return }
-        let limit = max(4000, sampleRate * 2 / 5)   // 200ms 分の Int16 モノラル
+        let limit = max(1000, sampleRate * 2 * audioCapMs / 1000)   // audioCapMs 分の Int16 モノラル
         lock.lock()
         guard let conn = client, clientReady else {
             lock.unlock()
             return
         }
         if pendingAudioBytes > limit {
+            audioDropped += 1
             lock.unlock()
             return
         }

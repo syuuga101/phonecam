@@ -774,6 +774,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
         }
         session.commitConfiguration()
+        if audioInput != nil {
+            // 低遅延化: 音声 I/O バッファを短くする (カテゴリは変更しない。失敗しても無視)
+            try? AVAudioSession.sharedInstance().setPreferredIOBufferDuration(0.005)
+        }
     }
 
     private func removeAudio() {
