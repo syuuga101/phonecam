@@ -303,17 +303,23 @@ def detect_itunes(entries=None):
     entries = uninstall_entries() if entries is None else entries
     service = reg_key_exists(APPLE_SERVICE_KEY) or tcp_open()
     nonstore = _has_entry(entries, "itunes", exact=True) or bool(_any_file([os.path.join("iTunes", "iTunes.exe")]))
+    store = installed_store_packages("itunes")
+    if store and (not nonstore or "AppleInc.AppleDevices" in store):
+        names = "・".join("「%s」" % STORE_LABELS.get(p, p) for p in store)
+        return {"state": STATE_WARN,
+                "detail": "Microsoft Store版の%sが入っています。AltServerと一緒に使えないため、"
+                          "インストール時に削除して公式サイト版のiTunesに入れ替えます" % names}
     if service and nonstore:
         return {"state": STATE_OK, "detail": ""}
-    if store_package_installed("itunes"):
-        return {"state": STATE_WARN, "detail": "Microsoft Store版です（インストール時に削除して公式サイト版に入れ替えます）"}
     if service:
         return {"state": STATE_WARN, "detail": "USB接続はOK・AltServerには公式サイト版が必要"}
     return {"state": STATE_MISSING, "detail": ""}
 
 
 # Microsoft Store 版のパッケージ名。公式サイト版と共存できず、AltServer は公式サイト版が必要なので入れ替える
-STORE_PACKAGES = {"icloud": "AppleInc.iCloud", "itunes": "AppleInc.iTunes"}
+# itunes には「Appleデバイス」アプリも含める。入っていると iTunes でiPhoneを扱えず、AltServer がiPhoneを見つけられない (エラー2003)
+STORE_PACKAGES = {"icloud": ["AppleInc.iCloud"], "itunes": ["AppleInc.iTunes", "AppleInc.AppleDevices"]}
+STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes", "AppleInc.AppleDevices": "Appleデバイス"}
 
 
 APPX_REPO_KEY = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
@@ -323,12 +329,16 @@ def store_package_installed(cid):
     r"""Microsoft Store 版 (AppleInc.iCloud_* など) が今のユーザーに入っているか。
     %LOCALAPPDATA%\Packages のフォルダはアンインストール後も残ることがあるので使わず、
     インストール済みパッケージの登録 (HKCU の AppModel\Repository\Packages) を見る。"""
-    pkg = STORE_PACKAGES.get(cid)
-    if not pkg:
-        return False
+    return bool(installed_store_packages(cid))
+
+
+def installed_store_packages(cid):
+    """cid に関係する Store パッケージのうち、今のユーザーに入っているものの名前一覧"""
+    wanted = STORE_PACKAGES.get(cid) or []
     wr = _winreg()
-    if wr is None:
-        return False
+    if not wanted or wr is None:
+        return []
+    found = []
     try:
         with wr.OpenKey(wr.HKEY_CURRENT_USER, APPX_REPO_KEY) as root:
             i = 0
@@ -336,12 +346,14 @@ def store_package_installed(cid):
                 try:
                     name = wr.EnumKey(root, i)
                 except OSError:
-                    return False
+                    break
                 i += 1
-                if name.startswith(pkg + "_"):
-                    return True
+                for pkg in wanted:
+                    if name.startswith(pkg + "_") and pkg not in found:
+                        found.append(pkg)
     except OSError:
-        return False
+        return []
+    return found
 
 
 def _store_icloud_installed():
@@ -351,11 +363,12 @@ def _store_icloud_installed():
 def remove_store_package(cid, runner=None):
     """Store 版を現在のユーザーから削除する (管理者権限は不要。通常権限のプロセスで呼ぶこと)。
     戻り値: (成功したか, メッセージ)"""
-    pkg = STORE_PACKAGES.get(cid)
-    if not pkg:
+    pkgs = STORE_PACKAGES.get(cid) or []
+    if not pkgs:
         return True, ""
-    script = ("$p = Get-AppxPackage -Name '%s'; if ($p) { $p | Remove-AppxPackage -ErrorAction Stop }; "
-              "if (Get-AppxPackage -Name '%s') { exit 2 } else { exit 0 }") % (pkg, pkg)
+    script = "; ".join(
+        "$p = Get-AppxPackage -Name '%s'; if ($p) { $p | Remove-AppxPackage -ErrorAction Stop }" % pkg for pkg in pkgs)
+    script += "; if (%s) { exit 2 } else { exit 0 }" % " -or ".join("(Get-AppxPackage -Name '%s')" % pkg for pkg in pkgs)
     cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script]
     try:
         if runner is not None:
@@ -368,7 +381,7 @@ def remove_store_package(cid, runner=None):
         return False, "Microsoft Store版を削除できませんでした (%s)" % e
     if code != 0:
         return False, "Microsoft Store版を削除できませんでした (終了コード %s)。設定 > アプリ から手動でアンインストールしてください" % code
-    return True, "Microsoft Store版を削除しました"
+    return True, "Microsoft Store版（%s）を削除しました" % "・".join(STORE_LABELS.get(p, p) for p in pkgs)
 
 
 def detect_icloud(entries=None):
