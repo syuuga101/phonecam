@@ -15,8 +15,24 @@ USB ケーブルでつなぐだけで、OBS・Discord・Zoom などに「PhoneCa
 - iPhone のマイクを、OBS や Discord のマイクとして使える（VB-CABLE を使います）
 - 背景ぼかし・背景の切り抜き（緑）、明るさや色の調整、露出・ピント・ズームの操作
 - 広角 / 超広角 / インカメの切り替え、4K 出力、iPhone 内での高画質録画
+- iPhone を横向きにしてもプレビューが横向きで表示され、PC に映る範囲の枠・向き表示・グリッドで構図を決められます（v1.5.0）
+- カメラの切り替えとマイクのミュートを iPhone の画面からもでき、PC に反映されます（v1.5.0）
+- 水平メーターで、iPhone を真っすぐ置けているか確認できます（v1.5.0）
+- PC とつながったときに、iPhone が振動とお知らせでわかります（v1.5.0）
+- OBS やゲーム中でも使える **ショートカットキー**（カメラ切り替え・ミュート・背景ぼかし・録画など）（v1.5.0）
 - 使っていないときはカメラを止めて、発熱とバッテリーを節約
 - 初回は **セットアップウィザード** が必要なソフトを自動で用意します
+
+## ご利用にあたって
+
+PhoneCam は、**ご自分のカメラとマイクを、配信やビデオ通話で使うためのアプリ** です。
+
+- **他の人を、同意なしに撮影・録音することは禁止です。** 盗撮など、法律に反する目的では使わないでください。
+- 人が映る・声が入る配信や録画をするときは、その人の同意をとってください。
+- 撮影中であることは、わかるようにしてあります。iPhone ではカメラ使用中の緑のドットが出て、PhoneCam の画面にも「配信中」と表示されます。これらを隠すための機能は、今後も付けません。
+- 使い方によって起きたトラブルや損害について、作者は責任を負えません。ルールとマナーを守って、気持ちよく使ってください。
+
+セキュリティの問題を見つけたときは [SECURITY.md](SECURITY.md) をご覧ください。
 
 ## 必要なもの
 
@@ -64,6 +80,7 @@ AltStore の「My Apps」で AltStore を一度 **Refresh** してから、も�
 - [iPhoneアプリの入れ方（AltStore）](https://github.com/syuuga101/phonecam/blob/main/docs/guide/iPhone%E3%82%A2%E3%83%97%E3%83%AA%E3%81%AE%E5%85%A5%E3%82%8C%E6%96%B9%EF%BC%88AltStore%EF%BC%89.md)
 - [OBSで使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/OBS%E3%81%A7%E4%BD%BF%E3%81%86.md) / [Discordで使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/Discord%E3%81%A7%E4%BD%BF%E3%81%86.md)
 - [音声（iPhoneのマイク）を使う](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E9%9F%B3%E5%A3%B0%EF%BC%88iPhone%E3%81%AE%E3%83%9E%E3%82%A4%E3%82%AF%EF%BC%89%E3%82%92%E4%BD%BF%E3%81%86.md)
+- [ショートカットキー](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%B7%E3%83%A7%E3%83%BC%E3%83%88%E3%82%AB%E3%83%83%E3%83%88%E3%82%AD%E3%83%BC.md)
 - [画質と遅延の調整](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E7%94%BB%E8%B3%AA%E3%81%A8%E9%81%85%E5%BB%B6%E3%81%AE%E8%AA%BF%E6%95%B4.md) / [録画機能](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E9%8C%B2%E7%94%BB%E6%A9%9F%E8%83%BD.md)
 - [アップデート方法](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%A2%E3%83%83%E3%83%97%E3%83%87%E3%83%BC%E3%83%88%E6%96%B9%E6%B3%95.md)
 

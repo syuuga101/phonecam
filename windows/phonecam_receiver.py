@@ -43,6 +43,16 @@ except Exception:  # pragma: no cover
     phonecam_audio = None
 
 try:
+    import phonecam_dshowctl  # OBS の「ビデオの設定」(カメラ設定ダイアログ) との連携
+except Exception:  # pragma: no cover
+    phonecam_dshowctl = None
+
+try:
+    import phonecam_hotkeys  # グローバルショートカットキー (OBS やゲームを操作中でも効く)
+except Exception:  # pragma: no cover
+    phonecam_hotkeys = None
+
+try:
     import numpy as np
 except Exception:  # pragma: no cover
     np = None
@@ -643,8 +653,12 @@ DEFAULT_SETTINGS = {
     "mic_enabled": False,
     "mic_device": "",
     "mic_volume": 100,
-    "mic_mute": False,
+    "mic_mute": False,           # PC側だけの消音 (iPhoneからは音が送られ続ける)
+    "mic_muted": False,          # iPhoneのマイクミュート (オンの間は音声が送られない)。iPhone側の操作も取り込む
     "mic_delay_ms": 0,
+    # ショートカットキー (v1.5): どのアプリを使っていても効く。動作名 → "ctrl+alt+c" (空文字=なし)
+    "hotkeys_enabled": True,
+    "hotkeys": dict(phonecam_hotkeys.DEFAULT_HOTKEYS) if phonecam_hotkeys is not None else {},
     "mic_exclusive": None,       # WASAPI排他モード。None=自動 (出力先が CABLE Input のときだけ ON)
     "mic_priority": "low",       # "low"=低遅延優先 / "stable"=安定優先
     # iPhoneのカメラを動かすタイミング
@@ -697,7 +711,7 @@ INT_RANGES = {
     "mic_volume": (0, 200),
     "mic_delay_ms": (0, 500),
 }
-BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "setup_done", "hw_decode", "update_check")
+BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "mic_muted", "setup_done", "hw_decode", "update_check", "hotkeys_enabled")
 AUDIO_AVAILABLE = sd is not None and np is not None
 
 
@@ -848,6 +862,11 @@ def sanitize_settings(s):
         s["output_size"] = DEFAULT_SETTINGS["output_size"]
     if not isinstance(s.get("update_skip_version"), str) or len(s["update_skip_version"]) > 40:
         s["update_skip_version"] = DEFAULT_SETTINGS["update_skip_version"]
+    # v1.5 追加: ショートカットキー
+    if phonecam_hotkeys is not None:
+        s["hotkeys"] = phonecam_hotkeys.sanitize_hotkeys(s.get("hotkeys"))
+    else:
+        s["hotkeys"] = {}
     # 音声デバイスの控え
     try:
         pend = int(s.get("vbcable_restore_pending"))
@@ -900,9 +919,22 @@ def save_settings(settings, path=SETTINGS_PATH):
         pass
 
 
-def build_control(settings, group):
-    """設定から制御 JSON を作る。group='all' で全項目。"""
+def output_canvas_control(settings, frame_size=None):
+    """iPhone の枠ガイド用: 仮想カメラの出力サイズと合わせ方。native のときは最後に受けたフレームのサイズ (無ければ None)。"""
+    size = canvas_size(settings) or frame_size
+    if not size:
+        return None
+    fit = settings.get("fit", "pad")
+    return {"width": int(size[0]), "height": int(size[1]), "fit": fit if fit in FIT_MODES else "pad"}
+
+
+def build_control(settings, group, frame_size=None):
+    """設定から制御 JSON を作る。group='all' で全項目。frame_size: 最後にデコードしたフレームの (幅, 高さ)。"""
     c = {}
+    if group in ("all", "video", "canvas"):
+        oc = output_canvas_control(settings, frame_size)
+        if oc is not None:
+            c["outputCanvas"] = oc
     if group in ("all", "video"):
         w, h = RESOLUTIONS.get(settings["resolution"], (1920, 1080))
         c["lens"] = settings["lens"]
@@ -965,6 +997,8 @@ def build_control(settings, group):
     if group in ("all", "mic"):
         # sounddevice が無いと再生できないので、iPhone側でも有効にしない
         c["mic"] = {"enabled": bool(settings["mic_enabled"]) and AUDIO_AVAILABLE}
+    if group in ("all", "micMuted"):
+        c["micMuted"] = bool(settings.get("mic_muted", False))
     return c
 
 
@@ -2701,6 +2735,7 @@ class Link:
         self._stop = threading.Event()
         self._sock = None
         self._send_lock = threading.Lock()
+        self.last_frame_size = None  # 最後にデコードしたフレームの (幅, 高さ)
         self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
         self._decoder_key = None
         self._device_id = None     # USB 接続した iPhone の usbmux デバイスID (音声チャンネルも同じ iPhone へ)
@@ -2864,7 +2899,7 @@ class Link:
         decoders = DecoderManager(make_decoder, hw=self._hw_wanted())
         self._decoder_key = None
         self.state.update(status_text="接続済み", connected=True, error_text="", audio_path="shared",
-                          thin_total=0, thin_last=0.0)
+                          thin_total=0, thin_last=0.0, phone_status={})  # 前の接続のステータス (phoneEdit の seq など) を持ち越さない
 
         # 最初にペアリングコードを送る (Wi-Fi で必須。USB では iPhone が無視する)。USB は認証不要なので音声チャンネルもすぐ開く
         mode = self.get_mode_ip()[0]
@@ -2907,7 +2942,7 @@ class Link:
         sock = sock or self._sock
         if sock is None:
             return
-        full = build_control(self.settings, "all")
+        full = build_control(self.settings, "all", self.last_frame_size)
         full["keyframe"] = True
         if self.stream is not None:
             # 新しい接続では iPhone は既定で動作中として扱うので、PC側の希望をすぐ伝える
@@ -2997,6 +3032,7 @@ class Link:
     def _frame_to_image(self, frame, fmt, fitter):
         """デコード結果 → 出力サイズの BGR/RGB 配列。縮小と形式変換は reformat の1回で行う。"""
         canvas = canvas_size(self.settings)
+        self.last_frame_size = (frame.width, frame.height)
         if canvas is None or canvas == (frame.width, frame.height):
             return frame.to_ndarray(format=fmt)
         return fitter.process(frame, fmt, canvas, self.settings.get("fit", "pad"), pad_color_for(self.settings))
@@ -3160,6 +3196,7 @@ class Link:
 # GUI
 # ---------------------------------------------------------------------------
 
+PHONE_NOTE_SECONDS = 5.0
 LENS_LABELS = [("wide", "広角"), ("ultrawide", "超広角"), ("front", "インカメ")]
 RES_LABELS = ["720p", "1080p", "4K"]
 FPS_LABELS = [30, 60]
@@ -3274,6 +3311,12 @@ class App:
         self._meter_db = METER_MIN_DB
         self._timer_win = None
         self._pending = {}
+        self._slider_vars = {}
+        self._mode_vars = {}
+        self._ui_sync = False
+        self.dshowctl = None
+        self._dshow_reason = ""
+        self._dshow_retry_t = 0.0
         self._save_job = None
         self.focus_widgets = []
         self.manual_widgets = {}
@@ -3307,6 +3350,8 @@ class App:
         self._build_ui()
         self._update_enabled()
         self._apply_audio()
+        self._hotkey_init()
+        self._dshow_init()
         self._poll()
         self._meter_tick()
         self._stream_tick()
@@ -3346,7 +3391,7 @@ class App:
 
         def fire():
             self._pending.pop(group, None)
-            self.link.send_control(build_control(self.settings, group))
+            self.link.send_control(build_control(self.settings, group, self.link.last_frame_size))
 
         self._pending[group] = self.root.after(THROTTLE_MS, fire)
 
@@ -3367,9 +3412,12 @@ class App:
         if valid_pair_code(code):
             self.link.retry_auth()
 
-    def _lens_changed(self):
-        """レンズ変更。左右反転チェックはレンズごとに記憶した値へ切り替える。"""
-        self._changed("lens", self._label_to_value(LENS_LABELS, self.lens_var.get()), "video")
+    def _lens_changed(self, value=None, send=True):
+        """レンズ変更。左右反転チェックはレンズごとに記憶した値へ切り替える。
+        value を渡すとコンボボックスもその値にする。send=False は iPhone 側の操作を取り込むとき (送り返さない)。"""
+        if value is not None:
+            self.lens_var.set(self._value_to_label(LENS_LABELS, value))
+        self._changed("lens", self._label_to_value(LENS_LABELS, self.lens_var.get()), "video" if send else None)
         self.mirror_var.set(bool(self.settings[mirror_key(self.settings)]))
 
     def _changed(self, key, value, group):
@@ -3426,6 +3474,11 @@ class App:
         self._build_pc_status(p4)
         self._build_latency(p4)
         self._build_thermal_graph(p4)
+        p_keys = self._page("ショートカット")
+        try:
+            self._build_hotkeys(p_keys)
+        except Exception as e:  # ショートカット画面の不具合でアプリ本体を止めない
+            ttk.Label(p_keys, text="ショートカットの画面を表示できませんでした (%s)" % e).pack(padx=14, pady=14, anchor="w")
         p_setup = self._page("セットアップ")
         self._setup_tab = p_setup
         try:
@@ -3439,6 +3492,8 @@ class App:
             except Exception:
                 pass
         self.nb.bind("<<NotebookTabChanged>>", self._tab_changed)
+        self._toast_label = None
+        self._toast_job = None
 
     def _page(self, title):
         """スクロール可能なタブページを作り、中身を載せるフレームを返す。"""
@@ -3504,9 +3559,12 @@ class App:
             else:
                 v = round(v, 4)
             show(v)
+            if self._ui_sync:  # 設定からUIを合わせているだけのときは、保存も送信もしない
+                return
             self._changed(key, v, group)
 
         var.trace_add("write", on_write)
+        self._slider_vars[key] = var
         return scale, val_label, var
 
     def _build_connection(self, parent):
@@ -3677,18 +3735,18 @@ class App:
         cb = ttk.Combobox(f, textvariable=self.out_size_var, values=[l for _, l in OUTPUT_SIZE_LABELS], state="readonly", width=24)
         cb.grid(row=8, column=1, sticky="w", padx=6)
         cb.bind("<<ComboboxSelected>>", lambda e: self._changed(
-            "output_size", self._label_to_value(OUTPUT_SIZE_LABELS, self.out_size_var.get()), None))
+            "output_size", self._label_to_value(OUTPUT_SIZE_LABELS, self.out_size_var.get()), "canvas"))
 
         ttk.Label(f, text="出力の形").grid(row=9, column=0, sticky="w", pady=2)
         self.canvas_var = tk.StringVar(value=self._value_to_label(CANVAS_LABELS, self.settings["canvas"]))
         cb = ttk.Combobox(f, textvariable=self.canvas_var, values=[l for _, l in CANVAS_LABELS], state="readonly", width=24)
         cb.grid(row=9, column=1, sticky="w", padx=6)
-        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("canvas", self._label_to_value(CANVAS_LABELS, self.canvas_var.get()), None))
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("canvas", self._label_to_value(CANVAS_LABELS, self.canvas_var.get()), "canvas"))
         ttk.Label(f, text="合わせ方").grid(row=10, column=0, sticky="w", pady=2)
         self.fit_var = tk.StringVar(value=self._value_to_label(FIT_LABELS, self.settings["fit"]))
         cb = ttk.Combobox(f, textvariable=self.fit_var, values=[l for _, l in FIT_LABELS], state="readonly", width=24)
         cb.grid(row=10, column=1, sticky="w", padx=6)
-        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("fit", self._label_to_value(FIT_LABELS, self.fit_var.get()), None))
+        cb.bind("<<ComboboxSelected>>", lambda e: self._changed("fit", self._label_to_value(FIT_LABELS, self.fit_var.get()), "canvas"))
         self._hint(f, 11, "仮想カメラのサイズは固定です。iPhoneから送る解像度や向きを変えても、OBSやDiscordの映像は止まりません。"
                           "ここを変えたときだけ、OBSはソースを非表示→表示、Discordはカメラを一度オフ→オンにしてください")
 
@@ -4151,6 +4209,7 @@ class App:
         var = tk.StringVar(value=self._value_to_label(MODE3_LABELS, self.settings[key]))
         cb = ttk.Combobox(parent, textvariable=var, values=[l for _, l in MODE3_LABELS], state="readonly", width=14)
         cb.grid(row=row, column=1, sticky="w", padx=6)
+        self._mode_vars[key] = var
 
         def sel(_e=None):
             self._changed(key, self._label_to_value(MODE3_LABELS, var.get()), group)
@@ -4201,7 +4260,7 @@ class App:
 
     def _build_zoom(self, parent):
         f = self._section(parent, "ズーム・ライト")
-        self.zoom_scale, _, _ = self._slider(f, 0, "ズーム", "zoom", 1.0, 10.0, "zoom", lambda v: "%.1fx" % v, 0.1)
+        self.zoom_scale, _, self.zoom_var = self._slider(f, 0, "ズーム", "zoom", 1.0, 10.0, "zoom", lambda v: "%.1fx" % v, 0.1)
         self.torch_var = tk.BooleanVar(value=bool(self.settings["torch"]))
         self.torch_cb = ttk.Checkbutton(f, text="ライト", variable=self.torch_var,
                                         command=lambda: self._changed("torch", bool(self.torch_var.get()), "torch"))
@@ -4381,10 +4440,20 @@ class App:
 
         self.vol_scale, _, _ = self._slider(f, 2, "音量", "mic_volume", 0, 200, None,
                                             lambda v: "%d%%" % round(v), 5, as_int=True)
+        mf = ttk.Frame(f)
+        mf.grid(row=3, column=0, columnspan=3, sticky="w")
+        # メインのミュート: iPhoneに伝えて音声そのものを送らせない
+        self.mic_muted_var = tk.BooleanVar(value=bool(self.settings.get("mic_muted", False)))
+        self.mic_muted_cb = ttk.Checkbutton(mf, text="ミュート", variable=self.mic_muted_var,
+                                            command=lambda: self._changed("mic_muted", bool(self.mic_muted_var.get()), "micMuted"))
+        self.mic_muted_cb.grid(row=0, column=0, sticky="w")
+        self.phone_mute_var = tk.StringVar(value="")
+        self.phone_mute_lbl = ttk.Label(mf, textvariable=self.phone_mute_var, foreground="#c0392b", font=("", 9, "bold"))
+        self.phone_mute_lbl.grid(row=0, column=1, sticky="w", padx=(10, 0))
         self.mute_var = tk.BooleanVar(value=bool(self.settings["mic_mute"]))
-        self.mute_cb = ttk.Checkbutton(f, text="ミュート", variable=self.mute_var,
+        self.mute_cb = ttk.Checkbutton(mf, text="PCで消音（iPhoneからは送られ続けます）", variable=self.mute_var,
                                        command=lambda: self._changed("mic_mute", bool(self.mute_var.get()), None))
-        self.mute_cb.grid(row=3, column=0, columnspan=3, sticky="w")
+        self.mute_cb.grid(row=1, column=0, columnspan=2, sticky="w")
 
         ttk.Label(f, text="入力レベル").grid(row=4, column=0, sticky="w", pady=(6, 2))
         self.meter = tk.Canvas(f, height=12, highlightthickness=0, borderwidth=0, background="#e5e5ea")
@@ -4542,9 +4611,12 @@ class App:
             ttk.Label(f, textvariable=var, wraplength=px(340), justify="left").grid(row=row, column=1, sticky="w", padx=6)
             self.pc_vars[key] = var
         self.watch_var = self.pc_vars["watch"]
+        self.dshow_var = tk.StringVar(value="")
+        ttk.Label(f, text="OBSのカメラ設定ダイアログ連携").grid(row=4, column=0, sticky="w", pady=2)
+        ttk.Label(f, textvariable=self.dshow_var, wraplength=px(340), justify="left").grid(row=4, column=1, columnspan=2, sticky="w", padx=6)
         self.thin_var = tk.StringVar(value="")
         ttk.Label(f, textvariable=self.thin_var, foreground="#c0392b", wraplength=px(480), justify="left").grid(
-            row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+            row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._hint(f, 5, "「使用中の検出」は、OBSやDiscordが専用カメラを開いているかをPhoneCamが見ている結果です。"
                          "「未使用」のままカメラが動かないときは、アプリ側でカメラを一度オフ→オンにしてください", pady=(6, 0))
 
@@ -4760,6 +4832,275 @@ class App:
             else:
                 self.bg_hint.grid_remove()
 
+    # -- ショートカットキー ---------------------------------------------------
+    HOTKEY_POLL_MS = 50
+    HOTKEY_TAKEN_TEXT = "このキーは他のアプリが使っています"
+    ZOOM_STEP = 0.25
+    ZOOM_MIN, ZOOM_MAX = 1.0, 10.0
+
+    def _hotkey_init(self):
+        """起動時: ショートカットを登録して、押された動作を取り出すポーリングを始める。"""
+        self.hotkeys = None
+        self._hk_capture = None      # キー入力待ちの動作名
+        self._hk_taken = {}          # 動作名 → True (他のアプリが使用中)
+        if phonecam_hotkeys is None or not phonecam_hotkeys.is_windows():
+            return
+        try:
+            self.hotkeys = phonecam_hotkeys.HotkeyManager()
+            self._hotkey_apply()
+        except Exception:
+            self.hotkeys = None
+            return
+        self.root.after(self.HOTKEY_POLL_MS, self._hotkey_tick)
+
+    def _hotkey_bindings(self):
+        if not self.settings.get("hotkeys_enabled", True):
+            return {}
+        return dict(self.settings.get("hotkeys") or {})
+
+    def _hotkey_apply(self):
+        """設定どおりに登録し直す。登録できなかった動作は「他のアプリが使っています」を出す。"""
+        res = {}
+        if self.hotkeys is not None:
+            try:
+                res = self.hotkeys.apply(self._hotkey_bindings())
+            except Exception:
+                res = {}
+        self._hk_taken = {a: True for a, ok in res.items() if ok is False}
+        self._hotkey_refresh_ui()
+
+    def _hotkey_tick(self):
+        if self._closing or self.hotkeys is None:
+            return
+        try:
+            while True:
+                action = self.hotkeys.poll()
+                if action is None:
+                    break
+                self._hotkey_fire(action)
+        except Exception:
+            pass
+        self.root.after(self.HOTKEY_POLL_MS, self._hotkey_tick)
+
+    def _hotkey_fire(self, action):
+        """ショートカットが押された。動作を実行して、短いお知らせを出す。"""
+        try:
+            text = self._hotkey_do(action)
+        except Exception as e:
+            text = "ショートカットを実行できませんでした (%s)" % e
+        if text:
+            self._toast(text)
+
+    def _hotkey_do(self, action):
+        s = self.settings
+        if action == "camera":
+            st = self.state.snapshot()["phone_status"] if self.state.snapshot()["connected"] else {}
+            avail = [l for l in (st.get("lenses") or []) if l in LENSES] or list(LENSES)
+            cur = s.get("lens")
+            nxt = avail[(avail.index(cur) + 1) % len(avail)] if cur in avail else avail[0]
+            if nxt == cur:
+                return "カメラ: 切り替えできるレンズがありません"
+            self._lens_changed(nxt)
+            return "カメラ: %s" % dict(LENS_LABELS)[nxt]
+        if action == "mic":
+            muted = not bool(s.get("mic_muted", False))
+            self.mic_muted_var.set(muted)
+            self._changed("mic_muted", muted, "micMuted")
+            return "マイク: ミュート" if muted else "マイク: ミュート解除"
+        if action == "blur":
+            on = s.get("bg_mode") == "off"
+            mode = "blur" if on else "off"
+            self.bg_mode_var.set(self._value_to_label(BG_MODE_LABELS, mode))
+            self._changed("bg_mode", mode, "background")
+            self._update_enabled()
+            return "背景ぼかし: オン" if on else "背景ぼかし: オフ"
+        if action == "pause":
+            connected = self.state.snapshot()["connected"]
+            if not connected:
+                return "カメラ: iPhoneにつながっていません"
+            running = self.stream.desired(connected, time.monotonic())
+            self._stream_button()
+            return "カメラ: 一時停止" if running else "カメラ: 開始"
+        if action == "rec":
+            snap = self.state.snapshot()
+            if not snap["connected"]:
+                return "録画: iPhoneにつながっていません"
+            rec = snap["phone_status"].get("recording")
+            active = bool(rec.get("active")) if isinstance(rec, dict) else False
+            self._rec_clicked()
+            return "録画: 停止" if active else "録画: 開始"
+        if action in ("zoom_in", "zoom_out"):
+            step = self.ZOOM_STEP if action == "zoom_in" else -self.ZOOM_STEP
+            cur = float(s.get("zoom", 1.0))
+            new = round(min(self.ZOOM_MAX, max(self.ZOOM_MIN, round((cur + step) / self.ZOOM_STEP) * self.ZOOM_STEP)), 4)
+            if new != cur:
+                self.zoom_var.set(new)
+                if s.get("zoom") != new:
+                    self._changed("zoom", new, "zoom")
+            return "ズーム: %.2fx" % new
+        return None
+
+    def _toast(self, text):
+        """画面の下に短いお知らせを出し、状態欄にも出す。"""
+        self._phone_note = (text, time.monotonic() + 2.5)
+        try:
+            self.status_var.set(text)
+        except Exception:
+            pass
+        try:
+            if self._toast_label is None:
+                self._toast_label = tk.Label(self.root, bg="#1d1d1f", fg="#ffffff", font=("Yu Gothic UI", 11, "bold"),
+                                             padx=18, pady=8, borderwidth=0)
+            self._toast_label.config(text=text)
+            self._toast_label.place(relx=0.5, rely=1.0, y=-px(24), anchor="s")
+            self._toast_label.lift()
+            if self._toast_job is not None:
+                self.root.after_cancel(self._toast_job)
+            self._toast_job = self.root.after(2000, self._toast_hide)
+        except Exception:
+            pass
+
+    def _toast_hide(self):
+        self._toast_job = None
+        try:
+            if self._toast_label is not None:
+                self._toast_label.place_forget()
+        except Exception:
+            pass
+
+    def _build_hotkeys(self, parent):
+        hk = phonecam_hotkeys
+        f = self._section(parent, "ショートカットキー")
+        self.hk_enabled_var = tk.BooleanVar(value=bool(self.settings.get("hotkeys_enabled", True)))
+        ttk.Checkbutton(f, text="ショートカットキーを使う", variable=self.hk_enabled_var,
+                        command=self._hotkey_master_toggled).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        self._hint(f, 1, "OBSやゲームを操作しているときでも、PhoneCamを操作できます。"
+                         "「変更」を押してから、使いたいキーを押してください（Ctrl・Alt・Shift・Winのどれかと一緒に押します）")
+        self.hk_key_vars = {}
+        self.hk_note_vars = {}
+        self.hk_buttons = {}
+        grid = ttk.Frame(f)
+        grid.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        grid.columnconfigure(0, weight=1)
+        for i, (action, label, _d) in enumerate(hk.ACTIONS):
+            ttk.Label(grid, text=label).grid(row=i * 2, column=0, sticky="w", pady=(6, 0))
+            kv = tk.StringVar(value="")
+            self.hk_key_vars[action] = kv
+            ttk.Label(grid, textvariable=kv, font=("", 10, "bold"), width=22, anchor="center").grid(
+                row=i * 2, column=1, padx=6, pady=(6, 0))
+            b = ttk.Button(grid, text="変更", width=6, command=lambda a=action: self._hotkey_capture_start(a))
+            b.grid(row=i * 2, column=2, pady=(6, 0))
+            self.hk_buttons[action] = b
+            ttk.Button(grid, text="なし", width=6, command=lambda a=action: self._hotkey_set(a, "")).grid(
+                row=i * 2, column=3, padx=(4, 0), pady=(6, 0))
+            nv = tk.StringVar(value="")
+            self.hk_note_vars[action] = nv
+            ttk.Label(grid, textvariable=nv, foreground="#c0392b").grid(row=i * 2 + 1, column=0, columnspan=4, sticky="w")
+        row = len(hk.ACTIONS) * 2
+        ttk.Button(grid, text="すべて初期設定に戻す", command=self._hotkey_reset).grid(
+            row=row, column=0, columnspan=4, sticky="w", pady=(10, 0))
+        self.hk_msg_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self.hk_msg_var, foreground="#b7791f", wraplength=px(480), justify="left").grid(
+            row=3, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        if not hk.is_windows():
+            self._hint(f, 4, "ショートカットキーはWindowsでだけ使えます", pady=(4, 0))
+        self._hotkey_refresh_ui()
+
+    def _hotkey_refresh_ui(self):
+        hk = phonecam_hotkeys
+        if hk is None or not hasattr(self, "hk_key_vars"):
+            return
+        capturing = getattr(self, "_hk_capture", None)
+        enabled = bool(self.settings.get("hotkeys_enabled", True))
+        for action in hk.ACTION_NAMES:
+            combo = (self.settings.get("hotkeys") or {}).get(action, "")
+            if capturing == action:
+                self.hk_key_vars[action].set("キーを押してください…")
+                self.hk_buttons[action].config(text="取消")
+            else:
+                self.hk_key_vars[action].set(hk.combo_text(combo))
+                self.hk_buttons[action].config(text="変更")
+            taken = enabled and combo and getattr(self, "_hk_taken", {}).get(action)
+            self.hk_note_vars[action].set(self.HOTKEY_TAKEN_TEXT if taken else "")
+
+    def _hotkey_master_toggled(self):
+        self._changed("hotkeys_enabled", bool(self.hk_enabled_var.get()), None)
+        self._hotkey_capture_stop()
+        self._hotkey_apply()
+
+    def _hotkey_set(self, action, combo):
+        """動作のキーを変える ("" でなし)。他の動作と同じキーは断る。"""
+        hk = phonecam_hotkeys
+        keys = dict(self.settings.get("hotkeys") or {})
+        if combo:
+            for other, c in keys.items():
+                if other != action and c == combo:
+                    self.hk_msg_var.set("%s は「%s」で使っています。先にそちらを変えてください" % (
+                        hk.combo_text(combo), hk.ACTION_LABELS[other]))
+                    self._hotkey_capture_stop()
+                    return False
+        keys[action] = combo
+        self._changed("hotkeys", keys, None)
+        self.hk_msg_var.set("")
+        self._hotkey_capture_stop()
+        self._hotkey_apply()
+        return True
+
+    def _hotkey_reset(self):
+        self._changed("hotkeys", dict(phonecam_hotkeys.DEFAULT_HOTKEYS), None)
+        self.hk_msg_var.set("")
+        self._hotkey_capture_stop()
+        self._hotkey_apply()
+
+    def _hotkey_capture_start(self, action):
+        if getattr(self, "_hk_capture", None) == action:
+            self._hotkey_capture_stop()
+            return
+        self._hk_capture = action
+        self.hk_msg_var.set("使いたいキーを押してください（Ctrl・Alt・Shift・Winのどれかと一緒に押します）。Escで取り消します")
+        try:
+            self.root.bind("<KeyPress>", self._hotkey_on_key)
+            self.root.focus_force()
+        except Exception:
+            pass
+        # 入力待ちの間は登録を外す (今のキーを押し直したときに、反応せず取り込めるように)
+        if self.hotkeys is not None:
+            try:
+                self.hotkeys.apply({})
+            except Exception:
+                pass
+        self._hotkey_refresh_ui()
+
+    def _hotkey_capture_stop(self):
+        was = getattr(self, "_hk_capture", None)
+        self._hk_capture = None
+        try:
+            self.root.unbind("<KeyPress>")
+        except Exception:
+            pass
+        if was is not None:
+            self._hotkey_apply()
+        self._hotkey_refresh_ui()
+
+    def _hotkey_on_key(self, event):
+        action = getattr(self, "_hk_capture", None)
+        if action is None:
+            return None
+        hk = phonecam_hotkeys
+        if event.keysym == "Escape":
+            self.hk_msg_var.set("")
+            self._hotkey_capture_stop()
+            return "break"
+        if event.keysym in ("Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R",
+                            "Win_L", "Win_R", "Super_L", "Super_R", "Meta_L", "Meta_R"):
+            return "break"  # 修飾キーだけでは決めない。続けて押すのを待つ
+        combo = hk.combo_from_tk_event(event.state, event.keysym, getattr(event, "keycode", None), hk.win_key_down())
+        if combo is None:
+            self.hk_msg_var.set("Ctrl・Alt・Shift・Winのどれかと、文字・数字・F1〜F12・矢印キーなどを一緒に押してください")
+            return "break"
+        self._hotkey_set(action, combo)
+        return "break"
+
     # -- 接続 ---------------------------------------------------------------
     def toggle_connect(self):
         if not self.wanted:
@@ -4783,11 +5124,112 @@ class App:
             self.link.stop()
             self.stream.reset_user()
 
+    # -- OBS のカメラ設定ダイアログ連携 (メインスレッド) -------------------------
+    DSHOW_POLL_MS = 200
+    DSHOW_RETRY_SEC = 5.0
+
+    def _dshow_init(self):
+        """起動時: 共有メモリを開き、変更を取り込むループを始める。使えなくてもアプリは普通に動く。"""
+        self.dshowctl = None
+        self._dshow_reason = ""
+        if phonecam_dshowctl is None:
+            self._dshow_reason = "モジュールがありません"
+        else:
+            try:
+                self.dshowctl = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES)
+                if not self.dshowctl.open():
+                    self._dshow_reason = ("Windowsのみ対応" if not sys.platform.startswith("win")
+                                          else "PhoneCamカメラの準備ができていません")
+            except Exception:
+                self.dshowctl = None
+                self._dshow_reason = "初期化に失敗しました"
+        self._dshow_show_state()
+        self._dshow_retry_t = time.monotonic() + self.DSHOW_RETRY_SEC
+        self.root.after(self.DSHOW_POLL_MS, self._dshow_tick)
+
+    def _dshow_show_state(self):
+        try:
+            ok = self.dshowctl is not None and self.dshowctl.is_open
+            self.dshow_var.set("有効" if ok else "無効（%s）" % (self._dshow_reason or "未接続"))
+        except Exception:
+            pass
+
+    def _dshow_tick(self):
+        if self._closing:
+            return
+        try:
+            self._dshow_step()
+        except Exception:
+            pass  # 連携の失敗でアプリ本体を止めない
+        try:
+            self.root.after(self.DSHOW_POLL_MS, self._dshow_tick)
+        except Exception:
+            pass
+
+    def _dshow_step(self):
+        d = self.dshowctl
+        if d is None:
+            return
+        if not d.is_open:
+            now = time.monotonic()
+            if now < self._dshow_retry_t:
+                return
+            self._dshow_retry_t = now + self.DSHOW_RETRY_SEC
+            if d.open():
+                self._dshow_reason = ""
+            self._dshow_show_state()
+            if not d.is_open:
+                return
+        try:
+            changes = d.poll_changes()
+            for c in changes:
+                try:
+                    self._changed(c["key"], c["value"], c.get("group"))
+                except Exception:
+                    pass
+            if changes:
+                self._dshow_sync_ui([c["key"] for c in changes])
+        finally:
+            snap = self.state.snapshot()
+            st = snap["phone_status"] if snap.get("connected") else {}
+            d.publish(st or {}, self.settings)  # 変更を取り込んだ後は必ず現在値を書き戻す
+        self._dshow_show_state()
+
+    def _dshow_sync_ui(self, keys):
+        """設定の値に合わせてスライダー・コンボボックスを更新する (保存・送信はしない)。"""
+        self._ui_sync = True
+        try:
+            for k in keys:
+                try:
+                    v = self.settings[k]
+                    if k in self._slider_vars:
+                        self._slider_vars[k].set(float(v))
+                    elif k in self._mode_vars:
+                        self._mode_vars[k].set(self._value_to_label(MODE3_LABELS, v))
+                    elif k == "shutter":
+                        self.shutter_var.set("1/%d" % int(v))
+                except Exception:
+                    pass
+            try:
+                self._update_enabled()
+            except Exception:
+                pass
+        finally:
+            self._ui_sync = False
+
     # -- 状態表示のポーリング (メインスレッド) -----------------------------------
     def _poll(self):
         snap = self.state.snapshot()
         st = snap["phone_status"]
         self.status_var.set(snap["status_text"])
+        connected_now = snap["connected"]
+        note = self._apply_phone_edit(st if connected_now else None, time.monotonic())
+        if note:
+            self._phone_note = (note, time.monotonic() + PHONE_NOTE_SECONDS)
+        pn = getattr(self, "_phone_note", None)
+        if pn and time.monotonic() < pn[1]:
+            self.status_var.set(pn[0])
+        self.phone_mute_var.set("iPhoneでミュート中" if connected_now and st.get("micMuted") else "")
         self.fps_var.set("%.1f" % snap["recv_fps"] if snap["connected"] else "-")
         self.dec_var.set("%.1f ms" % snap["decode_ms"] if snap["connected"] else "-")
         self.res_var.set(snap["resolution"])
@@ -4814,6 +5256,35 @@ class App:
         self._was_connected = connected
         self._update_v13(st if connected else {}, connected, snap, now)
         self.root.after(100, self._poll)
+
+    def _apply_phone_edit(self, st, now=None):
+        """status の phoneEdit を取り込む。seq が前回より増えたときだけ lens / micMuted を設定とUIに反映する
+        (iPhone へは送り返さない)。最初に見た seq は基準にするだけ。st=None (未接続) で基準をリセット。
+        戻り値: 状態欄に出す通知文 (無ければ None)。"""
+        if not st:
+            self._edit_seq = None
+            return None
+        pe = st.get("phoneEdit")
+        if not isinstance(pe, dict):
+            return None
+        seq = pe.get("seq")
+        if not isinstance(seq, int) or isinstance(seq, bool):
+            return None
+        last = getattr(self, "_edit_seq", None)
+        self._edit_seq = seq
+        if last is None or seq <= last:
+            return None
+        notes = []
+        lens = pe.get("lens")
+        if lens in LENSES and lens != self.settings.get("lens"):
+            self._lens_changed(lens, send=False)
+            notes.append("iPhoneでカメラを「%s」に切り替えました" % dict(LENS_LABELS)[lens])
+        muted = pe.get("micMuted")
+        if isinstance(muted, bool) and muted != bool(self.settings.get("mic_muted", False)):
+            self.mic_muted_var.set(muted)
+            self._changed("mic_muted", muted, None)
+            notes.append("iPhoneでマイクをミュートしました" if muted else "iPhoneでマイクのミュートを解除しました")
+        return " / ".join(notes) if notes else None
 
     def _update_v13(self, st, connected, snap, now):
         """省電力・録画・遅延・音声の表示と、温度履歴の記録 (1秒ごと)。"""
@@ -5371,6 +5842,16 @@ class App:
 
     def on_close(self):
         self._closing = True
+        try:
+            if self.dshowctl is not None:
+                self.dshowctl.close()
+        except Exception:
+            pass
+        try:
+            if self.hotkeys is not None:
+                self.hotkeys.stop()
+        except Exception:
+            pass
         try:
             if self._upd_dl is not None:
                 self._upd_dl["cancel"].set()
