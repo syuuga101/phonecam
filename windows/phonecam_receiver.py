@@ -19,6 +19,10 @@ try:
     from phonecam_version import VERSION as APP_VERSION  # ビルド時に生成される
 except Exception:
     APP_VERSION = "dev"
+try:
+    from phonecam_version import REPO as APP_REPO  # ビルド時に生成される ("owner/name")
+except Exception:
+    APP_REPO = ""
 import threading
 import time
 from collections import deque
@@ -27,6 +31,11 @@ try:
     import phonecam_setup  # セットアップ (必要ソフトの検出・インストール・ウィザード)
 except Exception:  # pragma: no cover
     phonecam_setup = None
+
+try:
+    import phonecam_update  # 更新の確認と自己更新
+except Exception:  # pragma: no cover
+    phonecam_update = None
 
 try:
     import phonecam_audio  # VB-CABLE 導入で既定の音声デバイスが変わるのを戻す
@@ -646,6 +655,9 @@ DEFAULT_SETTINGS = {
     # VB-CABLE 導入前の既定の音声デバイス (導入後に CABLE へ切り替わったら戻すため。戻したら消す)
     "audio_defaults_backup": None,
     "vbcable_restore_pending": 0,
+    # 更新の確認
+    "update_check": True,        # 起動時と6時間ごとに新しいバージョンを確認する
+    "update_skip_version": "",   # 「このバージョンを通知しない」にした版 (例: "1.4.1")
 }
 
 RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "4K": (3840, 2160)}
@@ -685,7 +697,7 @@ INT_RANGES = {
     "mic_volume": (0, 200),
     "mic_delay_ms": (0, 500),
 }
-BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "setup_done", "hw_decode")
+BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "setup_done", "hw_decode", "update_check")
 AUDIO_AVAILABLE = sd is not None and np is not None
 
 
@@ -834,6 +846,8 @@ def sanitize_settings(s):
     # v1.4 追加: 出力サイズ (古い設定では持っていない → 解像度に関係なく 1080p。仮想カメラのサイズは固定)
     if s.get("output_size") not in RESOLUTIONS:
         s["output_size"] = DEFAULT_SETTINGS["output_size"]
+    if not isinstance(s.get("update_skip_version"), str) or len(s["update_skip_version"]) > 40:
+        s["update_skip_version"] = DEFAULT_SETTINGS["update_skip_version"]
     # 音声デバイスの控え
     try:
         pend = int(s.get("vbcable_restore_pending"))
@@ -3174,6 +3188,16 @@ REC_RES_LABELS = [("same", "配信と同じ"), ("4k", "4K")]
 REC_PRESET_LABELS = [("standard", "標準"), ("high", "高画質"), ("max", "最高")]
 REC_CONTAINER_LABELS = [("mp4", "MP4（おすすめ・どこでも再生できます）"), ("mov", "MOV（編集ソフト向け）")]
 CAMERA_DROP_LABELS = [("late", "遅延"), ("outOfBuffers", "バッファ不足"), ("discontinuity", "不連続")]
+# 更新バナー・更新欄の配色 (Apple 風: 淡いグレーの帯、青のボタン)
+UPD_BG = "#f5f5f7"
+UPD_BG_WHITE = "#ffffff"
+UPD_FG = "#1d1d1f"
+UPD_SUB = "#6e6e73"
+UPD_LINE = "#d2d2d7"
+UPD_ACCENT = "#0071e3"
+UPD_WARN = "#b25000"
+UPD_FONT = "Yu Gothic UI"
+
 STATUS_TAB_INDEX = 5
 METER_MIN_DB = -60.0
 THERMAL_WARNING = "iPhoneが熱くなっています。fpsを30に下げるか、エフェクトをオフにしてください"
@@ -3259,6 +3283,14 @@ class App:
         self.setup = None
         self._wizard = None
         self._setup_last_check = 0.0
+        self._upd_release = None        # 最後に取得した最新リリース (phonecam_update.parse_release)
+        self._upd_checking = False
+        self._upd_box = []
+        self._upd_dismissed = set()     # 「あとで」にした版 (この起動中だけ)
+        self._upd_pending_wizard = False
+        self._upd_dl = None             # ダウンロード中の状態
+        self._upd_notes_win = None
+        self._phone_ver = ""
         if phonecam_setup is not None:
             try:
                 self.setup = phonecam_setup.SetupController(
@@ -3280,6 +3312,7 @@ class App:
         self._stream_tick()
         root.after(600, self._first_run_check)
         root.after(2500, self._audio_startup_check)
+        self._update_init()
 
     # -- 補助 -------------------------------------------------------------
     def _get_mode_ip(self):
@@ -3362,6 +3395,12 @@ class App:
                                     font=("", 9, "bold"), wraplength=px(560), justify="left", padding=(14, 6))
         self.nb = ttk.Notebook(outer)
         self.nb.pack(fill="both", expand=True, padx=4, pady=(6, 4))
+        self.upd_check_var = tk.BooleanVar(value=bool(self.settings.get("update_check", True)))
+        self.upd_status_var = tk.StringVar(value="最終確認: まだ確認していません")
+        try:
+            self._build_update_banner(outer)
+        except Exception:  # 更新バナーの不具合でアプリ本体を止めない
+            self._upd_banner = None
         self._canvases = []
         self.root.bind_all("<MouseWheel>", self._on_wheel)
 
@@ -3394,6 +3433,11 @@ class App:
         except Exception as e:  # セットアップ画面の不具合でアプリ本体を止めない
             self.setup = None
             ttk.Label(p_setup, text="セットアップ画面を表示できませんでした (%s)" % e).pack(padx=14, pady=14, anchor="w")
+        if self.setup is None:
+            try:
+                self._build_update_section(p_setup, None)
+            except Exception:
+                pass
         self.nb.bind("<<NotebookTabChanged>>", self._tab_changed)
 
     def _page(self, title):
@@ -3822,6 +3866,10 @@ class App:
         self.setup_alt_btn = ps.make_button(row2, "AltServerを起動", self._setup_launch_altserver)
         self.setup_alt_btn.pack(side="left", padx=(px(10), 0))
         self.setup_alt_btn.pack_forget()
+        try:
+            self._build_update_section(inner, ps)
+        except Exception:
+            pass
         rerun = ps.make_link(inner, "初期セットアップをやり直す", self._setup_rerun)
         rerun.pack(anchor="w", pady=(16, 0))
         self.setup.listen(self._setup_event)
@@ -3942,6 +3990,7 @@ class App:
 
     def _iphone_wizard_closed(self):
         self._wizard = None
+        self._update_after_wizard()
         try:
             self.setup.recheck()
         except Exception:
@@ -4027,6 +4076,7 @@ class App:
             self.setup.recheck()
         except Exception:
             pass
+        self._update_after_wizard()
 
     def _do_save_now(self):
         if self._save_job is not None:
@@ -4205,6 +4255,9 @@ class App:
             self.st_vars[key] = var
             self.st_labels[key] = lbl
         self._hint(f, 12, "接続中のiPhoneから約1秒ごとに更新されます", pady=(6, 0))
+        self.ver_note_var = tk.StringVar(value="")
+        ttk.Label(f, textvariable=self.ver_note_var, foreground="#6e6e73", wraplength=px(480),
+                  justify="left").grid(row=13, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
     def _build_record(self, parent):
         f = self._section(parent, "録画の設定（iPhone側で高画質に録画）")
@@ -4864,6 +4917,7 @@ class App:
                 self._apply_audio()
 
     def _update_phone_status(self, st):
+        self._update_note_phone_version(st.get("appVersion"))
         thermal = st.get("thermalState")
         self.st_vars["thermal"].set(THERMAL_LABELS.get(thermal, "-") if thermal else "-")
         level = st.get("pressureLevel")
@@ -4918,8 +4972,399 @@ class App:
             pass
         self._update_enabled()
 
+    # -- 更新の確認と自己更新 -------------------------------------------------
+    def _update_possible(self):
+        """更新確認ができるか (開発版・確認先なしでは確認しない)。"""
+        return (phonecam_update is not None and bool(APP_REPO)
+                and phonecam_update.parse_version(APP_VERSION) is not None)
+
+    def _update_init(self):
+        if phonecam_update is None:
+            return
+        if _is_frozen():
+            try:
+                stem = os.path.splitext(os.path.basename(sys.executable))[0]
+                phonecam_update.cleanup_old(_app_dir(), prefix=stem)  # 前回の更新で残った古い exe を消す
+            except Exception:
+                pass
+        self.root.after(3000, self._update_startup)
+
+    def _update_startup(self):
+        if self._closing:
+            return
+        self.root.after(int(phonecam_update.CHECK_INTERVAL_SEC * 1000), self._update_periodic)
+        self._update_try(auto=True)
+
+    def _update_periodic(self):
+        if self._closing:
+            return
+        self.root.after(int(phonecam_update.CHECK_INTERVAL_SEC * 1000), self._update_periodic)
+        self._update_try(auto=True)
+
+    def _update_after_wizard(self):
+        if self._upd_pending_wizard:
+            self._upd_pending_wizard = False
+            self.root.after(1500, lambda: self._update_try(auto=True))
+
+    def _update_check_toggled(self):
+        self.settings["update_check"] = bool(self.upd_check_var.get())
+        self._schedule_save()
+
+    def _update_check_now(self):
+        self._update_try(auto=False)
+
+    def _update_try(self, auto):
+        if self._closing:
+            return
+        if auto and not self.settings.get("update_check", True):
+            return
+        if not self._update_possible():
+            if not auto:
+                self.upd_status_var.set("開発版のため、更新の確認はしません")
+            return
+        if auto and self._wizard is not None:
+            self._upd_pending_wizard = True  # セットアップを閉じたあとに確認する
+            return
+        if self._upd_checking:
+            return
+        self._upd_checking = True
+        self._upd_box = box = []
+        if not auto:
+            self.upd_status_var.set("確認しています…")
+
+        def work():
+            try:
+                box.append(("ok", phonecam_update.fetch_latest(APP_REPO, APP_VERSION)))
+            except phonecam_update.UpdateError as e:
+                box.append(("err", str(e)))
+            except Exception:
+                box.append(("err", "確認できませんでした"))
+
+        threading.Thread(target=work, name="update-check", daemon=True).start()
+        self.root.after(200, lambda: self._update_poll(box, auto))
+
+    def _update_poll(self, box, auto):
+        if self._closing:
+            return
+        if not box:
+            self.root.after(200, lambda: self._update_poll(box, auto))
+            return
+        self._upd_checking = False
+        kind, val = box[0]
+        stamp = time.strftime("%m/%d %H:%M")
+        if kind == "ok":
+            self._upd_release = val
+            if phonecam_update.is_newer(val["tag"], APP_VERSION):
+                self.upd_status_var.set("最終確認: %s（v%s があります）" % (stamp, val["version"]))
+            else:
+                self.upd_status_var.set("最終確認: %s（最新です）" % stamp)
+            if not auto:
+                self._upd_dismissed.discard(val["tag"])
+            self._update_refresh_banner(force=not auto)
+        else:
+            self.upd_status_var.set("最終確認: %s（確認できませんでした: %s）" % (stamp, val))
+
+    def _update_banner_state(self, force=False):
+        """(表示するか, PCが新しいか, iPhoneが古いか)。"""
+        rel = self._upd_release
+        if not rel:
+            return False, False, False
+        tag = rel["tag"]
+        pc_new = phonecam_update.is_newer(tag, APP_VERSION)
+        ph_new = bool(self._phone_ver) and phonecam_update.is_newer(tag, self._phone_ver)
+        if not (pc_new or ph_new):
+            return False, pc_new, ph_new
+        if tag in self._upd_dismissed:
+            return False, pc_new, ph_new
+        if not force and not phonecam_update.skip_allows(tag, self.settings.get("update_skip_version", "")):
+            return False, pc_new, ph_new
+        return True, pc_new, ph_new
+
+    def _update_refresh_banner(self, force=False):
+        banner = getattr(self, "_upd_banner", None)
+        if banner is None or self._closing:
+            return
+        if self._upd_dl is not None:
+            return  # ダウンロード中は表示を変えない
+        show, pc_new, ph_new = self._update_banner_state(force)
+        if not show:
+            self._update_hide_banner()
+            return
+        rel = self._upd_release
+        self._upd_title_var.set("新しいバージョン v%s があります" % rel["version"])
+        self._upd_sub_var.set("iPhoneアプリにも新しいバージョンがあります（AltStoreの「My Apps」で更新できます）" if ph_new else "")
+        if ph_new:
+            self._upd_sub.pack(anchor="w", pady=(2, 0), after=self._upd_title)
+        else:
+            self._upd_sub.pack_forget()
+        self._upd_msg_var.set("")
+        self._upd_progress_box.pack_forget()
+        self._upd_btn_row.pack(anchor="w", pady=(8, 0))
+        if pc_new:
+            self._upd_now_btn.pack(side="left", before=self._upd_notes_btn)
+        else:
+            self._upd_now_btn.pack_forget()
+        if not banner.winfo_ismapped():
+            banner.pack(side="top", fill="x", before=self.nb)
+
+    def _update_hide_banner(self):
+        try:
+            self._upd_banner.pack_forget()
+        except Exception:
+            pass
+
+    def _update_note_phone_version(self, ver):
+        """iPhone から届いた appVersion を覚え、PC と major.minor が違えば状態タブに控えめに知らせる。"""
+        ver = ver if isinstance(ver, str) else ""
+        if phonecam_update is None:
+            return
+        if ver and ver != self._phone_ver:
+            self._phone_ver = ver
+            if self._upd_release is not None:
+                self._update_refresh_banner()
+        note = ""
+        if (ver and phonecam_update.parse_version(ver) is not None
+                and phonecam_update.parse_version(APP_VERSION) is not None
+                and not phonecam_update.same_major_minor(ver, APP_VERSION)):
+            note = "iPhoneアプリとPCアプリのバージョンが違います（PC v%s, iPhone v%s）" % (
+                phonecam_update.display_version(APP_VERSION), phonecam_update.display_version(ver))
+        if self.ver_note_var.get() != note:
+            self.ver_note_var.set(note)
+
+    # 更新の画面
+    def _upd_button(self, parent, text, command, kind="secondary"):
+        if kind == "primary":
+            return tk.Button(parent, text=text, command=command, bg=UPD_ACCENT, fg="#ffffff", activebackground="#0077ed",
+                             activeforeground="#ffffff", relief="flat", bd=0, padx=px(16), pady=px(5), cursor="hand2",
+                             font=(UPD_FONT, 10, "bold"))
+        if kind == "link":
+            return tk.Button(parent, text=text, command=command, bg=UPD_BG, fg=UPD_SUB, activebackground=UPD_BG,
+                             activeforeground=UPD_FG, relief="flat", bd=0, padx=px(6), pady=px(5), cursor="hand2",
+                             font=(UPD_FONT, 9))
+        return tk.Button(parent, text=text, command=command, bg="#ffffff", fg=UPD_FG, activebackground="#ececf0",
+                         activeforeground=UPD_FG, relief="flat", bd=0, padx=px(14), pady=px(5), cursor="hand2",
+                         font=(UPD_FONT, 10))
+
+    def _build_update_banner(self, outer):
+        bar = tk.Frame(outer, bg=UPD_BG)
+        self._upd_banner = bar
+        inner = tk.Frame(bar, bg=UPD_BG)
+        inner.pack(fill="x", padx=px(16), pady=px(10))
+        self._upd_title_var = tk.StringVar(value="")
+        self._upd_sub_var = tk.StringVar(value="")
+        self._upd_msg_var = tk.StringVar(value="")
+        self._upd_title = tk.Label(inner, textvariable=self._upd_title_var, bg=UPD_BG, fg=UPD_FG,
+                                   font=(UPD_FONT, 11, "bold"), anchor="w")
+        self._upd_title.pack(anchor="w")
+        self._upd_sub = tk.Label(inner, textvariable=self._upd_sub_var, bg=UPD_BG, fg=UPD_SUB, font=(UPD_FONT, 9),
+                                 justify="left", wraplength=px(580), anchor="w")
+        row = tk.Frame(inner, bg=UPD_BG)
+        self._upd_btn_row = row
+        self._upd_now_btn = self._upd_button(row, "今すぐ更新", self._update_now, "primary")
+        self._upd_notes_btn = self._upd_button(row, "更新内容を見る", self._update_show_notes)
+        self._upd_notes_btn.pack(side="left", padx=(px(8), 0))
+        self._upd_button(row, "あとで", self._update_later, "link").pack(side="left", padx=(px(8), 0))
+        self._upd_button(row, "このバージョンを通知しない", self._update_skip, "link").pack(side="left")
+        row.pack(anchor="w", pady=(8, 0))
+        prog = tk.Frame(inner, bg=UPD_BG)
+        self._upd_progress_box = prog
+        self._upd_prog_var = tk.StringVar(value="")
+        tk.Label(prog, textvariable=self._upd_prog_var, bg=UPD_BG, fg=UPD_FG, font=(UPD_FONT, 9), anchor="w").pack(anchor="w")
+        pr = tk.Frame(prog, bg=UPD_BG)
+        pr.pack(fill="x", pady=(4, 0))
+        self._upd_bar = ttk.Progressbar(pr, orient="horizontal", mode="determinate", maximum=100)
+        self._upd_bar.pack(side="left", fill="x", expand=True)
+        self._upd_button(pr, "キャンセル", self._update_cancel, "link").pack(side="left", padx=(px(8), 0))
+        tk.Label(inner, textvariable=self._upd_msg_var, bg=UPD_BG, fg=UPD_WARN, font=(UPD_FONT, 9), justify="left",
+                 wraplength=px(580), anchor="w").pack(anchor="w", pady=(4, 0))
+        tk.Frame(bar, bg=UPD_LINE, height=1).pack(fill="x", side="bottom")
+
+    def _build_update_section(self, parent, ps):
+        """セットアップタブの「アップデート」欄。"""
+        bg = ps.BG if ps is not None else UPD_BG
+        fg = ps.FG if ps is not None else UPD_FG
+        sub = ps.SUB if ps is not None else UPD_SUB
+        font = ps.FONT if ps is not None else UPD_FONT
+        tk.Frame(parent, bg=ps.LINE if ps is not None else UPD_LINE, height=1).pack(fill="x", pady=(14, 10))
+        tk.Label(parent, text="アップデート", bg=bg, fg=fg, font=(font, 11, "bold")).pack(anchor="w")
+        tk.Checkbutton(parent, text="起動時に更新を確認する", variable=self.upd_check_var, command=self._update_check_toggled,
+                       bg=bg, activebackground=bg, fg=fg, activeforeground=fg, selectcolor="#ffffff",
+                       font=(font, 10), anchor="w", bd=0, highlightthickness=0).pack(anchor="w", pady=(6, 0))
+        row = tk.Frame(parent, bg=bg)
+        row.pack(anchor="w", pady=(6, 0))
+        self._upd_button(row, "今すぐ確認", self._update_check_now).pack(side="left")
+        tk.Label(row, textvariable=self.upd_status_var, bg=bg, fg=sub, font=(font, 9), justify="left",
+                 wraplength=px(380), anchor="w").pack(side="left", padx=(px(10), 0))
+
+    def _update_later(self):
+        if self._upd_release:
+            self._upd_dismissed.add(self._upd_release["tag"])
+        self._update_hide_banner()
+
+    def _update_skip(self):
+        if self._upd_release:
+            self.settings["update_skip_version"] = self._upd_release["version"]
+            self._do_save_now()
+        self._update_hide_banner()
+
+    def _update_open_page(self):
+        rel = self._upd_release or {}
+        url = rel.get("html_url") or ("https://github.com/%s/releases/latest" % APP_REPO if APP_REPO else "")
+        if url:
+            webbrowser_open(url)
+
+    def _update_show_notes(self):
+        rel = self._upd_release
+        if not rel:
+            return
+        win = self._upd_notes_win
+        try:
+            if win is not None and win.winfo_exists():
+                win.destroy()
+        except Exception:
+            pass
+        win = tk.Toplevel(self.root)
+        self._upd_notes_win = win
+        win.title("更新内容 v%s" % rel["version"])
+        win.configure(bg=UPD_BG_WHITE)
+        win.minsize(px(420), px(300))
+        win.geometry("%dx%d" % (px(520), px(420)))
+        try:
+            win.transient(self.root)
+        except Exception:
+            pass
+        head = tk.Frame(win, bg=UPD_BG_WHITE)
+        head.pack(fill="x", padx=px(18), pady=(px(16), px(6)))
+        tk.Label(head, text="v%s の更新内容" % rel["version"], bg=UPD_BG_WHITE, fg=UPD_FG,
+                 font=(UPD_FONT, 14, "bold")).pack(anchor="w")
+        foot = tk.Frame(win, bg=UPD_BG_WHITE)
+        foot.pack(side="bottom", fill="x", padx=px(18), pady=px(14))
+        self._upd_button(foot, "リリースページを開く", self._update_open_page, "primary").pack(side="left")
+        self._upd_button(foot, "閉じる", win.destroy).pack(side="left", padx=(px(8), 0))
+        mid = tk.Frame(win, bg=UPD_BG_WHITE)
+        mid.pack(fill="both", expand=True, padx=px(18))
+        txt = tk.Text(mid, wrap="word", bg=UPD_BG, fg=UPD_FG, relief="flat", bd=0, padx=px(12), pady=px(10),
+                      font=(UPD_FONT, 10), height=8)
+        sb = ttk.Scrollbar(mid, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        txt.pack(side="left", fill="both", expand=True)
+        body = phonecam_update.markdown_to_text(rel.get("body", "")) or "更新内容は書かれていません。"
+        txt.insert("1.0", body)
+        txt.configure(state="disabled")
+
+    def _update_now(self):
+        rel = self._upd_release
+        if not rel or self._upd_dl is not None:
+            return
+        asset = rel.get("asset")
+        if not _is_frozen() or not asset:
+            self._update_open_page()
+            if _is_frozen():
+                self._upd_msg_var.set("このリリースには自動更新用のファイルがないため、ダウンロードページを開きました。")
+            return
+        exe = os.path.abspath(sys.executable)
+        folder = os.path.dirname(exe)
+        if not phonecam_update.dir_writable(folder):
+            self._update_open_page()
+            self._upd_msg_var.set("このフォルダには書き込めないため自動で更新できません。開いたページから PhoneCamReceiver.exe を"
+                                  "ダウンロードして置き換えてください。")
+            return
+        if self.state.snapshot()["connected"]:
+            if not messagebox.askyesno("PhoneCam", "更新するとアプリが再起動し、接続中の映像はいったん切れます。更新しますか？"):
+                return
+        dest = os.path.splitext(exe)[0] + ".download"
+        cancel = threading.Event()
+        dl = {"done": 0, "total": int(asset.get("size") or 0), "cancel": cancel, "box": [], "dest": dest, "exe": exe}
+        self._upd_dl = dl
+        self._upd_msg_var.set("")
+        self._upd_btn_row.pack_forget()
+        self._upd_progress_box.pack(fill="x", pady=(8, 0))
+        self._upd_bar.configure(value=0)
+        self._upd_prog_var.set("ダウンロードしています…")
+
+        def progress(done, total):
+            dl["done"], dl["total"] = done, total or dl["total"]
+
+        def work():
+            try:
+                phonecam_update.download_asset(asset, dest, progress=progress, cancel=cancel, version=APP_VERSION)
+                dl["box"].append(("ok", None))
+            except phonecam_update.UpdateError as e:
+                dl["box"].append(("err", str(e)))
+            except Exception:
+                dl["box"].append(("err", "ダウンロードに失敗しました"))
+
+        threading.Thread(target=work, name="update-download", daemon=True).start()
+        self.root.after(150, self._update_dl_poll)
+
+    def _update_cancel(self):
+        if self._upd_dl is not None:
+            self._upd_dl["cancel"].set()
+
+    def _update_dl_poll(self):
+        dl = self._upd_dl
+        if dl is None or self._closing:
+            return
+        if not dl["box"]:
+            done, total = dl["done"], dl["total"]
+            if total > 0:
+                self._upd_bar.configure(value=min(100, done * 100.0 / total))
+                self._upd_prog_var.set("ダウンロードしています… %d%%（%s / %s）" % (
+                    min(100, int(done * 100 / total)), format_bytes(done), format_bytes(total)))
+            else:
+                self._upd_prog_var.set("ダウンロードしています… %s" % format_bytes(done))
+            self.root.after(150, self._update_dl_poll)
+            return
+        kind, msg = dl["box"][0]
+        if kind != "ok":
+            self._update_fail(msg)
+            return
+        self._upd_prog_var.set("入れ替えています…")
+        self._update_apply(dl)
+
+    def _update_fail(self, msg):
+        dl, self._upd_dl = self._upd_dl, None
+        if dl:
+            try:
+                os.remove(dl["dest"])
+            except OSError:
+                pass
+        self._upd_progress_box.pack_forget()
+        self._upd_btn_row.pack(anchor="w", pady=(8, 0))
+        self._upd_msg_var.set("更新できませんでした: %s" % msg)
+        self._update_refresh_banner(force=True)
+        self._upd_msg_var.set("更新できませんでした: %s" % msg)
+
+    def _update_apply(self, dl):
+        exe, new = dl["exe"], dl["dest"]
+        try:
+            old = phonecam_update.self_replace(exe, new)
+        except phonecam_update.UpdateError as e:
+            self._update_fail(str(e))
+            return
+        try:
+            kw = {}
+            if os.name == "nt":
+                kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen([exe] + sys.argv[1:], close_fds=True, cwd=os.path.dirname(exe),
+                             env=phonecam_update.relaunch_env(), **kw)
+        except Exception as e:
+            parked = os.path.splitext(exe)[0] + ".failed.exe"
+            ok = phonecam_update.undo_replace(exe, old, parked)
+            self._upd_dl = None
+            self._update_fail("新しいバージョンを起動できませんでした%s (%s)" % ("。元のままにしました" if ok else "", e))
+            return
+        self._upd_dl = None
+        self.on_close()
+
     def on_close(self):
         self._closing = True
+        try:
+            if self._upd_dl is not None:
+                self._upd_dl["cancel"].set()
+        except Exception:
+            pass
         try:
             if self.setup is not None:
                 self.setup.close()

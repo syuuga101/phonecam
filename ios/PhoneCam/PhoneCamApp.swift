@@ -763,6 +763,7 @@ struct CameraPreview: UIViewRepresentable {
 
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
+    @StateObject private var updater = UpdateChecker()
 
     private let cardColor = Color(white: 0.11)
 
@@ -772,6 +773,9 @@ struct ContentView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    if let rel = updater.available {
+                        UpdateBanner(checker: updater, release: rel)
+                    }
                     Text("PhoneCam")
                         .font(.system(size: 34, weight: .bold))
                         .foregroundColor(.white)
@@ -948,6 +952,13 @@ struct ContentView: View {
             }
         }
         .statusBarHidden(model.screenBlack)
+        .onAppear { updater.checkIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            updater.checkIfNeeded()
+        }
+        .sheet(isPresented: $updater.showNotes) {
+            UpdateNotesSheet(release: updater.available) { updater.showNotes = false }
+        }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in model.noteTouch() }
         )

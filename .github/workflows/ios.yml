@@ -41,6 +41,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            PHONECAM_REPO="${{ github.repository }}" \
             build
 
       - name: Package IPA

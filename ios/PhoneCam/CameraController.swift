@@ -217,6 +217,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     private func buildStatusUncached() -> [String: Any] {
         var s: [String: Any] = [:]
+        s["appVersion"] = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
         var lenses = ["wide"]
         if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
             lenses.append("ultrawide")

@@ -17,6 +17,7 @@ targets:
         CFBundleDisplayName: PhoneCam
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        PhoneCamRepo: "$(PHONECAM_REPO)"
         NSCameraUsageDescription: 配信用カメラとして使用します
         NSLocalNetworkUsageDescription: Wi-Fi経由でPCと接続するために使用します
         NSMicrophoneUsageDescription: iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します
@@ -40,4 +41,5 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
+        PHONECAM_REPO: "syuuga101/phonecam"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
