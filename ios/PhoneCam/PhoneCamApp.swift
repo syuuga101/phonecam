@@ -1075,7 +1075,7 @@ struct PreviewPanel: View {
                           onAngle: { a in model.updatePreviewAngle(a) })
                 .frame(width: max(1, lay.image.width), height: max(1, lay.image.height))
                 .position(x: lay.image.midX, y: lay.image.midY)
-            FramingOverlay(layout: lay, crop: model.outputCanvas?.crop ?? false, showGrid: showGrid, showLevel: showLevel)
+            FramingOverlay(layout: lay, crop: model.outputCanvas?.crop ?? false, showGrid: showGrid)
                 .allowsHitTesting(false)
             if showLevel {
                 LevelIndicator(deg: model.levelDeg, flat: model.levelFlat)
