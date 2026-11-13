@@ -3,7 +3,6 @@
 from threading import RLock
 import time
 
-from phonecam.core.protocol import read_exact
 from phonecam.core.settings import DEFAULT_SETTINGS, sanitize_settings
 from phonecam.core.softcam_reg import CAMERA_SLOTS
 from phonecam.core.usbmux import usbmux_connect, usbmux_devices
@@ -32,7 +31,9 @@ class DeviceRoutes:
                 return cached[0]
         try:
             with usbmux_connect(port=5557, serial=serial, timeout=.5) as sock:
-                ident = device_id(read_exact(sock, 37).decode("ascii").strip())
+                # A socket timeout here is terminal, unlike the streaming protocol's reads.
+                with sock.makefile("rb") as stream:
+                    ident = device_id(stream.readline(37).decode("ascii").strip())
         except Exception:
             ident = ""
         with self.lock:
