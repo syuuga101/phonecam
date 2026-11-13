@@ -55,9 +55,8 @@ def build(ctrl):
         mbps = rec_video_mbps(ctrl.settings)
         audio = ctrl.get("rec_audio", True)
         size = rec_mb_per_min(mbps, audio)
-        detail = t("recording.estimate.video", mbps=mbps)
-        if audio:
-            detail += " + " + t("recording.estimate.audio", kbps=REC_AUDIO_KBPS)
+        detail = (t("recording.estimate.video_audio", mbps=mbps, kbps=REC_AUDIO_KBPS) if audio
+                  else t("recording.estimate.video", mbps=mbps))
         estimate.setHint(t("recording.estimate.summary",
                            resolution=rec_effective_resolution(ctrl.settings).upper(),
                            minute=round(size), detail=detail, hour=f"{size * .06:.1f}"))

@@ -471,12 +471,11 @@ class Controller:
         if not (self.status and self.status.connected and "screenBlack" in phone):
             return ""
         auto = phone.get("autoBlackSeconds")
-        extra = ""
+        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
         if auto in SCREEN_AUTO_VALUES:
             label = t("labels.screen_auto.0") if auto == 0 else t(f"labels.sec.{auto}")
-            extra = t("shell.sync.screen_auto", v=label)
-        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
-        return t("shell.sync.screen", state=state, extra=extra)
+            return t("shell.sync.screen_with_auto", state=state, auto=label)
+        return t("shell.sync.screen", state=state)
 
     @property
     def update_status_text(self):

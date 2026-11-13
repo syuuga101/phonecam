@@ -107,8 +107,8 @@ def build(ctrl):
         mute_row.setHint(t("shell.phone_muted") if status.phone_muted else "")
         info = t("shell.sync.output", name=audio.device_name) if audio.running and on and not audio.error else ""
         if info and mic.get("sampleRate"):
-            info += t("shell.sync.audio_detail", hz=int(mic["sampleRate"]), buf=round(audio.buffered_ms()),
-                      target=round(audio.target_ms()))
+            info = t("shell.sync.output_detail", name=audio.device_name, hz=int(mic["sampleRate"]),
+                     buf=round(audio.buffered_ms()), target=round(audio.target_ms()))
         error = audio.error if on else ""
         if not AUDIO_AVAILABLE:
             error = t("audio.error.nolib")
@@ -123,7 +123,7 @@ def build(ctrl):
         under = t("shell.sync.underruns", n=audio.underruns) if audio.running else ""
         for key, value in dict(info=info, error=error, path=path, micpath=mic_path,
                                mode="\n".join(filter(None, (audio.notice, mode))) or "-",
-                               latency=latency_text + " · " + t("audio.latency.hint"), under=under).items():
+                               latency=t("audio.latency.value_with_hint", latency=latency_text, hint=t("audio.latency.hint")), under=under).items():
             rows[key].setHint(value)
             if key in ("info", "error", "under"):
                 rows[key].setVisible(bool(value))   # 空のときは行ごと隠す (見出しだけの空行を残さない)

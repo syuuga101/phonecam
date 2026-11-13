@@ -10,7 +10,7 @@ from phonecam.core.canvas import canvas_size
 from phonecam.core.decoder import THIN_NOTICE_SEC
 from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph_window, range_label
 from phonecam.i18n import t
-from phonecam.qt.widgets import Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
+from phonecam.qt.widgets import NO_VALUE, Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
 from phonecam.ui.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
 
 
@@ -214,13 +214,13 @@ def build(ctrl):
                          else THERMAL_LABELS.get(pressure, "-"))
         factors = phone.get("pressureFactors")
         factor_names = {"systemTemperature", "peakPower", "depthModuleTemperature", "cameraTemperature"}
-        factor_text = ", ".join(t(f"status.iphone.factor.{f}") if f in factor_names else f
+        factor_text = t("common.list_separator").join(t(f"status.iphone.factor.{f}") if f in factor_names else f
                                 for f in factors if isinstance(f, str)) if pressure and isinstance(factors, list) else ""
         low = phone.get("lowPowerMode")
         codec = snap["codec_in_use"] or phone.get("codec")
         decoder = DECODER_LABELS.get(snap["decoder"], "-") if status.connected else "-"
         if status.connected and snap.get("decoder_note"):
-            decoder += t("status.pc.note", v=snap["decoder_note"])
+            decoder = t("status.pc.decoder_note", decoder=decoder, note=snap["decoder_note"])
         size = canvas_size(ctrl.settings)
         output = f"{size[0]}×{size[1]}" if size else t("status.pc.out_native")
         data = {
@@ -252,14 +252,14 @@ def build(ctrl):
                 levels["video", "sentfps"] = "ok" if phone["sentFps"] > 0 else "warning"
         for section, specs in sections[:-1]:
             for (key, _), value in zip(specs, data[section]):
-                values[section, key].set_status(value if value and value != "-" else t("compact.no_value"),
+                values[section, key].set_status(value if value and value != "-" else NO_VALUE,
                                                 levels.get((section, key)),
                                                 t("status.video.dropped_tip") if (section, key) == ("video", "dropped") else None)
         latency = ctrl.link.latency.averages() if status.connected else {}
         for key, _ in sections[-1][1]:
             value = latency.get(key)
             text = status.latency_text if key == "total" else f"{value:.1f} ms" if value is not None else "-"
-            values["latency", key].set_status(text if text != "-" else t("compact.no_value"))
+            values["latency", key].set_status(text if text != "-" else NO_VALUE)
         current.setHint(t("status.graph.current", level=status.thermal_text or "-",
                           hot=format_mmss(ctrl.thermal_log.hot_seconds)))
 

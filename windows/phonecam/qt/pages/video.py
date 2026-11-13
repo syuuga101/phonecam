@@ -84,7 +84,7 @@ def build(ctrl):
         decoder_name = DECODER_LABELS.get(snapshot["decoder"], "-") if status.connected else "-"
         decoder_now.setText(t("status.pc.now", v=decoder_name))
         screen = ctrl.screen_state_text()
-        black.setHint(t("video.power.hint") + (" · " + screen if screen else ""))
+        black.setHint(t("video.power.hint_with_screen", hint=t("video.power.hint"), screen=screen) if screen else t("video.power.hint"))
 
     ctrl.status_changed.connect(refresh)
     refresh(ctrl.status)

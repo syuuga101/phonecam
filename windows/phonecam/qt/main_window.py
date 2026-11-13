@@ -401,7 +401,7 @@ class MainWindow(QMainWindow):
                                      env=phonecam_update.relaunch_env(), creationflags=flags)
                 except Exception as error:
                     restored = phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
-                    self.show_toast(t("update.msg.relaunch_failed", restored=t("update.msg.restored") if restored else "", error=error), "error")
+                    self.show_toast(t("update.msg.relaunch_failed_restored" if restored else "update.msg.relaunch_failed", error=error), "error")
                     return
             except Exception as error:
                 self.show_toast(t("update.msg.failed", error=error), "error")

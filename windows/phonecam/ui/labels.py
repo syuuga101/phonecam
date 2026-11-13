@@ -146,7 +146,7 @@ def setup_outcome_text(out, name_of):
         notes.append(out["error"])
     elif failed:
         details = " / ".join("%s: %s" % (name_of(c), r.get("detail", "")) for c, r in failed.items())
-        notes.append(t("labels.setup.partial") + details)
+        notes.append(t("labels.setup.partial", details=details))
     else:
         notes.append(t("labels.setup.done"))
     if out.get("reboot"):
@@ -160,7 +160,7 @@ def watch_text(watcher, now):
     detail = watcher.detail()
     err = getattr(watcher, "last_error", "")
     if err:
-        detail = detail + (t("labels.sep") if detail else "") + t("labels.error") + ": " + err[:120]
+        detail = detail + (t("common.list_separator") if detail else "") + t("labels.watch_error", error=err[:120])
     return t("labels.watch_fmt", label=label, detail=detail) if detail else label
 
 
