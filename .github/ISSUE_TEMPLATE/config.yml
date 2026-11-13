@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 使い方・トラブルの解決方法（Wiki）
-    url: https://github.com/syuuga101/phonecam/tree/main/docs/guide
+    url: https://github.com/syuuga101/phonecam/wiki
     about: まずは ガイドの「よくある質問とトラブル」を見てください。多くの問題はここで解決します。
   - name: 質問・相談（Discussions）
     url: https://github.com/syuuga101/phonecam/discussions

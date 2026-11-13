@@ -149,6 +149,8 @@ jobs:
   qt-screenshots:
     runs-on: windows-latest
     continue-on-error: true
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -188,3 +190,18 @@ jobs:
           name: qt-screens
           path: qt-screens
           if-no-files-found: warn
+
+      # 確認用にスクショをブランチ qt-screens へ置く (artifact を直接取れない環境向け)
+      - name: Push screenshots to branch
+        if: always() && github.event_name == 'push'
+        shell: bash
+        run: |
+          [ -d qt-screens ] || exit 0
+          cd qt-screens
+          git init -q -b qt-screens
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "${GITHUB_SHA}" > SOURCE_SHA.txt
+          git add -A
+          git commit -q -m "Qt screenshots for ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" qt-screens

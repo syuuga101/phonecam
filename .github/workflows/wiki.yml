@@ -1,0 +1,29 @@
+name: Publish Wiki
+
+on:
+  push:
+    branches: [main]
+    paths: ["wiki/**", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push wiki/ to the GitHub Wiki
+        shell: bash
+        run: |
+          git clone -q "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki-repo
+          find wiki-repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r wiki/. wiki-repo/
+          cd wiki-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -q -m "Wiki を更新 (${GITHUB_SHA::7})"
+          git push -q origin HEAD

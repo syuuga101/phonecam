@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        先に [使い方ガイド](https://github.com/syuuga101/phonecam/tree/main/docs/guide) を見てもらえると早く解決することがあります。
+        先に [使い方ガイド](https://github.com/syuuga101/phonecam/wiki) を見てもらえると早く解決することがあります。
         （[Discussions](https://github.com/syuuga101/phonecam/discussions) が使える場合は、そちらでも質問できます）
   - type: textarea
     id: question

@@ -4,7 +4,7 @@ PhoneCam に興味を持ってくれてありがとうございます。不具�
 
 ## 不具合を報告する
 
-1. まず [ガイドの「よくある質問とトラブル」](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB.md) と、[既存の Issue](https://github.com/syuuga101/phonecam/issues) を見てください。
+1. まず [ガイドの「よくある質問とトラブル」](https://github.com/syuuga101/phonecam/wiki/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB) と、[既存の Issue](https://github.com/syuuga101/phonecam/issues) を見てください。
 2. 解決しなければ、[新しい Issue](https://github.com/syuuga101/phonecam/issues/new/choose) で「不具合の報告」を選びます。
 3. テンプレートの項目（PhoneCam のバージョン、Windows / iPhone の環境、接続のしかた、出力先、再現の手順）を、わかる範囲で書いてください。受信アプリの **「状態」タブ** の内容を貼り付けてもらえると、原因を見つけやすくなります。
 
@@ -43,4 +43,4 @@ PhoneCam のライセンスは [GPL-2.0以降（GPL-2.0-or-later）](LICENSE) �
 
 ## ドキュメントの直し
 
-誤字の修正や説明の改善も大歓迎です。`README.md` と `docs/`（使い方ガイドは `docs/guide/`）は、Pull Request で直接直せます。
+誤字の修正や説明の改善も大歓迎です。`README.md` と `docs/`（使い方ガイドは [Wiki](https://github.com/syuuga101/phonecam/wiki)。Wiki はリポジトリの Wiki タブから編集できます）は、Pull Request で直接直せます。

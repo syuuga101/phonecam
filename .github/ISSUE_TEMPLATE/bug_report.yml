@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        報告ありがとうございます。先に [ガイドの「よくある質問とトラブル」](https://github.com/syuuga101/phonecam/blob/main/docs/guide/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB.md) を見てもらえると、すぐ解決することがあります。
+        報告ありがとうございます。先に [ガイドの「よくある質問とトラブル」](https://github.com/syuuga101/phonecam/wiki/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB) を見てもらえると、すぐ解決することがあります。
         わかる範囲で大丈夫です。
   - type: input
     id: phonecam-version

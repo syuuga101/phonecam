@@ -2,7 +2,7 @@
 
 PhoneCam は App Store には無いので、**AltStore** という仕組みで iPhone に入れます。Mac は不要です。
 
-受信アプリのセットアップウィザードの最後に **「iPhoneのセットアップ」** が開き、下の手順を 1 つずつ案内します（あとから開くときは「セットアップ」タブの **iPhoneのセットアップ** ボタン）。各ステップには状態表示（✓ / 待機中）があり、2 秒ごとに自動で更新されます。
+受信アプリのセットアップウィザードの最後に **「iPhoneのセットアップ」** が開き、下の手順を 1 つずつ案内します（あとから開くときは、受信アプリの左メニュー「設定」の **初期セットアップ > 開く** から、iPhone の手順に進みます）。各ステップには状態表示（✓ / 待機中）があり、2 秒ごとに自動で更新されます。
 
 ## 7 ステップ
 
@@ -13,10 +13,26 @@ PhoneCam は App Store には無いので、**AltStore** という仕組みで i
 | 3 | iTunes で Wi-Fi 同期をオン | **iTunesを開く** ボタンから。7 日ごとの自動更新に使います（手動で更新するなら省略可） |
 | 4 | AltStore を iPhone に入れる | **AltServerを起動** ボタンから。タスクトレイの AltServer アイコン → **Install AltStore** → この iPhone → Apple ID。**これは PC ごとの作業です**（下の「AltServer は PC ごと」を読んでください） |
 | 5 | iPhone の設定 | **設定 > プライバシーとセキュリティ > デベロッパモード** をオンにして再起動。**設定 > 一般 > VPNとデバイス管理** で自分の Apple ID を「信頼」 |
-| 6 | PhoneCam を入れる | 画面の **QRコード** を iPhone で読み取り、AltStore にソースを追加して「PhoneCam」を入手 |
+| 6 | PhoneCam を入れる | 画面の **QRコード** を iPhone で読み取り、**AltStore Classic**（手順 4 で入れたもの。マーケットプレイス版ではありません）にソースを追加して「PhoneCam」を入手 |
 | 7 | 接続テスト | iPhone で PhoneCam を開くと、USB 経由でつながったことを自動で確認して ✓ → **完了** |
 
 どの画面でも **戻る / 次へ**、**あとで**（iPhone の準備をあとに回す）が使えます。
+
+## 「マーケットプレイスIDが欠落しています」と出るとき
+
+ソースを追加したときに、次のエラーが出ることがあります。
+
+> ソース内の1つ以上のアプリにマーケットプレイスIDが欠落しています…AltStoreはAppleによって公証済みのマーケットプレイスアプリのみをインストールできます
+
+**原因**: iPhone に入っているのが、**マーケットプレイス版の AltStore**（Apple に公証された AltStore PAL。日本などの代替マーケットプレイスで、altstore.io の Web ページなどから入れたもの）だからです。この版は、Apple に公証されたマーケットプレイスのアプリしか入れられないため、PhoneCam のソースは追加できません。
+
+**対処**: PC の **AltServer から入れる AltStore Classic** を使ってください。
+
+1. この手順の「7 ステップ」のとおり、PC の AltServer（タスクトレイのアイコン）→ **Install AltStore** で、iPhone に AltStore を入れます。
+2. iPhone のホーム画面に、マーケットプレイス版とは別に **AltStore（Classic）** が入ります。
+3. **AltStore Classic** を開いて、PhoneCam のソースを追加します（ウィザードの QR コード、または下の URL）。
+
+マーケットプレイス版と AltStore Classic は **別のアプリ** なので、**両方入れたままで問題ありません**。マーケットプレイス版を消す必要はありません。ソースを追加するときは、アイコンやアプリの画面を見て、Classic のほうを開いているか確認してください。
 
 ## AltServer は「PC ごと」の仕組みです
 
@@ -32,7 +48,7 @@ AltStore は **どの PC の AltServer からでも** 更新（Refresh）でき�
 
 ### AltServer の診断
 
-受信アプリの **セットアップ** タブ（または iPhone のセットアップの「AltStore を入れる」画面）の **AltServerの診断** を押すと、次を調べて ✓ / ✗ と直し方を 1 行で表示します。
+受信アプリの左メニュー **設定** にある **AltServerの診断**（「診断する」ボタン。iPhone のセットアップの「AltStore を入れる」画面からも開けます）を押すと、次を調べて ✓ / ✗ と直し方を 1 行で表示します。
 
 - AltServer が起動している / Apple Mobile Device Service と Bonjour Service が動いている
 - Apple 公式サイト版の iTunes が入っている
@@ -79,7 +95,8 @@ PhoneCam を開いたら、カメラとローカルネットワークの許可�
 
 ## うまくいかないとき
 
+- 「マーケットプレイスIDが欠落しています」: マーケットプレイス版の AltStore を使っています。PC の AltServer から入れる **AltStore Classic** で追加してください（上の「マーケットプレイスIDが欠落しています」と出るとき）。
 - `AltServer.ServerError 2005`: AltStore の「My Apps」で AltStore を一度 **Refresh** してから、もう一度入れます。
 - `AltServer could not find this device`（エラー 2003）: 上の「エラー 2003 が出るとき」と **AltServerの診断** を試してください。
 - `requires additional permissions not specified by the source`: PhoneCam を最新版にして（v1.3.5 以降）、ソースを入れ直してください。
-- ほかは [よくある質問とトラブル](%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB.md) へ。
+- ほかは [[よくある質問とトラブル]] へ。

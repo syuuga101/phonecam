@@ -81,7 +81,7 @@ jobs:
             echo
             echo "- **Windows**: \`PhoneCamReceiver.exe\` をダウンロードして、古い exe と置き換えるだけです（初めての方はそのまま起動するとセットアップが始まります）。"
             echo "- **iPhone**: AltStore の「My Apps」で PhoneCam を更新します（AltStore のソースは自動で最新になります）。"
-            echo "- くわしい手順は [使い方ガイド](https://github.com/${{ github.repository }}/tree/main/docs/guide) を見てください。"
+            echo "- くわしい手順は [使い方ガイド](https://github.com/${{ github.repository }}/wiki) を見てください。"
             echo
             echo "---"
             echo

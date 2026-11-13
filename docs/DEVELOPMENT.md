@@ -1,6 +1,6 @@
 # 開発者向けガイド
 
-PhoneCam を自分でビルドしたい人、コードを変更したい人向けの資料です。使うだけの方は [README](../README.md) か [使い方ガイド](https://github.com/syuuga101/phonecam/tree/main/docs/guide) を見てください。
+PhoneCam を自分でビルドしたい人、コードを変更したい人向けの資料です。使うだけの方は [README](../README.md) か [使い方ガイド](https://github.com/syuuga101/phonecam/wiki) を見てください。
 
 関連資料: [ARCHITECTURE.md](ARCHITECTURE.md)（しくみ） / [PROTOCOL.md](PROTOCOL.md)（通信プロトコル） / [CONTRIBUTING.md](../CONTRIBUTING.md)
 
