@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showScanner = false
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("showLevel") private var showLevel = true
+    @State private var deviceName = UserDefaults.standard.string(forKey: DeviceName.defaultsKey) ?? ""
 
     var body: some View {
         List {
@@ -23,7 +24,20 @@ struct SettingsView: View {
     // MARK: 一般
 
     private var generalSection: some View {
-        Section("一般") {
+        Section {
+            LabeledContent {
+                TextField(DeviceName.modelName, text: $deviceName)
+                    .multilineTextAlignment(.trailing)
+                    .submitLabel(.done)
+                    .onChange(of: deviceName) { _, newValue in
+                        let limited = String(newValue.prefix(DeviceName.maxNameLength))
+                        if limited != newValue { deviceName = limited }
+                        UserDefaults.standard.set(limited, forKey: DeviceName.defaultsKey)
+                        model.deviceNameChanged()
+                    }
+            } label: {
+                SettingsLabel("この端末の名前", symbol: "iphone")
+            }
             NavigationLink {
                 LanguageSettingsView()
             } label: {
@@ -32,6 +46,10 @@ struct SettingsView: View {
             Link(destination: AppInfo.translateURL) {
                 SettingsLabel("翻訳に参加する", symbol: "character.bubble")
             }
+        } header: {
+            Text("一般")
+        } footer: {
+            Text("PCの接続先の一覧に表示されます")
         }
     }
 

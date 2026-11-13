@@ -20,10 +20,12 @@ iPhone アプリ（サーバ）と Windows 受信アプリ（クライアント�
 
 ### Wi-Fi の検出と QR ペアリング
 
-- Wi-Fi 接続の許可中、iPhone は Bonjour の `_phonecam._tcp` をポート 5555 で公開します。TXT の `id` はインストールごとの UUID、`name` は端末名、`v` は検出・ペアリング手順の版（現在は `1`）です。ペアリングコードは公開しません。
+- Wi-Fi 接続の許可中、iPhone は Bonjour の `_phonecam._tcp` をポート 5555 で公開します。TXT の `id` はインストールごとの UUID、`name` は利用者が設定した端末名（未設定なら機種名。UTF-8 で 63 バイト以内）、`model` は機種名（例: `iPhone 13`。63 バイト以内）、`v` は検出・ペアリング手順の版（現在は `1`）です。ペアリングコードは公開しません。
 - PC が表示する `phonecam://pair` URI のクエリは `ips`（カンマ区切りの IPv4 候補）、`port`、`token`、`name`、`v` です。待ち受けは表示中だけ有効で、トークンは 180 秒で失効するか、1 回成功した時点で消費されます。
-- iPhone は利用者が PC 名を確認した後、候補に TCP で接続し、UTF-8 JSON 1 行を送ります。内容は `v`（数値）、`token`、`id`、`name`、`addresses`（IPv4 の配列）、`code`（6 桁の文字列）です。PC は受理すると `{"ok":true}` と改行を返します。
+- iPhone は利用者が PC 名を確認した後、候補に TCP で接続し、UTF-8 JSON 1 行を送ります。内容は `v`（数値）、`token`、`id`、`name`、`model`、`addresses`（IPv4 の配列）、`code`（6 桁の文字列）です。PC は受理すると `{"ok":true}` と改行を返します。
 - PC は認証情報をローカル設定に保存します。映像・音声は既存のポートと認証手順を使います。登録済みの iPhone でコードを変更した場合は、PC のコードを更新するか QR で再登録します。
+
+- 状態 JSON（status）にも `device_name`（端末名）と `model`（機種名）を含めます。
 
 ## フレーミング
 

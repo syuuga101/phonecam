@@ -20,7 +20,7 @@ final class StreamServer {
     private let audioCapMs: Int
     private let role: Role
     private let security: SecurityManager
-    private let bonjourService: NWListener.Service?
+    private var bonjourService: NWListener.Service?
 
     init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200,
          role: Role = .main, security: SecurityManager, bonjourService: NWListener.Service? = nil) {
@@ -106,6 +106,15 @@ final class StreamServer {
     func ensureListening() {
         queue.async { [weak self] in
             self?.checkListenerHealth()
+        }
+    }
+
+    /// 広告内容 (名前など) を差し替えて再公開する
+    func updateBonjourService(_ service: NWListener.Service?) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.bonjourService = service
+            self.listener?.service = self.security.wifiAllowed ? service : nil
         }
     }
 
