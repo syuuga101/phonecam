@@ -1,6 +1,7 @@
 # CI の exe ビルド (v2.7.0) で実際に使われた版に固定 (ビルドを再現できるように)。
 # 上げるときは CI の Build Windows receiver と qt-screenshots が通るのを確かめてから。
-PySide6==6.8.3
+# PySide6 は Essentials だけ (Core/Gui/Widgets/Network/Svg で足りる。Addons の約130MBを入れない)。
+PySide6-Essentials==6.8.3
 av==19.0.2
 numpy==2.5.4
 pyvirtualcam==0.15.0
