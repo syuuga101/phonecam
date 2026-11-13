@@ -14,7 +14,7 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -569,6 +569,97 @@ class Expander(Card):
         self.content.setVisible(self.expanded)
         if self.expanded:
             self.content.setMaximumHeight(16777215)
+
+    def fit_content(self):
+        """中身が変わったとき、開閉アニメーションで固定した高さを外して中身の高さに合わせ直す。"""
+        if self.animation.state() == QPropertyAnimation.State.Running:
+            self.animation.stop()
+        self.content.setVisible(self.expanded)
+        self.content.setMaximumHeight(16777215 if self.expanded else 0)
+        self.content.layout().invalidate()
+        self.content.layout().activate()
+        self.layout().invalidate()
+        self.layout().activate()
+        self.update()
+
+
+def refit(widget):
+    """中身 (行の追加・削除、表示の出し入れ、文言の変更) が変わったあとに呼ぶ。
+    widget から親をたどり、各レイアウトを測り直して、折りたたみ (Expander) の高さも中身に合わせる。
+    折り返しラベルの高さは幅が決まってから確定するので、1 周後にもう一度測り直す。"""
+    _refit_chain(widget)
+    QTimer.singleShot(0, lambda: _refit_chain(widget))
+
+
+def _refit_chain(widget):
+    try:
+        node = widget
+        while node is not None:
+            layout = node.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            if isinstance(node, Expander):
+                node.fit_content()
+            node.updateGeometry()
+            node = node.parentWidget()
+    except RuntimeError:
+        pass   # 途中で破棄されたウィジェット
+
+
+class FitBox(QWidget):
+    """レイアウト付きの入れ物。今の幅で必要な高さを minimumHeight にして、押しつぶされても重ならないようにする。"""
+
+    def __init__(self, base_height=0, parent=None):
+        super().__init__(parent)
+        self._base_height = base_height
+        self._fitting = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit()
+
+    def _fit(self):
+        layout = self.layout()
+        if self._fitting or layout is None or self.width() <= 0:
+            return
+        self._fitting = True
+        try:
+            need = max(self._base_height, layout.totalHeightForWidth(self.width()))
+            if need != self.minimumHeight():
+                self.setMinimumHeight(need)
+                self.updateGeometry()
+        finally:
+            self._fitting = False
+
+
+class EmptyState(FitBox):
+    """一覧が空のときの表示。上から アイコン -> タイトル -> 説明 -> ボタン を縦に並べる (すべてレイアウト内)。"""
+
+    def __init__(self, icon_name, title, note="", action=None, parent=None):
+        super().__init__(0, parent)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(8)
+        icon = IconLabel(icon_name, 24)
+        lay.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.title_label = QLabel(title)
+        font = self.title_label.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        self.title_label.setFont(font)
+        self.title_label.setWordWrap(True)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        lay.addWidget(self.title_label)
+        if note:
+            self.note_label = Hint(note)
+            self.note_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            lay.addWidget(self.note_label)
+        if action is not None:
+            lay.addWidget(action, 0, Qt.AlignmentFlag.AlignHCenter)
 
 
 class Page(QScrollArea):

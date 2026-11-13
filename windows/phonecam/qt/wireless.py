@@ -20,7 +20,7 @@ from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
-    IconLabel, Hint, Row, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
+    EmptyState, FitBox, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
 
@@ -213,6 +213,7 @@ class Disclosure(QWidget):
 
     def add(self, widget):
         self.body_layout.addWidget(widget)
+        refit(self)
         return widget
 
     def is_open(self):
@@ -225,6 +226,7 @@ class Disclosure(QWidget):
         self.body.setVisible(value)
         self.header.setChecked(value)
         self.arrow.set_icon("chevron_up" if value else "chevron_down")
+        refit(self)
         self.toggled.emit(value)
 
 
@@ -310,11 +312,11 @@ class Entry:
         return (d.id, d.title, d.model, d.code, self.address, self.route, self.found)
 
 
-class DeviceRow(QWidget):
+class DeviceRow(FitBox):
     """見つかった iPhone 1 台: アイコン | 名前 + 詳細 | 状態 / つなぐ・切断 / …"""
 
     def __init__(self, entry, state, owner, parent=None):
-        super().__init__(parent)
+        super().__init__(60, parent)
         self.setMinimumHeight(60)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(16, 10, 16, 10)
@@ -382,6 +384,7 @@ class WirelessOptions:
     # -- 部品 -------------------------------------------------------------------
     def _build_devices(self):
         box = QWidget()
+        self.devices_box = box
         lay = QVBoxLayout(box)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -657,6 +660,7 @@ class WirelessOptions:
             widget = item.widget()
             if widget is not None:
                 widget.hide()
+                widget.setParent(None)   # すぐレイアウトの計算から外す (deleteLater だけだと次のループまで残る)
                 widget.deleteLater()
         if not entries:
             self.list.addWidget(Separator())
@@ -665,29 +669,15 @@ class WirelessOptions:
             self.list.addWidget(Separator())
             self.list.addWidget(DeviceRow(entry, state, self))
         self._render_trouble()
+        refit(self.devices_box)   # 行の増減・空の状態への切り替えのたびに、折りたたみの高さを中身に合わせ直す
 
     def _empty(self, scanning):
-        box = QWidget()
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(8)
-        lay.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        icon = IconLabel("phone", 32)
-        lay.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
-        title = QLabel(t("wireless.searching") if scanning and not self.scanned else t("wireless.empty_title"))
-        font = title.font()
-        font.setWeight(QFont.Weight.DemiBold)
-        title.setFont(font)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(title)
-        if self.scanned or not scanning:
-            note = Hint(t("wireless.empty_note"))
-            note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lay.addWidget(note)
-            more = button(t("wireless.empty_more"))
-            more.clicked.connect(lambda: self.trouble.set_open(True))
-            lay.addWidget(more, 0, Qt.AlignmentFlag.AlignHCenter)
-        return box
+        """空の状態: 探し中はアイコン + 「探しています…」だけ。見つからなかったときは説明とボタンも出す。"""
+        if scanning and not self.scanned:
+            return EmptyState("phone", t("wireless.searching"))
+        more = button(t("wireless.empty_more"))
+        more.clicked.connect(lambda: self.trouble.set_open(True))
+        return EmptyState("phone", t("wireless.empty_title"), t("wireless.empty_note"), more)
 
     def _render_trouble(self):
         for block, ok_text, on in ((self.tether_block, t("wireless.tether_ok"), on_tether(self.addresses)),
@@ -698,6 +688,7 @@ class WirelessOptions:
                 ok.set_status(ok_text, "ok")
             steps.setVisible(not on)
         self.hotspot_button.setVisible(not hotspot_on(self.addresses))
+        refit(self.trouble)
 
     # -- 行の操作 -------------------------------------------------------------------
     def connect_entry(self, entry):
