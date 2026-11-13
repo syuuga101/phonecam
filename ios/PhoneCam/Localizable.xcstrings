@@ -5,8 +5,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
+            "state" : "translated",
+            "value" : "Scan QR code"
           }
         },
         "ja" : {
@@ -27,8 +27,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
+            "state" : "translated",
+            "value" : "Point the camera at the PhoneCam QR code shown on your PC."
           }
         },
         "ja" : {
@@ -49,8 +49,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
+            "state" : "translated",
+            "value" : "Cannot open the camera. Check camera permissions."
           }
         },
         "ja" : {
@@ -71,8 +71,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
+            "state" : "translated",
+            "value" : "Your pairing code will be sent to this PC. Check its name before continuing."
           }
         },
         "ja" : {
@@ -93,8 +93,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
+            "state" : "translated",
+            "value" : "Pair"
           }
         },
         "ja" : {
@@ -115,8 +115,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
+            "state" : "translated",
+            "value" : "Scan again"
           }
         },
         "ja" : {
@@ -137,8 +137,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
+            "state" : "translated",
+            "value" : "Close"
           }
         },
         "ja" : {
@@ -159,8 +159,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
+            "state" : "translated",
+            "value" : "This is not a PhoneCam pairing QR code."
           }
         },
         "ja" : {
@@ -181,8 +181,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
+            "state" : "translated",
+            "value" : "Contacting the PC…"
           }
         },
         "ja" : {
@@ -203,8 +203,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
+            "state" : "translated",
+            "value" : "Paired with the PC"
           }
         },
         "ja" : {
@@ -225,8 +225,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
+            "state" : "translated",
+            "value" : "Could not reach the PC. Check the network and whether the QR code has expired."
           }
         },
         "ja" : {
@@ -863,7 +863,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "日本語"
           }
         },
@@ -885,7 +885,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "English"
           }
         },
@@ -2293,8 +2293,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
+            "state" : "translated",
+            "value" : "Device name"
           }
         },
         "ja" : {
@@ -2315,8 +2315,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
+            "state" : "translated",
+            "value" : "Shown in the list of devices on your PC"
           }
         },
         "ja" : {
