@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QProgressDialog,
+    QSizePolicy,
     QStackedWidget,
     QStyle,
     QStyledItemDelegate,
@@ -140,7 +141,7 @@ class MainWindow(QMainWindow):
     def __init__(self, ctrl, tick=True):
         super().__init__()
         self.ctrl = ctrl
-        self.setWindowTitle("PhoneCam")
+        self.setWindowTitle(ctrl.app_title())
         self.setWindowIcon(window_icon())
         self.resize(960, 720)
         self.setMinimumSize(640, 520)
@@ -159,8 +160,18 @@ class MainWindow(QMainWindow):
         nl.setSpacing(10)
         self.app_icon = QLabel()
         self.app_icon.setContentsMargins(16, 0, 0, 0)
+        self.app_icon.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._set_app_icon()
-        nl.addWidget(self.app_icon, 0, Qt.AlignmentFlag.AlignLeft)
+        self.app_name = QLabel(ctrl.app_title())
+        f = self.app_name.font()
+        f.setBold(True)
+        self.app_name.setFont(f)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 12, 0)
+        head.setSpacing(8)
+        head.addWidget(self.app_icon, 0)
+        head.addWidget(self.app_name, 1)
+        nl.addLayout(head)
         self.nav = QListWidget()
         self.nav.setFrameShape(QFrame.Shape.NoFrame)
         self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

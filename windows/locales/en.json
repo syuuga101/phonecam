@@ -212,6 +212,8 @@
  "settings.language.ja": "日本語",
  "settings.language.label": "Language",
  "settings.language.system": "Follow system",
+ "settings.preview_fps.hint": "Smoothness of the in-app preview. Higher values use slightly more CPU. Does not affect the video sent to OBS or other apps",
+ "settings.preview_fps.label": "Preview fps",
  "settings.setup.launch_error": "Could not open setup ({error})",
  "settings.setup.open.button": "Open",
  "settings.setup.open.label": "Initial setup",

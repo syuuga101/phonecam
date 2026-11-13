@@ -428,6 +428,13 @@ class Controller:
     def version_text(self):
         return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION
 
+    def app_title(self):
+        """ウィンドウタイトル / ナビ上部に出す「PhoneCam v2.1.1」(版数が取れない開発時は「PhoneCam dev」)。"""
+        ver = self.version_text()
+        if ver and ver[:1].isdigit():
+            ver = "v" + ver
+        return ("PhoneCam " + ver).strip()
+
     def phone_version_note(self):
         """iPhone アプリと PC の major.minor が違うときの注意文 (違わなければ "")。Tk の _update_note_phone_version と同じ判定。"""
         ver = self.status.phone.get("appVersion") if self.status else None
