@@ -34,7 +34,7 @@ WATCH_INTERVAL_MS = 500
 RUN_MODE_LABELS = [("auto", "使われているときだけ（自動）"), ("always", "接続中ずっと"), ("manual", "手動")]
 
 
-IDLE_STOP_LABELS = [(10, "10秒"), (30, "30秒"), (60, "60秒")]
+IDLE_STOP_LABELS = [(0, "止めない"), (10, "10秒"), (30, "30秒"), (60, "1分"), (300, "5分")]
 
 
 AUTO_UNSUPPORTED_NOTE = "自動判定は出力先が「PhoneCam（専用カメラ）」のときだけ使えます"

@@ -3,7 +3,9 @@
 """
 
 import threading
-from phonecam.core.settings import IDLE_STOP_VALUES, RUN_MODES
+from phonecam.core.settings import DEFAULT_SETTINGS, IDLE_STOP_VALUES, RUN_MODES
+
+DEFAULT_IDLE_SEC = DEFAULT_SETTINGS["idle_stop_sec"]
 
 
 class StreamController:
@@ -32,8 +34,8 @@ class StreamController:
         return self.settings.get("run_mode", "auto") == "auto" and self.settings.get("backend") != "phonecam"
 
     def idle_sec(self):
-        v = self.settings.get("idle_stop_sec", 10)
-        return v if v in IDLE_STOP_VALUES else 10
+        v = self.settings.get("idle_stop_sec", DEFAULT_IDLE_SEC)
+        return v if v in IDLE_STOP_VALUES else DEFAULT_IDLE_SEC
 
     # -- 入力 ------------------------------------------------------------
     def note_in_use(self, in_use, now):
@@ -73,7 +75,10 @@ class StreamController:
         if self.in_use:
             return True
         li = self.last_in_use
-        return li is not None and (now - li) < self.idle_sec()
+        if li is None:
+            return False
+        idle = self.idle_sec()
+        return idle == 0 or (now - li) < idle   # 0 = 一度動いたら、使われなくなっても止めない
 
     def desired(self, connected, now):
         with self._lock:

@@ -245,13 +245,13 @@ class StatusValue(QWidget):
 
     _icons = {"ok": "check", "warning": "warning", "error": "warning"}
 
-    def __init__(self, text="", parent=None):
+    def __init__(self, text="", parent=None, wrap=True):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         self.label = QLabel(text)
-        self.label.setWordWrap(True)
+        self.label.setWordWrap(wrap)   # False: 短い値を折り返さず 1 行で出す
         self.label.setMaximumWidth(300)
         self.icon = QLabel()
         self.icon.setFixedSize(16, 16)
@@ -264,9 +264,13 @@ class StatusValue(QWidget):
     def text(self):
         return self.label.text()
 
-    def set_status(self, text, level=None):
+    def set_status(self, text, level=None, tip=None):
         if self.label.text() != text:
             self.label.setText(text)
+        if tip is not None and self.toolTip() != tip:
+            self.setToolTip(tip)
+            self.label.setToolTip(tip)
+            self.icon.setToolTip(tip)
         if self.level != level:
             self.level = level
             self._render()

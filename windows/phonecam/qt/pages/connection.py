@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from phonecam.core.deps import np
-from phonecam.core.softcam_shmem import IDLE_STOP_LABELS, RUN_MODE_LABELS
+from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import t
 from phonecam.qt.widgets import (
     ErrorLabel,
@@ -384,8 +384,9 @@ class ConnectionPage(Page):
         sec = self.add_section(t("connection.run.title"))
         row = sec.add_row("play", t("connection.run.mode"), t("connection.run.mode_hint"))
         row.addControl(bound_combo(self.ctrl, "run_mode", RUN_MODE_LABELS, setter=self.ctrl.set_run_mode, width=200))
-        row = sec.add_row("clock", t("connection.run.idle"))
-        self.idle_combo = bound_combo(self.ctrl, "idle_stop_sec", IDLE_STOP_LABELS, width=100)
+        row = sec.add_row("clock", t("connection.run.idle"), t("connection.run.idle_hint"))
+        IDLE_LABELS = [(v, t("labels.sec.%d" % v)) for v, _ in _IDLE_STOP_LABELS]
+        self.idle_combo = bound_combo(self.ctrl, "idle_stop_sec", IDLE_LABELS, width=110)
         row.addControl(self.idle_combo)
         self.camera_row = sec.add_row("camera", t("connection.run.camera"))
         self.camera_value = QLabel("-")

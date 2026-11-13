@@ -113,7 +113,7 @@ DEFAULT_SETTINGS = {
     "language": "system",        # "system" / "ja" / "en" ...
     "preview_fps": 30,           # アプリ内プレビューの更新fps (15/30/60)。仮想カメラ出力には影響しない
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
-    "idle_stop_sec": 10,
+    "idle_stop_sec": 60,   # 0 = 使われなくなっても止めない
     "window_maximized": True,    # Qt UI: 最大化で起動する
     "ui_expanded": {},           # Qt UI: ページごとの詳細表示状態
     "tk_window_geometry": "",    # Tk UI: 最大化していないときの位置と大きさ ("WxH+X+Y")
@@ -193,7 +193,7 @@ PAIR_CODE_LEN = 6
 RUN_MODES = ("auto", "always", "manual")
 
 
-IDLE_STOP_VALUES = (10, 30, 60)
+IDLE_STOP_VALUES = (0, 10, 30, 60, 300)   # 0 = 止めない
 
 
 # 整数の設定 (キー: (最小, 最大))
