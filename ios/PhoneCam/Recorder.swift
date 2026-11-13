@@ -209,13 +209,6 @@ final class Recorder {
         return active
     }
 
-    /// 現在の録画セッションが 4K 指定か
-    var isHighRes: Bool {
-        lk.lock()
-        defer { lk.unlock() }
-        return active && sessionSettings.resolution == "4k"
-    }
-
     static func freeBytes() -> Int64 {
         let url = Recorder.documentsURL()
         if let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),

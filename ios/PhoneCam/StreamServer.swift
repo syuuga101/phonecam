@@ -55,7 +55,6 @@ final class StreamServer {
     private var videoSendTimes: [UInt64: Double] = [:]
     private var videoSendID: UInt64 = 0
     private var videoSample = VideoSendSample()
-    private var audioDropped = 0
 
     /// 1 本の接続 (queue 上でのみ触る)
     private final class Session {
@@ -269,7 +268,6 @@ final class StreamServer {
         limitVideoQueue = false
         videoSendTimes.removeAll()
         videoSample = VideoSendSample()
-        audioDropped = 0
         lock.unlock()
 
         if let prev = activeSession {
@@ -583,13 +581,6 @@ final class StreamServer {
         }
     }
 
-    /// 音声チャンネルで破棄した音声パケット数
-    func audioDroppedPackets() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return audioDropped
-    }
-
     /// 音声 (type 6)。未送信が audioCapMs 分を超えているときは (新しい方を) 破棄する。
     func sendAudio(captureTime: Double, sampleRate: Int, pcm: Data) {
         guard captureTime.isFinite, sampleRate > 0, !pcm.isEmpty else { return }
@@ -600,7 +591,6 @@ final class StreamServer {
             return
         }
         if pendingAudioBytes > limit {
-            audioDropped += 1
             lock.unlock()
             return
         }

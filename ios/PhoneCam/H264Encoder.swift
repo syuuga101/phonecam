@@ -95,10 +95,6 @@ final class H264Encoder {
 
     // MARK: - エンコード
 
-    func encode(pixelBuffer: CVPixelBuffer, pts: CMTime) {
-        encode(pixelBuffer: pixelBuffer, pts: pts, duration: CMTime.invalid)
-    }
-
     func encode(pixelBuffer: CVPixelBuffer, pts: CMTime, duration: CMTime) {
         let w = Int32(CVPixelBufferGetWidth(pixelBuffer))
         let h = Int32(CVPixelBufferGetHeight(pixelBuffer))

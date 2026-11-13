@@ -4,7 +4,6 @@ import UIKit
 import Foundation
 import CoreMedia
 import CoreVideo
-import CoreMotion
 
 /// PC の仮想カメラキャンバス (outputCanvas)。framing guide 用
 struct OutputCanvas: Equatable {

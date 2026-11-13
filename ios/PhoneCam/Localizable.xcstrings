@@ -833,22 +833,6 @@
         }
       }
     },
-    "録画開始": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画開始"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start recording"
-          }
-        }
-      }
-    },
     "マイク: %@": {
       "localizations": {
         "ja": {
@@ -877,54 +861,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Keep the app in the foreground."
-          }
-        }
-      }
-    },
-    "プレビューはオフです": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューはオフです"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preview is off"
-          }
-        }
-      }
-    },
-    "プレビューの高さを変更": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューの高さを変更"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resize preview height"
-          }
-        }
-      }
-    },
-    "プレビューの幅を変更": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューの幅を変更"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resize preview width"
           }
         }
       }
@@ -961,22 +897,6 @@
         }
       }
     },
-    "音声と録画": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声と録画"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio & recording"
-          }
-        }
-      }
-    },
     "プレビュー": {
       "localizations": {
         "ja": {
@@ -1005,22 +925,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "View"
-          }
-        }
-      }
-    },
-    "プレビューをオンにすると映る範囲を確認できます": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on Preview to check the framing."
           }
         }
       }
@@ -1101,22 +1005,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Streaming in %@"
-          }
-        }
-      }
-    },
-    "%@ · 待機中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · 待機中"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · Standby"
           }
         }
       }
@@ -1325,38 +1213,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standby"
-          }
-        }
-      }
-    },
-    "配信中 · %@": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配信中 · %@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Streaming · %@"
-          }
-        }
-      }
-    },
-    "待機中（カメラ停止）· %@": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "待機中（カメラ停止）· %@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standby (camera off) · %@"
           }
         }
       }
