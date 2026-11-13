@@ -130,8 +130,27 @@ class DropTrend:
         return total >= DROP_WARN_TOTAL or recent >= DROP_WARN_RECENT
 
 
+def _dropped_total(status):
+    phone = status.phone
+    cam, net = phone.get("cameraDroppedFrames"), phone.get("networkDroppedFrames")
+    return cam + net if isinstance(cam, int) and isinstance(net, int) and status.connected else None
+
+
+class _StatusPage(Page):
+    """隠れている間は表示の更新を止め、開いたときに最新の状態で 1 回だけ更新する。"""
+
+    def __init__(self):
+        super().__init__()
+        self.on_show = None
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.on_show is not None:
+            self.on_show()
+
+
 def build(ctrl):
-    page = Page()
+    page = _StatusPage()
     values = {}
     _drop_trend = DropTrend()
     sections = (
@@ -204,7 +223,7 @@ def build(ctrl):
         cam, net = phone.get("cameraDroppedFrames"), phone.get("networkDroppedFrames")
         dropped = (t("status.video.dropped_fmt", cam=cam, net=net)
                    if isinstance(cam, int) and isinstance(net, int) else "-")
-        dropped_total = cam + net if isinstance(cam, int) and isinstance(net, int) and status.connected else None
+        dropped_total = _dropped_total(status)
         dropped_warn = _drop_trend.update(dropped_total, time.monotonic())
         reasons = phone.get("cameraDropReasons")
         reasons = reasons if isinstance(reasons, dict) else {}
@@ -286,7 +305,23 @@ def build(ctrl):
         current.setHint(t("status.graph.current", level=status.thermal_text or "-",
                           hot=format_mmss(ctrl.thermal_log.hot_seconds)))
 
-    ctrl.status_changed.connect(refresh)
-    ctrl.settings_changed.connect(lambda *_: refresh(ctrl.status))
+    dirty = [False]
+
+    def refresh_if_visible(*_):
+        if page.isVisible():
+            dirty[0] = False
+            refresh(ctrl.status)
+        else:
+            dirty[0] = True
+            _drop_trend.update(_dropped_total(ctrl.status), time.monotonic())   # 取りこぼしの傾向だけは隠れていても追う
+
+    def show_pending():
+        if dirty[0]:
+            dirty[0] = False
+            refresh(ctrl.status)
+
+    page.on_show = show_pending
+    ctrl.status_changed.connect(refresh_if_visible)
+    ctrl.settings_changed.connect(refresh_if_visible)
     refresh(ctrl.status)
     return page.finish()

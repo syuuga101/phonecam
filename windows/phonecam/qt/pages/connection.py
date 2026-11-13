@@ -99,8 +99,16 @@ class PreviewView(QWidget):
         self._timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._apply_fps(ctrl.get("preview_fps", 30))
         self._timer.timeout.connect(self._tick)
-        self._timer.start()
         ctrl.settings_changed.connect(self._setting)
+
+    # 別ページを開いている間は止める (表示中にだけ 15〜60 回/秒で起きる)
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._timer.start()
+
+    def hideEvent(self, event):
+        self._timer.stop()
+        super().hideEvent(event)
 
     # -- 大きさ --------------------------------------------------------------
     def _rect_size(self):
