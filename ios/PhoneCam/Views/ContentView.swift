@@ -4,15 +4,15 @@ import UIKit
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
     @StateObject private var updater = UpdateChecker()
+    @StateObject private var recordings = RecordingsStore()
     // 設定画面と共有するキー: "showGrid" / "showLevel" (どちらも Bool, @AppStorage)
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("showLevel") private var showLevel = true
-    // プレビューの大きさ。previewHeight == 0 は「幅いっぱいの 16:9」(未保存)
-    @AppStorage("previewHeight") private var previewHeight: Double = 0
-    @AppStorage("previewWidthRatio") private var previewWidthRatio: Double = 0.6
-    @State var rotationHint = false
-    @State private var heightDragBase: Double?
-    @State private var ratioDragBase: Double?
+    @State private var showRecordings = false
+    @State private var showLandscapeSettings = false
+
+    /// 横画面の右側の操作列の幅
+    private let controlColumnWidth: CGFloat = 96
 
     var body: some View {
         ZStack {
@@ -27,7 +27,6 @@ struct ContentView: View {
                         }
                     }
                     .frame(width: geo.size.width, height: geo.size.height)
-                    .onChange(of: landscape) { rotationHint = true }
                 }
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
@@ -40,20 +39,43 @@ struct ContentView: View {
         }
         .animation(.easeOut(duration: 0.2), value: model.toast)
         .statusBarHidden(model.screenBlack)
-        .onAppear { updater.checkIfNeeded() }
+        .onAppear {
+            updater.checkIfNeeded()
+            recordings.refresh()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             updater.checkIfNeeded()
         }
         .onChange(of: model.previewEnabled) {
-            if model.previewEnabled { rotationHint = false }
             model.setMotionActive(model.previewEnabled && showLevel)
         }
         .onChange(of: showLevel) {
             model.setMotionActive(model.previewEnabled && showLevel)
         }
-        .onChange(of: model.rotationAngle) { rotationHint = true }
+        .onChange(of: model.recActive) {
+            // 録画が終わったら、ファイルが書き終わるのを待ってからサムネイルを更新する
+            if !model.recActive {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { recordings.refresh() }
+            }
+        }
         .sheet(isPresented: $updater.showNotes) {
             UpdateNotesSheet(release: updater.available) { updater.showNotes = false }
+        }
+        .sheet(isPresented: $showRecordings) {
+            NavigationStack {
+                RecordingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("完了") { showRecordings = false }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showLandscapeSettings) {
+            NavigationStack {
+                SettingsView(model: model, showStreamInfo: true) { showLandscapeSettings = false }
+            }
+            .environmentObject(model)
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in model.noteTouch() }
@@ -62,150 +84,98 @@ struct ContentView: View {
 
     // MARK: レイアウト
 
+    /// 縦画面: プレビュー → 操作バー → 設定 → 配信情報 (一番下)
     private func portraitLayout(_ size: CGSize) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            topBar
-            statusHeader
-                .padding(.horizontal, 20)
-                .padding(.bottom, 6)
-            controlList(previewListWidth: size.width - 32)
-        }
-    }
-
-    private func landscapeLayout(_ size: CGSize) -> some View {
-        let ratio = min(0.75, max(0.4, previewWidthRatio))
-        let gripW: CGFloat = 20
-        let previewW = max(1, size.width * CGFloat(ratio) - gripW)
-        return HStack(spacing: 0) {
-            landscapePreviewArea(CGSize(width: previewW, height: size.height))
-            verticalGrabber(totalWidth: size.width)
-                .frame(width: gripW, height: size.height)
-            VStack(alignment: .leading, spacing: 0) {
-                topBar
-                statusHeader
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
-                controlList(previewListWidth: nil)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    private func landscapePreviewArea(_ box: CGSize) -> some View {
-        Group {
-            if model.previewEnabled {
-                PreviewPanel(region: CGSize(width: max(1, box.width - 8), height: max(1, box.height - 16)),
-                             showGrid: showGrid, showLevel: showLevel, cornerRadius: 12)
-            } else {
-                previewOffPlaceholder
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.vertical, 8)
-                    .padding(.leading, 8)
-            }
-        }
-        .frame(width: box.width, height: box.height)
-    }
-
-    // MARK: プレビューカード
-
-    private var previewOffPlaceholder: some View {
-        ZStack {
-            Color.black
-            VStack(spacing: 8) {
-                Image(systemName: "eye.slash")
-                    .font(.system(size: 28, weight: .light))
-                Text("プレビューはオフです")
-                    .font(.system(size: 15, weight: .medium))
-            }
-            .foregroundColor(Color(white: 0.6))
-        }
-    }
-
-    private func clampedPreviewHeight(width: CGFloat) -> CGFloat {
-        let base = previewHeight > 0 ? CGFloat(previewHeight) : width * 9.0 / 16.0
-        return min(560, max(160, base))
-    }
-
-    /// 幅いっぱいのプレビュー + 下辺のつまみ (ドラッグで高さを変更し、保存する)
-    private func previewCard(listWidth: CGFloat) -> some View {
-        let h = clampedPreviewHeight(width: max(1, listWidth))
+        let w = max(1, size.width - 32)
+        let stage = CGSize(width: w, height: (w * 9.0 / 16.0).rounded())
         return VStack(spacing: 0) {
-            GeometryReader { g in
-                Group {
-                    if model.previewEnabled {
-                        PreviewPanel(region: CGSize(width: max(1, g.size.width), height: h),
-                                     showGrid: showGrid, showLevel: showLevel, cornerRadius: 0)
-                    } else {
-                        previewOffPlaceholder
-                    }
-                }
-                .frame(width: g.size.width, height: h)
+            PreviewStage(size: stage, showGrid: showGrid, showLevel: showLevel, cornerButtons: true)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.top, 8)
+            controlBar
+                .padding(.top, 10)
+                .padding(.horizontal, 16)
+            if !model.recError.isEmpty {
+                Text(model.recError)
+                    .font(.system(size: 13))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: h)
-
-            Capsule()
-                .fill(Color.secondary.opacity(0.4))
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
-                .frame(height: 20)
-                .contentShape(Rectangle())
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                        .onChanged { v in
-                            if heightDragBase == nil { heightDragBase = Double(h) }
-                            let base = heightDragBase ?? Double(h)
-                            previewHeight = min(560, max(160, base + Double(v.translation.height)))
-                        }
-                        .onEnded { _ in heightDragBase = nil }
-                )
-                .accessibilityLabel("プレビューの高さを変更")
+            controlList
         }
     }
 
-    private func verticalGrabber(totalWidth: CGFloat) -> some View {
-        Capsule()
-            .fill(Color.secondary.opacity(0.4))
-            .frame(width: 5, height: 36)
-            .frame(maxHeight: .infinity)
-            .frame(width: 20)
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                    .onChanged { v in
-                        if ratioDragBase == nil { ratioDragBase = min(0.75, max(0.4, previewWidthRatio)) }
-                        let base = ratioDragBase ?? 0.6
-                        let delta = Double(v.translation.width) / Double(max(1, totalWidth))
-                        previewWidthRatio = min(0.75, max(0.4, base + delta))
-                    }
-                    .onEnded { _ in ratioDragBase = nil }
-            )
-            .accessibilityLabel("プレビューの幅を変更")
+    /// 横画面: 左にプレビュー (縦横比を保って最大)、右に幅固定のアイコンだけの操作列
+    private func landscapeLayout(_ size: CGSize) -> some View {
+        let area = CGSize(width: max(1, size.width - controlColumnWidth - 8),
+                          height: max(1, size.height - 16))
+        let stage = ContentView.fit16x9(in: area)
+        return HStack(spacing: 0) {
+            PreviewStage(size: stage, showGrid: showGrid, showLevel: showLevel, cornerButtons: false)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(width: area.width, height: size.height)
+                .padding(.leading, 8)
+            landscapeColumn
+                .frame(width: controlColumnWidth, height: size.height)
+        }
     }
 
-    // MARK: リスト
+    static func fit16x9(in area: CGSize) -> CGSize {
+        let aspect: CGFloat = 16.0 / 9.0
+        if area.width / area.height > aspect {
+            return CGSize(width: (area.height * aspect).rounded(), height: area.height)
+        }
+        return CGSize(width: area.width, height: (area.width / aspect).rounded())
+    }
 
-    private func controlList(previewListWidth: CGFloat?) -> some View {
+    // MARK: 操作バー / 操作列
+
+    /// 縦画面の操作バー (プレビューのすぐ下、1 行): 左にサムネイル / 中央に録画 / 右にライト
+    private var controlBar: some View {
+        VStack(spacing: 6) {
+            RecordTimerPill(recording: model.recActive, seconds: model.recSeconds)
+            HStack(spacing: 0) {
+                LastRecordingButton(store: recordings) { showRecordings = true }
+                    .frame(width: 64, alignment: .leading)
+                Spacer(minLength: 0)
+                RecordButton(recording: model.recActive) { model.toggleRecording() }
+                Spacer(minLength: 0)
+                TorchButton(style: .bar, size: 52)
+                    .frame(width: 64, alignment: .trailing)
+            }
+        }
+    }
+
+    /// 横画面の操作列 (アイコンだけ): 上からライト、録画 (中央)、プレビュー、設定
+    private var landscapeColumn: some View {
+        VStack(spacing: 0) {
+            TorchButton(style: .bar, size: 48)
+            Spacer(minLength: 8)
+            VStack(spacing: 6) {
+                RecordTimerPill(recording: model.recActive, seconds: model.recSeconds)
+                RecordButton(recording: model.recActive) { model.toggleRecording() }
+            }
+            Spacer(minLength: 8)
+            PreviewToggleButton(style: .bar, size: 48)
+            RoundIconButton(symbol: "gearshape", size: 48, style: .bar, label: "設定") {
+                showLandscapeSettings = true
+            }
+            .padding(.top, 10)
+        }
+        .padding(.vertical, 12)
+    }
+
+    // MARK: リスト (設定 → 配信情報)
+
+    private var controlList: some View {
         List {
             if let rel = updater.available {
                 Section {
                     UpdateBanner(checker: updater, release: rel)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                }
-            }
-
-            if let w = previewListWidth {
-                Section {
-                    previewCard(listWidth: w)
-                        .listRowInsets(EdgeInsets())
-                }
-            }
-
-            if model.lenses.count > 1 {
-                Section {
-                    lensPicker
-                } header: {
-                    Text("レンズ")
                 }
             }
 
@@ -219,25 +189,17 @@ struct ContentView: View {
                         ))
                     }
                 }
-                recordRow
-            } header: {
-                Text("音声と録画")
+                NavigationLink {
+                    SettingsView(model: model)
+                } label: {
+                    HStack(spacing: 12) {
+                        RowIcon(symbol: "gearshape")
+                        Text("設定")
+                    }
+                }
             }
 
             infoSection
-
-            Section {
-                HStack(spacing: 12) {
-                    RowIcon(symbol: "eye")
-                    Toggle("プレビュー", isOn: $model.previewEnabled)
-                }
-            } header: {
-                Text("表示")
-            } footer: {
-                if !model.previewEnabled && rotationHint {
-                    Text("プレビューをオンにすると映る範囲を確認できます")
-                }
-            }
 
             Section {
                 footnotes
@@ -247,75 +209,5 @@ struct ContentView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-    }
-
-    // MARK: 部品
-
-    private var topBar: some View {
-        HStack(spacing: 0) {
-            Image(systemName: "camera")
-                .font(.system(size: 26, weight: .regular))
-                .foregroundStyle(.primary)
-                .padding(.leading, 20)
-                .accessibilityHidden(true)
-            Spacer()
-            NavigationLink {
-                SettingsView(model: model)
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 20, weight: .regular))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .padding(.trailing, 8)
-            .accessibilityLabel("設定")
-        }
-        .frame(height: 44)
-    }
-
-    var statusText: String {
-        if !model.isConnected { return String(localized: "待機中") }
-        let kind = model.connectionKind
-        if model.streamActiveUI { return String(localized: "配信中 · \(kind)") }
-        return String(localized: "待機中（カメラ停止）· \(kind)")
-    }
-
-    private var statusHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(model.isConnected ? Color.green : Color(.systemGray3))
-                    .frame(width: 10, height: 10)
-                Text(statusText)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            if model.micEnabled && model.micMuted {
-                MutePill()
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    static func lensName(_ l: String) -> String {
-        switch l {
-        case "ultrawide": return "0.5×"
-        case "front": return String(localized: "前面")
-        default: return "1×"
-        }
-    }
-
-    private var lensPicker: some View {
-        let order = ["ultrawide", "wide", "front"].filter { model.lenses.contains($0) }
-        return Picker("レンズ", selection: Binding(
-            get: { model.lens },
-            set: { model.selectLens($0) }
-        )) {
-            ForEach(order, id: \.self) { l in
-                Text(ContentView.lensName(l)).tag(l)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
     }
 }

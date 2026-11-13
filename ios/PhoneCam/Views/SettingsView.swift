@@ -4,13 +4,20 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    /// 横画面のシートで開くとき true: 先頭に「配信情報」を出し、「完了」ボタンを付ける
+    var showStreamInfo = false
+    var onClose: (() -> Void)?
     @State private var showScanner = false
+    @AppStorage(OrientationLock.defaultsKey) private var orientationRaw = OrientationLock.auto.rawValue
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("showLevel") private var showLevel = true
     @State private var deviceName = UserDefaults.standard.string(forKey: DeviceName.defaultsKey) ?? ""
 
     var body: some View {
         List {
+            if showStreamInfo {
+                StreamInfoSection()
+            }
             generalSection
             screenSection
             connectionSection
@@ -19,6 +26,13 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("設定")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let close = onClose {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完了") { close() }
+                }
+            }
+        }
     }
 
     // MARK: 一般
@@ -39,6 +53,11 @@ struct SettingsView: View {
                 SettingsLabel("この端末の名前", symbol: "iphone")
             }
             NavigationLink {
+                RecordingsView()
+            } label: {
+                SettingsLabel("録画ファイル", symbol: "film.stack")
+            }
+            NavigationLink {
                 LanguageSettingsView()
             } label: {
                 SettingsLabel("言語", symbol: "globe")
@@ -56,7 +75,7 @@ struct SettingsView: View {
     // MARK: 画面
 
     private var screenSection: some View {
-        Section("画面") {
+        Section {
             Toggle(isOn: Binding(
                 get: { model.dimScreen },
                 set: { model.setDim($0) }
@@ -84,12 +103,29 @@ struct SettingsView: View {
             Toggle(isOn: $model.vibrateOnConnect) {
                 SettingsLabel("接続時に振動", symbol: "iphone.radiowaves.left.and.right")
             }
+            Picker(selection: Binding(
+                get: { orientationRaw },
+                set: { v in
+                    orientationRaw = v
+                    OrientationLock.apply()
+                }
+            )) {
+                Text("自動").tag(OrientationLock.auto.rawValue)
+                Text("縦で固定").tag(OrientationLock.portrait.rawValue)
+                Text("横で固定").tag(OrientationLock.landscape.rawValue)
+            } label: {
+                SettingsLabel("画面の向き", symbol: "lock.rotation")
+            }
             Toggle(isOn: $showGrid) {
                 SettingsLabel("グリッド", symbol: "grid")
             }
             Toggle(isOn: $showLevel) {
                 SettingsLabel("水平メーター", symbol: "level")
             }
+        } header: {
+            Text("画面")
+        } footer: {
+            Text("「横で固定」では、iPhone を左右どちらに倒しても横向きのままになります。")
         }
     }
 
