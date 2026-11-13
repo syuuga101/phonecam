@@ -158,6 +158,8 @@ def child(scale, out):
         print("DBG %s before grab: box=%d qr_y=%d" % (theme, wireless.devices_box.height(), wireless.qr.parentWidget().y()))
         win.grab()   # 1 回目は保留中のレイアウトを確定させるだけ (撮り直す)
         _settle(app, 150)
+        inner = win.current_page().widget()
+        print("DBG %s inner h=%d min=%d content h=%d min=%d" % (theme, inner.height(), inner.minimumHeight(), wireless.devices_box.parentWidget().height(), wireless.devices_box.parentWidget().minimumHeight()))
         print("DBG %s after grab: box=%d qr_y=%d" % (theme, wireless.devices_box.height(), wireless.qr.parentWidget().y()))
         win.grab().save(os.path.join(out, "empty_state_%s_x%s.png" % (theme, scale)))
         for expander in win.current_page().findChildren(Expander):

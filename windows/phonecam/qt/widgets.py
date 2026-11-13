@@ -633,7 +633,10 @@ class FitBox(QWidget):
         layout = self.layout()
         if layout is None or self.width() <= 0:
             return None
-        return max(self._base_height, layout.totalHeightForWidth(self.width()))
+        hfw = layout.totalHeightForWidth(self.width())
+        if hfw < 0:
+            hfw = layout.minimumSize().height()
+        return max(self._base_height, hfw)
 
     def _fit(self):
         need = self._need()
@@ -699,7 +702,7 @@ class Page(QScrollArea):
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        inner = QWidget()
+        inner = FitBox()   # 中の折りたたみが伸びたとき、ページの高さが追いつかず内容が重なるのを防ぐ
         self.setWidget(inner)
         outer = QHBoxLayout(inner)
         outer.setContentsMargins(0, 0, 0, 0)
