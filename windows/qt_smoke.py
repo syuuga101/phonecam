@@ -155,11 +155,17 @@ def child(scale, out):
         _settle(app, 500)
         win.current_page().verticalScrollBar().setValue(0)
         _settle(app, 150)
+        print("DBG %s before grab: box=%d qr_y=%d" % (theme, wireless.devices_box.height(), wireless.qr.parentWidget().y()))
+        win.grab()   # 1 回目は保留中のレイアウトを確定させるだけ (撮り直す)
+        _settle(app, 150)
+        print("DBG %s after grab: box=%d qr_y=%d" % (theme, wireless.devices_box.height(), wireless.qr.parentWidget().y()))
         win.grab().save(os.path.join(out, "empty_state_%s_x%s.png" % (theme, scale)))
         for expander in win.current_page().findChildren(Expander):
             if expander.expanded:
                 shot = wireless.devices_box.mapTo(win.current_page().widget(), wireless.devices_box.rect().topLeft()).y()
                 win.current_page().verticalScrollBar().setValue(max(0, shot - 80))
+                _settle(app, 150)
+                win.grab()
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, "empty_state_%s_x%s_scroll.png" % (theme, scale)))
                 break
