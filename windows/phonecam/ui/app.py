@@ -740,7 +740,7 @@ _bind_setup()
 
 def main():
     args = sys.argv[1:]
-    setup_window = args in (["--setup-wizard"], ["--setup-diagnose"])
+    setup_window = args[:1] in (["--setup-wizard"], ["--setup-diagnose"])
     helper = None if setup_window else helper_main(args)
     if helper is not None:
         return helper
@@ -753,10 +753,10 @@ def main():
     crashlog.install(root)
     apply_ui_scale(root)
     if setup_window:
-        root.withdraw()
         settings = load_settings()
         set_language(settings.get("language", "system"))
-        theme.apply(root, settings.get("theme", "system"))
+        theme.init(root, settings.get("theme", "system"))
+        root.update()
         if phonecam_setup is None:
             messagebox.showerror("PhoneCam", t("setup.unavailable"), parent=root)
             root.destroy()
@@ -771,10 +771,14 @@ def main():
                 current["setup_done"] = True
                 save_settings(current)
 
-            dialog = phonecam_setup.SetupWizard(root, controller, on_finish=finish_setup, open_url=webbrowser_open)
+            after_update = args[args.index("--after-update") + 1] if "--after-update" in args else None
+            dialog = phonecam_setup.SetupWizard(root, controller, on_finish=finish_setup,
+                                                open_url=webbrowser_open, update_version=after_update)
         if dialog is not None:
             dialog.top.transient("")
             dialog.top.deiconify()
+            dialog.top.update()
+            root.withdraw()
             root.wait_window(dialog.top)
         root.destroy()
         return 0 if dialog is not None else 1

@@ -561,6 +561,7 @@
  "shortcuts.key.cancel": "取消",
  "shortcuts.key.change": "変更",
  "shortcuts.key.none": "なし",
+ "shortcuts.key.placeholder": "キーを入力",
  "shortcuts.key.waiting": "キーを押してください…",
  "shortcuts.list.title": "割り当て",
  "shortcuts.msg.capture": "使いたいキーを押してください（Ctrl・Alt・Shift・Winのどれかと一緒に押します）。Escで取り消します",

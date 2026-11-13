@@ -561,6 +561,7 @@
  "shortcuts.key.cancel": "Cancel",
  "shortcuts.key.change": "Change",
  "shortcuts.key.none": "None",
+ "shortcuts.key.placeholder": "Press shortcut",
  "shortcuts.key.waiting": "Press a key...",
  "shortcuts.list.title": "Assignments",
  "shortcuts.msg.capture": "Press the key you want (together with Ctrl, Alt, Shift or Win). Press Esc to cancel",

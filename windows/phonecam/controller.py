@@ -37,6 +37,7 @@ from phonecam.core.settings import (
     normalize_pair_code,
     sanitize_settings,
     save_settings,
+    settings_has_key,
     valid_pair_code,
 )
 from phonecam.core.softcam_shmem import (
@@ -147,12 +148,16 @@ class Controller:
         self.update_changed = CallbackList()    # emit(banner)        banner: None か dict(text, actions=[(label, fn)])
 
         self.update_status_changed = CallbackList()
+        self.update_action = CallbackList()
         self.update_status_text = t("update.status.never")
         self.update_check_busy = False
         self._dismissed_update = None
+        self._setup_process = None
         self._next_update = time.monotonic() + 3
         self._results = SimpleQueue()
         self.frozen = bool(getattr(sys, "frozen", False))
+        if self.frozen and not demo and phonecam_update is not None:
+            phonecam_update.cleanup_old(os.path.dirname(sys.executable), prefix=Path(sys.executable).stem)
         self.camera_registration = registration_status() if self.frozen and not demo else "unavailable"
         self.camera_registration_busy = False
         self.camera_registration_changed = CallbackList()
@@ -343,20 +348,51 @@ class Controller:
         except OSError as error:
             self.toast.emit(t("audio.vbcable.openfail", err=error), "error")
 
-    def open_setup(self, diagnose=False):
-        if self.demo:
+    def open_setup(self, diagnose=False, after_update=None):
+        if self.demo or self._setup_process is not None:
             return
         self.save_now()
         args = [sys.executable]
         if not self.frozen:
             args.append(str(Path(__file__).resolve().parents[1] / "phonecam_receiver.py"))
         args.append("--setup-diagnose" if diagnose else "--setup-wizard")
+        if after_update:
+            args.extend(("--after-update", after_update))
         try:
-            subprocess.Popen(args)
+            process = subprocess.Popen(args)
+            self._setup_process = process
+            self.run_background(process.wait, lambda result: self._setup_finished(process))
         except OSError as error:
             self.toast.emit(t("settings.setup.launch_error", error=error), "error")
 
-    def _background(self, work, done):
+    def _setup_finished(self, process):
+        if self._setup_process is not process:
+            return
+        self._setup_process = None
+        current = load_settings()
+        for key in ("setup_done", "setup_shown_version", "audio_defaults_backup", "vbcable_restore_pending"):
+            self.changed(key, current[key])
+
+    def first_run_setup(self):
+        if self.demo or not self.frozen or phonecam_update is None:
+            return
+        version = phonecam_update.parse_version(APP_VERSION)
+        version = phonecam_update.display_version(APP_VERSION) if version and version != (0, 0, 0) else ""
+        if not self.get("setup_done"):
+            if settings_has_key("setup_done") is False and self.camera_registration == "ok":
+                self.changed("setup_done", True)
+                if version:
+                    self.changed("setup_shown_version", version)
+                self.save_now()
+                return
+            if version:
+                self.changed("setup_shown_version", version)
+            self.open_setup()
+        elif version and self.get("setup_shown_version") != version:
+            self.changed("setup_shown_version", version)
+            self.open_setup(after_update=version)
+
+    def run_background(self, work, done):
         def run():
             try:
                 result = work()
@@ -387,7 +423,7 @@ class Controller:
                 key = {"ok": "unchanged", "cancelled": "cancelled", "timeout": "timeout"}.get(kind, "failed")
                 self.toast.emit(t(f"video.vcam.{key}", word=word), "error")
 
-        self._background(lambda: run_elevated("--" + action), finished)
+        self.run_background(lambda: run_elevated("--" + action), finished)
 
     def version_text(self):
         return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION
@@ -433,7 +469,7 @@ class Controller:
                 self._show_update_status(t("update.status.dev"))
             return
         self._show_update_status(t("update.status.checking"), busy=True)
-        self._background(lambda: phonecam_update.fetch_latest(APP_REPO, APP_VERSION), lambda result: self._finish_update_check(result, auto))
+        self.run_background(lambda: phonecam_update.fetch_latest(APP_REPO, APP_VERSION), lambda result: self._finish_update_check(result, auto))
 
     def _finish_update_check(self, result, auto):
         stamp = time.strftime("%m/%d %H:%M")
@@ -447,7 +483,8 @@ class Controller:
         self._show_update_status(t(key, time=stamp, version=version))
         if not auto:
             self._dismissed_update = None
-        if tag == self._dismissed_update or not phonecam_update.should_notify(tag, APP_VERSION, self.get("update_skip_version", "")):
+        if tag == self._dismissed_update or not phonecam_update.should_notify(
+                tag, APP_VERSION, self.get("update_skip_version", "") if auto else ""):
             return
 
         def dismiss():
@@ -461,7 +498,8 @@ class Controller:
 
         self.update_banner = {
             "text": t("update.banner.title", version=version),
-            "actions": [(t("update.notes.open_release"), lambda: webbrowser.open(result["html_url"] or f"https://github.com/{APP_REPO}/releases/latest")),
+            "actions": [(t("update.banner.now"), lambda: self.update_action.emit("install", result)),
+                        (t("update.banner.notes"), lambda: self.update_action.emit("notes", result)),
                         (t("update.banner.later"), dismiss), (t("update.banner.skip"), skip)],
         }
         self.update_changed.emit(self.update_banner)
@@ -646,8 +684,11 @@ class Controller:
                 break
             done(result)
         if not self.demo and phonecam_update and now >= self._next_update:
-            self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC
-            self.check_updates(auto=True)
+            if self._setup_process is not None:
+                self._next_update = now + 1.0
+            else:
+                self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC
+                self.check_updates(auto=True)
         if now >= self._next_poll:
             self._next_poll = now + POLL_SEC
             self._poll_dshow(now)
@@ -853,6 +894,8 @@ class Controller:
     # ------------------------------------------------------------------
     def close(self):
         """アプリ終了時に呼ぶ。受信・音声を止め、設定を保存する。"""
+        if self.closing:
+            return
         self.closing = True
         if self._hotkeys is not None:
             self._hotkeys.stop()
@@ -868,6 +911,12 @@ class Controller:
             self.audio.stop()
         except Exception:
             pass
+        if self._setup_process is not None:
+            if self._setup_process.poll() is None:
+                self.save_now()
+                self.persist = False
+            else:
+                self._setup_finished(self._setup_process)
         if self.persist:
             save_settings(self.settings)
 

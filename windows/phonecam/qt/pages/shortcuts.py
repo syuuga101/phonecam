@@ -1,7 +1,7 @@
 """Windows global shortcut settings."""
 
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QKeySequenceEdit
+from PySide6.QtWidgets import QKeySequenceEdit, QLineEdit
 
 from phonecam.core.deps import phonecam_hotkeys
 from phonecam.i18n import t
@@ -34,6 +34,7 @@ def build(ctrl):
             seq = _sequence(bindings.get(action, ""))
             if editor.keySequence() != seq:
                 editor.setKeySequence(seq)
+            editor.findChild(QLineEdit).setPlaceholderText(t("shortcuts.key.placeholder"))
             taken = ctrl.get("hotkeys_enabled", True) and bindings.get(action) and action in ctrl.hotkey_conflicts
             rows[action].setHint(t("shortcuts.taken") if taken else "")
 
