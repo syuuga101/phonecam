@@ -22,8 +22,19 @@ def main():
     if not os.path.exists(toc):
         print("PKG-00.toc がありません:", toc)
         return 0
-    for ent in load(toc):
-        name, src, typ = ent[0], ent[1], ent[2]
+    data = load(toc)
+    if isinstance(data, dict):
+        print("PKG-00.toc は dict (keys: %s)" % list(data.keys())[:10])
+        data = data.get("toc") or data.get("entries") or list(data.values())[0] if data else []
+    if data:
+        print("sample entry:", repr(list(data)[0])[:300])
+    for ent in data:
+        if isinstance(ent, dict):
+            name = ent.get("dest_name") or ent.get("name")
+            src = ent.get("src_name") or ent.get("src") or ent.get("path")
+            typ = ent.get("typecode") or ent.get("type") or ""
+        else:
+            name, src, typ = ent[0], ent[1], ent[2]
         if typ in ("PYMODULE", "PYSOURCE", "PYZ") or not src or not os.path.isfile(src):
             continue
         rows.append((os.path.getsize(src), name, typ))
