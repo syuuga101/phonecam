@@ -23,7 +23,9 @@ enum DeviceName {
     }
 
     /// 人が読める機種名 (例: "iPhone 13")
-    static var modelName: String { modelName(for: identifier) }
+    /// 端末の機種名は変わらないので 1 回だけ求める (状態 JSON を作るたびに uname を呼ばない)
+    static var modelName: String { cachedModelName }
+    private static let cachedModelName: String = DeviceName.modelName(for: DeviceName.identifier)
 
     static func modelName(for id: String) -> String {
         if let name = table[id] { return name }

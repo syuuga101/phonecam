@@ -209,6 +209,36 @@ final class Recorder {
         return active
     }
 
+    /// 画面表示用の軽い状態 (active / 経過秒 / エラー)。ディスクには触らない。
+    func uiState() -> (active: Bool, seconds: Double, error: String) {
+        lk.lock()
+        defer { lk.unlock() }
+        var seconds = 0.0
+        if let st = startDate {
+            seconds = (active ? Date() : (endDate ?? Date())).timeIntervalSince(st)
+        }
+        return (active, max(0, seconds), errorText)
+    }
+
+    private static let freeCacheLock = NSLock()
+    private static var freeCache: (at: TimeInterval, value: Int64)?
+
+    /// ステータス用の空き容量。volumeAvailableCapacityForImportantUsage は重いので 10 秒キャッシュする。
+    static func freeBytesCached() -> Int64 {
+        let now = ProcessInfo.processInfo.systemUptime
+        freeCacheLock.lock()
+        if let c = freeCache, now - c.at < 10 {
+            freeCacheLock.unlock()
+            return c.value
+        }
+        freeCacheLock.unlock()
+        let v = freeBytes()
+        freeCacheLock.lock()
+        freeCache = (now, v)
+        freeCacheLock.unlock()
+        return v
+    }
+
     static func freeBytes() -> Int64 {
         let url = Recorder.documentsURL()
         if let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
@@ -254,7 +284,7 @@ final class Recorder {
             "seconds": max(0, seconds),
             "fileName": name,
             "bytes": Int(bytes),
-            "freeBytes": Int(Recorder.freeBytes()),
+            "freeBytes": Int(Recorder.freeBytesCached()),
             "resolution": isActive ? sessionRes : res,
             "error": err,
             "droppedFrames": drops

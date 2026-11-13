@@ -132,7 +132,7 @@ final class StreamServer {
     private func startHealthTimer() {
         guard healthTimer == nil else { return }
         let t = DispatchSource.makeTimerSource(queue: queue)
-        t.schedule(deadline: .now() + 5.0, repeating: 5.0)
+        t.schedule(deadline: .now() + 5.0, repeating: 5.0, leeway: .seconds(1))
         t.setEventHandler { [weak self] in
             self?.checkListenerHealth()
         }
@@ -633,14 +633,15 @@ final class StreamServer {
 
     /// ステータス JSON を送信する (破棄しない)
     func sendStatus(_ status: [String: Any]) {
-        guard JSONSerialization.isValidJSONObject(status),
-              let json = try? JSONSerialization.data(withJSONObject: status) else { return }
+        // 送り先が無いときは JSON を作らない (大きい辞書の直列化を省く)
         lock.lock()
         guard let conn = client, clientReady else {
             lock.unlock()
             return
         }
         lock.unlock()
+        guard JSONSerialization.isValidJSONObject(status),
+              let json = try? JSONSerialization.data(withJSONObject: status) else { return }
         let packet = Packet.encode(type: PacketType.status, payload: json)
         conn.send(content: packet, completion: .contentProcessed({ _ in }))
     }

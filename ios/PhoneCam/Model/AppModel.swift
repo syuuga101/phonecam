@@ -492,7 +492,8 @@ final class AppModel: ObservableObject {
 
     private func startTimer() {
         let t = DispatchSource.makeTimerSource(queue: timerQueue)
-        t.schedule(deadline: .now() + 1.0, repeating: 1.0)
+        // 1 秒周期にゆとり (leeway) を持たせ、他のタイマーと一緒に CPU を起こして電池を節約する
+        t.schedule(deadline: .now() + 1.0, repeating: 1.0, leeway: .milliseconds(100))
         t.setEventHandler { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
@@ -515,8 +516,10 @@ final class AppModel: ObservableObject {
             let wifiOn = self.security.wifiAllowed
             let ip = wifiOn ? AppModel.wifiIPv4() : nil
             DispatchQueue.main.async {
-                self.sentFps = max(0, delta)
-                self.wifiAddress = wifiOn ? (ip.map { "\($0):5555" } ?? String(localized: "未接続")) : String(localized: "オフ")
+                let fps = max(0, delta)
+                if self.sentFps != fps { self.sentFps = fps }
+                let address = wifiOn ? (ip.map { "\($0):5555" } ?? String(localized: "未接続")) : String(localized: "オフ")
+                if self.wifiAddress != address { self.wifiAddress = address }
             }
         }
         t.resume()
@@ -562,8 +565,11 @@ final class AppModel: ObservableObject {
         batteryStateText = stateText
         stateLock.unlock()
 
-        thermalText = AppModel.thermalLabel(ProcessInfo.processInfo.thermalState)
-        batteryText = lvl >= 0 ? "\(Int((lvl * 100).rounded()))%" : "-"
+        // @Published は同じ値を代入しても購読している View (ContentView 全体) を再評価させるため、変わったときだけ代入する
+        let thermal = AppModel.thermalLabel(ProcessInfo.processInfo.thermalState)
+        if thermalText != thermal { thermalText = thermal }
+        let battery = lvl >= 0 ? "\(Int((lvl * 100).rounded()))%" : "-"
+        if batteryText != battery { batteryText = battery }
     }
 
     private func withExtras(_ base: [String: Any]) -> [String: Any] {
@@ -916,14 +922,12 @@ final class AppModel: ObservableObject {
     }
 
     private func refreshRecordingUI() {
-        let st = recorder.statusDictionary()
-        let act = (st["active"] as? Bool) ?? false
-        let sec = (st["seconds"] as? Double) ?? 0
-        let err = (st["error"] as? String) ?? ""
+        // 画面用には、ディスク容量やファイルサイズを読まない軽い版を使う (毎秒呼ばれる)
+        let st = recorder.uiState()
         DispatchQueue.main.async {
-            self.recActive = act
-            self.recSeconds = sec
-            self.recError = err
+            if self.recActive != st.active { self.recActive = st.active }
+            if self.recSeconds != st.seconds { self.recSeconds = st.seconds }
+            if self.recError != st.error { self.recError = st.error }
         }
     }
 
