@@ -117,7 +117,7 @@ def _update_pc_status(app, snap):
                              else t("status.pc.now", v=dec or t("status.pc.software")))
     text = dec or "-"
     if dec and snap.get("decoder_note"):
-        text += t("status.pc.note", v=snap["decoder_note"])
+        text = t("status.pc.decoder_note", decoder=text, note=snap["decoder_note"])
     app.pc_vars["decoder"].set(text)
     size = canvas_size(app.settings)
     app.pc_vars["out"].set("%dx%d" % size if size else t("status.pc.out_native"))

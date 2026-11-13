@@ -14,7 +14,7 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 
 from phonecam.qt import icons
 
+NO_VALUE = "—"       # 値がないときの表示 (言語に依らない記号)
 MAX_CONTENT_W = 760   # 内容列の最大幅 (論理px)
 PAGE_PAD_X = 24
 
@@ -468,7 +469,7 @@ class Expander(Card):
         self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         header_layout.addWidget(self.arrow)
         self.layout().addWidget(self.header)
-        self.content = QWidget()
+        self.content = _ExpanderContent()
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(1, 0, 1, 1)
         content_layout.setSpacing(0)
@@ -548,6 +549,7 @@ class Expander(Card):
         self.header.setChecked(expanded)
         self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
         self.animation.stop()
+        self.content.setMinimumHeight(0)   # 前回測った高さを外す (アニメーション中は上限で高さを決める)
         if animate and self.isVisible():
             start = self.content.height() if self.content.isVisible() else 0
             self.content.show()
@@ -569,6 +571,155 @@ class Expander(Card):
         self.content.setVisible(self.expanded)
         if self.expanded:
             self.content.setMaximumHeight(16777215)
+            self.content.fit()
+
+    def fit_content(self):
+        """中身が変わったとき、開閉アニメーションで固定した高さを外して中身の高さに合わせ直す。"""
+        if self.animation.state() == QPropertyAnimation.State.Running:
+            self.animation.stop()
+        self.content.setVisible(self.expanded)
+        self.content.setMaximumHeight(16777215 if self.expanded else 0)
+        self.content.fit()
+        self.content.layout().invalidate()
+        self.content.layout().activate()
+        self.layout().invalidate()
+        self.layout().activate()
+        self.update()
+
+
+def refit(widget):
+    """中身 (行の追加・削除、表示の出し入れ、文言の変更) が変わったあとに呼ぶ。
+    widget から親をたどり、各レイアウトを測り直して、折りたたみ (Expander) の高さも中身に合わせる。
+    折り返しラベルの高さは幅が決まってから確定するので、1 周後にもう一度測り直す。"""
+    _refit_chain(widget)
+    QTimer.singleShot(0, lambda: _refit_chain(widget))
+
+
+def _refit_chain(widget, settle=True):
+    try:
+        node = widget
+        while node is not None:
+            layout = node.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            if isinstance(node, FitBox):
+                node._fit()
+            if settle and isinstance(node, Expander):
+                node.fit_content()
+            node.updateGeometry()
+            node = node.parentWidget()
+    except RuntimeError:
+        pass   # 途中で破棄されたウィジェット
+
+
+class FitBox(QWidget):
+    """レイアウト付きの入れ物。今の幅で必要な高さを minimumHeight にして、押しつぶされても重ならないようにする。
+    minimumHeight の変更はレイアウトの組み立て中 (resizeEvent) に直接やると親へ伝わらないことがあるので、1 周遅らせる。"""
+
+    def __init__(self, base_height=0, parent=None):
+        super().__init__(parent)
+        self._base_height = base_height
+        self._queued = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit()
+
+    def _need(self):
+        layout = self.layout()
+        if layout is None or self.width() <= 0:
+            return None
+        if layout.hasHeightForWidth():
+            hfw = layout.totalHeightForWidth(self.width())
+        else:
+            hfw = layout.minimumSize().height()   # 折り返しがなければ、中身の最小高さがそのまま答え
+        return max(self._base_height, hfw)
+
+    def _fit(self):
+        need = self._need()
+        if need is None or need == self.minimumHeight() or self._queued:
+            return
+        self._queued = True
+        QTimer.singleShot(0, self._apply_fit)
+
+    def _apply_fit(self):
+        self._queued = False
+        try:
+            need = self._need()
+            if need is not None and need != self.minimumHeight():
+                self.setMinimumHeight(need)
+                self.updateGeometry()
+                _refit_chain(self.parentWidget(), settle=False)
+        except RuntimeError:
+            pass
+
+
+class _ExpanderContent(FitBox):
+    """Expander の中身。開いているあいだだけ必要な高さを minimumHeight にする (アニメーション中・閉じている間は固定しない)。"""
+
+    def _need(self):
+        if self.maximumHeight() < 16777215:
+            return 0
+        return super()._need()
+
+    def fit(self):
+        self._fit()
+
+
+class FixedHint(Hint):
+    """折り返す説明文だが、heightForWidth を使わず、今の幅での高さを固定する。
+    heightForWidth は入れ子のレイアウトの途中で最小高さが無視され、親が足りない高さを割り当てて重なることがある。
+    高さが固定なら、レイアウトは minimumSize/sizeHint だけで正しく並べられる。"""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, True, parent)
+        policy = self.sizePolicy()
+        policy.setHeightForWidth(False)
+        self.setSizePolicy(policy)
+
+    def _pin(self):
+        if self.width() <= 0:
+            return
+        h = QLabel.heightForWidth(self, self.width())
+        if h > 0 and (h != self.minimumHeight() or h != self.maximumHeight()):
+            self.setFixedHeight(h)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._pin()
+
+    def setText(self, text):
+        super().setText(text)
+        self._pin()
+
+
+class EmptyState(FitBox):
+    """一覧が空のときの表示。上から アイコン -> タイトル -> 説明 -> ボタン を縦に並べる (すべてレイアウト内)。"""
+
+    def __init__(self, icon_name, title, note="", action=None, parent=None):
+        super().__init__(0, parent)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(8)
+        icon = IconLabel(icon_name, 24)
+        lay.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.title_label = QLabel(title)
+        font = self.title_label.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        self.title_label.setFont(font)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self.title_label)
+        if note:
+            self.note_label = FixedHint(note)
+            self.note_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            lay.addWidget(self.note_label)
+        if action is not None:
+            lay.addWidget(action, 0, Qt.AlignmentFlag.AlignHCenter)
 
 
 class Page(QScrollArea):
@@ -579,7 +730,7 @@ class Page(QScrollArea):
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        inner = QWidget()
+        inner = FitBox()   # 中の折りたたみが伸びたとき、ページの高さが追いつかず内容が重なるのを防ぐ
         self.setWidget(inner)
         outer = QHBoxLayout(inner)
         outer.setContentsMargins(0, 0, 0, 0)

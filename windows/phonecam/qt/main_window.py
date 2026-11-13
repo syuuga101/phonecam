@@ -12,6 +12,7 @@ from PySide6.QtCore import QByteArray, QEvent, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
+    QToolButton,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -32,9 +33,10 @@ from PySide6.QtWidgets import (
 )
 
 from phonecam.core.paths import WINDOWS_DIR
+from phonecam.core.cameras import CameraGroup
 from phonecam.i18n import t
 from phonecam.qt import icons
-from phonecam.qt.widgets import _THEME_EVENTS, Hint, Page, blend, button, ref_palette, text_color
+from phonecam.qt.widgets import _THEME_EVENTS, Combo, Hint, Page, blend, button, ref_palette, text_color
 
 # (キー, アイコン名)。順番がページ番号 (qt/pages/<キー>.py の build(ctrl) -> QWidget)
 NAV_ITEMS = [("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
@@ -141,6 +143,10 @@ class MainWindow(QMainWindow):
     def __init__(self, ctrl, tick=True):
         super().__init__()
         self.ctrl = ctrl
+        self.cameras = CameraGroup(ctrl)
+        self.camera_index = 0
+        self.camera_pages = {}
+        self._observed_cameras = {ctrl}
         self.setWindowTitle(ctrl.app_title())
         self.setWindowIcon(window_icon())
         self.resize(960, 720)
@@ -199,6 +205,21 @@ class MainWindow(QMainWindow):
         warning_icon = QLabel()
         warning_icon.setPixmap(icons.pixmap("thermometer", 16, text_color(self.warn_bar)))
         self.warn_bar._lay.insertWidget(0, warning_icon)
+        camera_bar = QHBoxLayout()
+        camera_bar.setContentsMargins(12, 6, 12, 0)
+        self.camera_select = Combo()
+        self.camera_select.setAccessibleName(t("multi.camera"))
+        self.camera_select.activated.connect(self._select_camera)
+        self.camera_add = QToolButton()
+        self.camera_add.setText("+")
+        self.camera_add.setToolTip(t("multi.add"))
+        self.camera_add.setAccessibleName(t("multi.add"))
+        self.camera_add.clicked.connect(self._add_camera)
+        camera_bar.addWidget(self.camera_select)
+        camera_bar.addWidget(self.camera_add)
+        camera_bar.addStretch(1)
+        rl.addLayout(camera_bar)
+        self._refresh_camera_list()
         rl.addWidget(self.update_bar)
         rl.addWidget(self.warn_bar)
         self.stack = QStackedWidget()
@@ -226,7 +247,8 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(0)
 
         ctrl.toast.connect(self.show_toast)
-        ctrl.status_changed.connect(self._status)
+        ctrl.camera_prompt.connect(self._ask_camera_registration)
+        ctrl.status_changed.connect(lambda s: self._status(s) if self.camera_index == 0 else None)
         ctrl.update_changed.connect(self._update_banner)
         ctrl.update_action.connect(self._update_action)
         self._status(ctrl.status)
@@ -236,16 +258,41 @@ class MainWindow(QMainWindow):
         if tick:
             self._tick_timer = QTimer(self)
             self._tick_timer.setInterval(50)
-            self._tick_timer.timeout.connect(ctrl.tick)
+            self._tick_timer.timeout.connect(self.cameras.tick)
             self._tick_timer.start()
 
     # -- ページ --------------------------------------------------------------------
-    def _load_page(self, key):
+    def _refresh_camera_list(self):
+        self.camera_select.clear()
+        for index, camera in enumerate(self.cameras.cameras):
+            self.camera_select.addItem(t("multi.camera_number", n=index + 1))
+        self.camera_select.setCurrentIndex(self.camera_index)
+        self.camera_select.setVisible(len(self.cameras.cameras) > 1)
+        self.camera_add.setEnabled(len(self.cameras.cameras) < 4)
+
+    def _add_camera(self):
+        camera = self.cameras.add()
+        if camera is None:
+            return
+        self._refresh_camera_list()
+        self._select_camera(len(self.cameras.cameras) - 1)
+
+    def _select_camera(self, index):
+        if not 0 <= index < len(self.cameras.cameras):
+            return
+        self.camera_index = index
+        self.camera_select.setCurrentIndex(index)
+        row = self.nav.currentRow()
+        self._page_selected(max(0, row))
+        self._status(self.cameras.cameras[index].status)
+
+    def _load_page(self, key, ctrl=None):
+        ctrl = self.ctrl if ctrl is None else ctrl
         try:
             mod = importlib.import_module("phonecam.qt.pages." + key)
-            page = mod.build(self.ctrl)
+            page = mod.build(ctrl)
             from phonecam.qt.compact import compact_page
-            compact_page(page, self.ctrl, key)
+            compact_page(page, ctrl, key)
         except Exception as e:   # 1ページの不具合でアプリ本体を止めない
             import traceback
             traceback.print_exc()
@@ -266,7 +313,27 @@ class MainWindow(QMainWindow):
     def _page_selected(self, row):
         if row < 0:
             return
-        self.stack.setCurrentIndex(row)
+        key = NAV_ITEMS[row][0]
+        page_index = self.camera_index
+        if key in ("settings", "shortcuts"):
+            page_index = 0
+        elif key == "audio":
+            page_index = self.cameras.audio_index
+        if page_index == 0:
+            self.stack.setCurrentIndex(row)
+        else:
+            cache_key = (page_index, key)
+            if cache_key not in self.camera_pages:
+                ctrl = self.cameras.cameras[page_index]
+                page = self._load_page(key, ctrl)
+                self.camera_pages[cache_key] = page
+                self.stack.addWidget(page)
+                if ctrl not in self._observed_cameras:
+                    self._observed_cameras.add(ctrl)
+                    ctrl.status_changed.connect(lambda status, i=page_index: self._status(status)
+                                                if self.camera_index == i else None)
+                    ctrl.toast.connect(self.show_toast)
+            self.stack.setCurrentWidget(self.camera_pages[cache_key])
         fn = getattr(self.stack.currentWidget(), "on_activated", None)
         if callable(fn):
             try:
@@ -400,7 +467,7 @@ class MainWindow(QMainWindow):
                                      env=phonecam_update.relaunch_env(), creationflags=flags)
                 except Exception as error:
                     restored = phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
-                    self.show_toast(t("update.msg.relaunch_failed", restored=t("update.msg.restored") if restored else "", error=error), "error")
+                    self.show_toast(t("update.msg.relaunch_failed_restored" if restored else "update.msg.relaunch_failed", error=error), "error")
                     return
             except Exception as error:
                 self.show_toast(t("update.msg.failed", error=error), "error")
@@ -439,6 +506,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, "toast_label") and self.toast_label.isVisible():
             self._place_toast()
 
+    def _ask_camera_registration(self, state):
+        key = "setup.first_run.update_cam" if state == "outdated" else "setup.first_run.register_cam"
+        if QMessageBox.question(self, "PhoneCam", t(key)) == QMessageBox.StandardButton.Yes:
+            self.ctrl.change_camera_registration("register")
+        else:
+            self.show_toast(t("setup.first_run.declined_note"))
+
     def restore_state(self):
         """起動時: 最大化 (既定) か、前回の位置と大きさ。画面外なら無視。show の代わりに呼ぶ。"""
         s = self.ctrl.settings
@@ -475,6 +549,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, e):
         self._save_window_state()
         try:
-            self.ctrl.close()
+            self.cameras.close()
         finally:
             e.accept()

@@ -22,13 +22,13 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wi-Fi経由でPCと接続するために使用します"
+            "value": "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Used to connect to your PC over Wi-Fi."
+            "value": "Used to discover and connect to your PC over Wi-Fi."
           }
         }
       }

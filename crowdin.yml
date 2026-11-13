@@ -1,16 +1,10 @@
-# Crowdin 設定。翻訳は https://crowdin.com/project/phonecam (仮) で行う
-project_id_env: CROWDIN_PROJECT_ID
-api_token_env: CROWDIN_PERSONAL_TOKEN
 preserve_hierarchy: true
 files:
-  # Windows アプリ: 原文は日本語 (ja.json)。翻訳は windows/locales/<言語2文字>.json
   - source: /windows/locales/ja.json
     translation: /windows/locales/%two_letters_code%.json
-    type: json
-  # iPhone アプリ: String Catalog (多言語 1 ファイル)。翻訳は同じパスに書き戻される
   - source: /ios/PhoneCam/Localizable.xcstrings
     translation: /ios/PhoneCam/Localizable.xcstrings
-    type: xcstrings
+    multilingual: true
   - source: /ios/PhoneCam/InfoPlist.xcstrings
     translation: /ios/PhoneCam/InfoPlist.xcstrings
-    type: xcstrings
+    multilingual: true

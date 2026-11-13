@@ -138,5 +138,5 @@ def main():
     win.restore_state()
     from PySide6.QtCore import QTimer
     QTimer.singleShot(600, ctrl.first_run_setup)
-    app.aboutToQuit.connect(ctrl.close)
+    app.aboutToQuit.connect(win.cameras.close)
     return app.exec()

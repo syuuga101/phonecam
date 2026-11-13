@@ -20,14 +20,16 @@ final class StreamServer {
     private let audioCapMs: Int
     private let role: Role
     private let security: SecurityManager
+    private var bonjourService: NWListener.Service?
 
     init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200,
-         role: Role = .main, security: SecurityManager) {
+         role: Role = .main, security: SecurityManager, bonjourService: NWListener.Service? = nil) {
         self.port = port
         self.ignoreIncoming = ignoreIncoming
         self.audioCapMs = max(10, audioCapMs)
         self.role = role
         self.security = security
+        self.bonjourService = bonjourService
     }
 
     var onControl: (([String: Any]) -> Void)?
@@ -107,6 +109,22 @@ final class StreamServer {
         }
     }
 
+    /// 広告内容 (名前など) を差し替えて再公開する
+    func updateBonjourService(_ service: NWListener.Service?) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.bonjourService = service
+            self.listener?.service = self.security.wifiAllowed ? service : nil
+        }
+    }
+
+    func refreshAdvertisement() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.listener?.service = self.security.wifiAllowed ? self.bonjourService : nil
+        }
+    }
+
     private func startHealthTimer() {
         guard healthTimer == nil else { return }
         let t = DispatchSource.makeTimerSource(queue: queue)
@@ -167,6 +185,7 @@ final class StreamServer {
         newListener.newConnectionHandler = { [weak self] conn in
             self?.handleNewConnection(conn)
         }
+        newListener.service = security.wifiAllowed ? bonjourService : nil
         listener = newListener
         listenerStartedAt = Date()
         newListener.start(queue: queue)
@@ -589,4 +608,33 @@ final class StreamServer {
         let packet = Packet.encode(type: PacketType.status, payload: json)
         conn.send(content: packet, completion: .contentProcessed({ _ in }))
     }
+}
+
+
+/// Read-only identification over USB. Loopback only, with no effect on the
+/// main/audio listeners or their current clients.
+final class USBIdentityListener {
+    private let queue = DispatchQueue(label: "phonecam.usb.identity")
+    private var listener: NWListener?
+    private let payload: Data
+
+    init(id: String) {
+        payload = Data((id + "\n").utf8)
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: 5557)
+        guard let listener = try? NWListener(using: params) else { return }
+        self.listener = listener
+        listener.newConnectionHandler = { [weak self] conn in
+            guard let self else { conn.cancel(); return }
+            conn.stateUpdateHandler = { [weak conn, payload = self.payload] state in
+                guard let conn, case .ready = state else { return }
+                conn.send(content: payload, completion: .contentProcessed { _ in conn.cancel() })
+            }
+            conn.start(queue: self.queue)
+            self.queue.asyncAfter(deadline: .now() + 2) { conn.cancel() }
+        }
+        listener.start(queue: queue)
+    }
+
+    deinit { listener?.cancel() }
 }

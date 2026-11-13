@@ -24,7 +24,7 @@ def usbmux_recv(sock):
     return plistlib.loads(body)
 
 
-def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id=None, info=None):
+def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id=None, info=None, serial=None):
     """usbmux 経由で USB 接続した iPhone のポートへ接続し、トンネル化したソケットを返す。
     device_id を渡すとそのデバイスへ接続する (音声チャンネルを映像と同じ iPhone に繋ぐため)。
     info (dict) には接続した device_id を入れる。"""
@@ -45,6 +45,8 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
         resp = usbmux_recv(sock)
         devices = [d for d in resp.get("DeviceList", [])
                    if d.get("Properties", {}).get("ConnectionType") == "USB"]
+        if serial is not None:
+            devices = [d for d in devices if d.get("Properties", {}).get("SerialNumber") == serial]
         if not devices:
             raise PhoneCamError(
                 "iPhoneがUSBで見つかりません。ケーブルとロック解除・このコンピュータを信頼を確認"
@@ -56,6 +58,8 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
             device_id = ids[0]
         if info is not None:
             info["device_id"] = device_id
+            info["usb_serial"] = next(d.get("Properties", {}).get("SerialNumber", "")
+                                      for d in devices if d["DeviceID"] == device_id)
 
         req = dict(base)
         req["MessageType"] = "Connect"
@@ -77,6 +81,24 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
     except (OSError, ConnectionError, plistlib.InvalidFileException, struct.error, ValueError):
         sock.close()
         raise PhoneCamError("USBでの通信中にエラーが発生しました。ケーブルを抜き差しして再試行してください")
+
+
+def usbmux_devices(mux_addr=USBMUX_ADDR):
+    """Return the USB serials of attached iPhones without opening an app connection."""
+    try:
+        with socket.create_connection(mux_addr, timeout=1.0) as sock:
+            sock.settimeout(1.0)
+            sock.sendall(usbmux_pack({"MessageType": "ListDevices", "ClientVersionString": "phonecam",
+                                      "ProgName": "phonecam"}, 1))
+            resp = usbmux_recv(sock)
+        return [props["SerialNumber"] for d in resp.get("DeviceList", [])
+                if (props := d.get("Properties", {})).get("ConnectionType") == "USB" and props.get("SerialNumber")]
+    except Exception:
+        return []
+
+
+def usbmux_available(mux_addr=USBMUX_ADDR):
+    return bool(usbmux_devices(mux_addr))
 
 
 def wifi_connect(ip, port=PHONE_PORT, timeout=3.0):

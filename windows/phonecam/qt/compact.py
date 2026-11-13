@@ -5,11 +5,11 @@ from functools import partial
 from PySide6.QtWidgets import QCheckBox, QComboBox, QKeySequenceEdit, QLabel, QLineEdit
 
 from phonecam.i18n import t
-from phonecam.qt.widgets import Expander, Row, Section, SliderValue, StatusValue, Switch
+from phonecam.qt.widgets import NO_VALUE, Expander, Row, Section, SliderValue, StatusValue, Switch
 
 
 PRIMARY = {
-    "connection": ("connection.method.label", "connection.run.mode"),
+    "connection": ("connection.run.mode",),
     "video": ("video.resolution.label", "video.fps.label", "video.orient.label"),
     "quality": ("quality.zoom.label", "quality.exposure.bias.label", "quality.focus.mode.label", "quality.light.label"),
     "effects": ("effects.background.mode.label", "effects.background.strength.label", "effects.color.brightness.label"),
@@ -97,14 +97,14 @@ def _row_value(row):
                 return control.text()
         if isinstance(control, QKeySequenceEdit):
             return control.keySequence().toString()
-        if isinstance(control, (QLabel, StatusValue)) and control.text() not in ("", "-", t("compact.no_value")):
+        if isinstance(control, (QLabel, StatusValue)) and control.text() not in ("", "-", NO_VALUE):
             return control.text()
     return ""
 
 
 def _set_summary(expander, rows):
     values = [_row_value(row) for row in rows]
-    expander.set_summary(" · ".join(value for value in values if value) or t("compact.no_value"))
+    expander.set_summary(" · ".join(value for value in values if value) or NO_VALUE)
 
 
 def compact_page(page, ctrl, key):
@@ -119,8 +119,8 @@ def compact_page(page, ctrl, key):
         widget = item.widget()
         if widget is None:
             continue
-        if not isinstance(widget, Section):
-            extra.append((widget, item.alignment()))
+        if not isinstance(widget, Section) or widget.title_label and widget.title_label.text() == t("multi.output"):
+            extra.append((widget, item.alignment(), widget.isHidden()))
             continue
         title = widget.title_label.text()
         children = groups.setdefault(title, [])
@@ -137,8 +137,10 @@ def compact_page(page, ctrl, key):
         widget.hide()
         widget.deleteLater()
 
-    for widget, alignment in extra:
-        page.column.addWidget(widget, 0, alignment)
+    for widget, alignment, hidden in extra:
+        if not isinstance(widget, Section):
+            page.column.addWidget(widget, 0, alignment)
+            widget.setVisible(not hidden)
 
     primary = Section(t("compact.primary"))
     for label in wanted:
@@ -150,6 +152,10 @@ def compact_page(page, ctrl, key):
                 row.setHint("")
             primary.add(row)
     page.column.addWidget(primary)
+    for widget, alignment, hidden in extra:
+        if isinstance(widget, Section):
+            page.column.addWidget(widget, 0, alignment)
+            widget.setVisible(not hidden)
 
     for title_key, icon, summary_keys in GROUPS[key]:
         title = t(title_key)
@@ -162,12 +168,17 @@ def compact_page(page, ctrl, key):
             expander.add(child)
             child.setVisible(not hidden)
         page.column.addWidget(expander)
+        if title_key == "connection.wifi.title" and hasattr(page, "wireless"):
+            page.wireless.bind_expander(expander)   # 要約は Wi-Fi 側が「接続中 · 名前」などを出す
+            continue
         summary_rows = ([rows[t(name)] for name in summary_keys if t(name) in rows]
                         if summary_keys else [child for child, _ in children if isinstance(child, Row)])
         refresh = partial(_set_summary, expander, summary_rows[:3])
         for row in summary_rows[:3]:
             for control in row.controls():
-                if isinstance(control, QLineEdit):
+                if isinstance(control, QComboBox):
+                    control.currentTextChanged.connect(lambda *_args, fn=refresh: fn())
+                elif isinstance(control, QLineEdit):
                     control.textChanged.connect(lambda *_args, fn=refresh: fn())
                 elif isinstance(control, QKeySequenceEdit):
                     control.keySequenceChanged.connect(lambda *_args, fn=refresh: fn())

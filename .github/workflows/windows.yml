@@ -40,83 +40,37 @@ jobs:
           git clone --depth 1 --branch $env:SOFTCAM_TAG https://github.com/tshino/softcam softcam-src
           if ($LASTEXITCODE -ne 0) { throw "softcam の取得に失敗しました" }
 
-      - name: Patch softcam (name and CLSID)
-        shell: pwsh
-        working-directory: softcam-src
-        run: |
-          $ErrorActionPreference = "Stop"
-          # 他の softcam と衝突しないよう、表示名・共有メモリ名・CLSID を PhoneCam 専用にする。
-          # CLSID は windows/phonecam_receiver.py の PHONECAM_CLSID と一致させること。
-          $newGuidText  = "BD7AEDAC-501F-4685-9B20-BC10F70BD144"
-          $oldGuidText  = "AEF3B972-5FA5-4647-9571-358EB472BC9E"
-          $oldGuidDef   = "0xaef3b972, 0x5fa5, 0x4647, 0x95, 0x71, 0x35, 0x8e, 0xb4, 0x72, 0xbc, 0x9e"
-          $newGuidDef   = "0xbd7aedac, 0x501f, 0x4685, 0x9b, 0x20, 0xbc, 0x10, 0xf7, 0x0b, 0xd1, 0x44"
-
-          function Patch-File($path, $pairs) {
-            $text = [System.IO.File]::ReadAllText((Resolve-Path $path).Path)
-            foreach ($pair in $pairs) {
-              if (-not $text.Contains($pair[0])) { throw "パッチ対象の文字列が見つかりません: '$($pair[0])' in $path" }
-              $text = $text.Replace($pair[0], $pair[1])
-            }
-            [System.IO.File]::WriteAllText((Resolve-Path $path).Path, $text)
-          }
-
-          Patch-File "src/softcam/softcam.cpp" @(
-            @("DirectShow Softcam", "PhoneCam"),
-            @($oldGuidText, $newGuidText),
-            @($oldGuidDef, $newGuidDef)
-          )
-          Patch-File "src/softcamcore/DShowSoftcam.cpp" @(, @("DirectShow Softcam", "PhoneCam"))
-          Patch-File "src/softcamcore/FrameBuffer.cpp"  @(, @("DirectShow Softcam", "PhoneCam"))
-
-          # 検証
-          $cpp = Get-Content "src/softcam/softcam.cpp" -Raw
-          if ($cpp -notmatch 'L"PhoneCam"') { throw "表示名のパッチに失敗しました" }
-          if ($cpp -match "(?i)AEF3B972") { throw "旧 CLSID が残っています" }
-          if ($cpp -notmatch "(?i)0xbd7aedac") { throw "新 CLSID が入っていません" }
-          if ((Get-Content "src/softcamcore/FrameBuffer.cpp" -Raw) -notmatch '"PhoneCam/SharedMemory"') { throw "共有メモリ名のパッチに失敗しました" }
-          Write-Host "softcam をパッチしました"
-
-      # ---- カメラ設定ダイアログ (OBS の「ビデオの設定」) 用の拡張 ----
-      - name: Extend softcam (camera controls / property pages)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          ./windows/softcam_ext/apply.ps1 -SoftcamDir softcam-src
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build softcam (x64)
+      - name: Build four independent softcam filters (x64)
         shell: pwsh
-        working-directory: softcam-src
-        run: |
-          $ErrorActionPreference = "Stop"
-          # ソリューションの softcam ターゲットだけをビルドする (テストや NuGet を避ける)。依存プロジェクトも自動でビルドされる
-          msbuild softcam.sln -t:softcam -p:Configuration=Release -p:Platform=x64 -m -v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "softcam (x64) のビルドに失敗しました" }
-          $dll = "dist/bin/x64/softcam.dll"
-          if (-not (Test-Path $dll)) {
-            $found = Get-ChildItem -Recurse -Filter softcam.dll | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1
-            if (-not $found) { throw "softcam.dll (x64) が見つかりません" }
-            $dll = $found.FullName
-          }
-          New-Item -ItemType Directory -Force -Path ../softcam-out | Out-Null
-          Copy-Item $dll ../softcam-out/softcam.dll
-          Write-Host "x64: $dll"
+        run: ./windows/softcam_ext/build-slots.ps1 -SoftcamDir softcam-src -OutputDir softcam-out
 
-      - name: Build softcam (Win32, optional)
+      - name: Build four independent softcam filters (Win32, optional)
         shell: pwsh
-        working-directory: softcam-src
         continue-on-error: true
+        run: ./windows/softcam_ext/build-slots.ps1 -SoftcamDir softcam-src -OutputDir softcam-out -Platform Win32
+
+      # ---- softcam の版 (softcam.rev) ----
+      # DLL は MSVC のリンク時刻・PDB の GUID でビルドごとに数バイト変わる (v2.2.1 と v2.3.0 は 24 バイトだけ違った)。
+      # DLL のハッシュで「登録済みか」を判定すると、アプリを更新するたびに管理者権限の再登録が要ってしまう。
+      # そこで softcam のソースを決めるもの (タグ・拡張パッチ・REVISION) だけから版を計算し、アプリはこの値で比べる。
+      # CLSID/名前のパッチ (上の Patch softcam) やビルド設定を変えたら windows/softcam_ext/REVISION の数字を上げること。
+      - name: Compute softcam revision
+        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          msbuild softcam.sln -t:softcam -p:Configuration=Release -p:Platform=Win32 -m -v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "softcam (Win32) のビルドに失敗しました" }
-          $dll = "dist/bin/Win32/softcam.dll"
-          if (-not (Test-Path $dll)) { throw "softcam.dll (Win32) が見つかりません" }
-          Copy-Item $dll ../softcam-out/softcam32.dll
-          Write-Host "Win32: $dll"
+          $ext = Join-Path $env:GITHUB_WORKSPACE "windows/softcam_ext"
+          $sha = [System.Security.Cryptography.SHA256]::Create()
+          $text = "tag=$env:SOFTCAM_TAG`n"
+          foreach ($f in @("apply.ps1", "build-slots.ps1", "PhoneCamControls.h", "REVISION")) {
+            $text += "$f=" + ([System.IO.File]::ReadAllText((Join-Path $ext $f)) -replace "`r`n", "`n") + "`n"
+          }
+          $hash = ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text)) | ForEach-Object { $_.ToString("x2") }) -join ""
+          $rev = $hash.Substring(0, 12)
+          [System.IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE "softcam-out/softcam.rev"), $rev)
+          Write-Host "softcam revision: $rev"
 
       # ---- softcam の DLL を exe に埋め込んでビルド (配布物は PhoneCamReceiver.exe 1つだけ) ----
       - name: Build exe
@@ -132,9 +86,17 @@ jobs:
           $dll64 = Join-Path $out "softcam.dll"
           if (-not (Test-Path $dll64)) { throw "softcam.dll (x64) がありません" }
           $bins = @("--add-binary", "$dll64;softcam")
+          $bins += @("--add-data", "$(Join-Path $out 'softcam.rev');softcam")
           $dll32 = Join-Path $out "softcam32.dll"
           if (Test-Path $dll32) { $bins += @("--add-binary", "$dll32;softcam") } else { Write-Host "softcam32.dll は無いため 64bit のみ埋め込みます" }
           $qtPlugins = (& python -c "import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).parent / 'plugins')").Trim()
+          foreach ($slot in 2..4) {
+            $path = Join-Path $out "$slot/softcam.dll"
+            if (-not (Test-Path -LiteralPath $path)) { throw "Missing softcam.dll for slot $slot" }
+            $bins += @("--add-binary", "$path;softcam/$slot")
+            $path32 = Join-Path $out "$slot/softcam32.dll"
+            if (Test-Path -LiteralPath $path32) { $bins += @("--add-binary", "$path32;softcam/$slot") }
+          }
           $qtBins = @(
             "--add-binary", "$(Join-Path $qtPlugins 'platforms/qwindows.dll');PySide6/plugins/platforms",
             "--add-binary", "$(Join-Path $qtPlugins 'imageformats/qsvg.dll');PySide6/plugins/imageformats",
@@ -142,7 +104,7 @@ jobs:
             "--add-binary", "$(Join-Path $qtPlugins 'iconengines/qsvgicon.dll');PySide6/plugins/iconengines",
             "--add-binary", "$(Join-Path $qtPlugins 'styles/qmodernwindowsstyle.dll');PySide6/plugins/styles"
           )
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller に失敗しました" }
           if (-not (Test-Path dist/PhoneCamReceiver.exe)) { throw "PhoneCamReceiver.exe が作成されませんでした" }
 

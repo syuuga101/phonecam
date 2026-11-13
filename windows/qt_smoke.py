@@ -63,6 +63,19 @@ def child(scale, out):
     from phonecam.qt.widgets import Expander
 
     ctrl = Controller.demo_connected("ja")
+    # Wi-Fi の一覧用: 登録済み (接続中) 1台 + 未登録 1台 (テザリング経由)
+    from phonecam.core.wireless import Device
+    known = Device("5f1c0c1e-9a53-4a0e-8b8e-0b6f2f1d3a11", "iPhone 13", ("192.168.1.23",), "482913", "iPhone 13")
+    ctrl.settings["known_devices"] = [known.stored()]
+    ctrl.demo_discovered = [
+        Device(known.id, "iPhone 13", ("192.168.1.23",), "", "iPhone 13"),
+        Device("0d2e6a52-3c1b-4f0a-9d4e-7a1b2c3d4e5f", "リビングのiPhone", ("172.20.10.1",), "", "iPhone 15 Pro"),
+    ]
+    ctrl.settings["mode"] = "auto"
+    ctrl.settings["ip"] = "192.168.1.23"
+    ctrl.settings["pair_code"] = "482913"
+    ctrl.state.update(transport="wifi", peer="192.168.1.23")   # 自動で Wi-Fi につながっている状態
+    ctrl.poll()
     frame = _sample_frame()
     if frame is not None:
         ctrl.set_preview_frame(frame, "rgb24")
@@ -100,6 +113,18 @@ def child(scale, out):
                 expanded_bar.setValue(expanded_bar.maximum() // 2)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, base + "_expanded_scroll.png"))
+                # 小さな折りたたみ (Wi-Fi の「見つからないときは」「IP を手で入れる」) も開いて一番下を撮る
+                from phonecam.qt.wireless import Disclosure
+                discs = win.current_page().findChildren(Disclosure)
+                if discs:
+                    for d in discs:
+                        d.set_open(True)
+                    _settle(app, 200)
+                    expanded_bar.setValue(expanded_bar.maximum())
+                    _settle(app, 150)
+                    win.grab().save(os.path.join(out, base + "_expanded_bottom.png"))
+                    for d in discs:
+                        d.set_open(False)
                 for expander in expanders:
                     expander.set_expanded(False, animate=False, save=False)
             # スクロール: 低いウィンドウで中ほどまで送る
@@ -110,6 +135,63 @@ def child(scale, out):
             _settle(app, 150)
             win.grab().save(os.path.join(out, base + "_scroll.png"))
             print("  %s: scroll max=%d" % (base, bar.maximum()))
+    # 空の状態: 見つかった端末が 2 台 -> 0 台 (登録も消す) に変えてから、Wi-Fi 折りたたみを開いて撮る
+    conn = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "connection")
+    win.resize(W, H)
+    win.select(conn)
+    _settle(app)
+    wireless = win.current_page().wireless
+    for expander in win.current_page().findChildren(Expander):
+        expander.set_expanded(True, animate=False, save=False)
+    _settle(app, 200)
+    ctrl.settings["known_devices"] = []
+    ctrl.demo_discovered = []
+    wireless.discovered = []
+    wireless._render()
+    ctrl.state.update(transport="usb", peer="")   # 接続中の表示は外す
+    ctrl.poll()
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app, 500)
+        win.current_page().verticalScrollBar().setValue(0)
+        _settle(app, 150)
+        win.grab()   # 1 回目は保留中のレイアウトを確定させるだけ (撮り直す)
+        _settle(app, 150)
+        inner = win.current_page().widget()
+        win.grab().save(os.path.join(out, "empty_state_%s_x%s.png" % (theme, scale)))
+        for expander in win.current_page().findChildren(Expander):
+            if expander.expanded:
+                shot = wireless.devices_box.mapTo(win.current_page().widget(), wireless.devices_box.rect().topLeft()).y()
+                win.current_page().verticalScrollBar().setValue(max(0, shot - 80))
+                _settle(app, 150)
+                win.grab()
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, "empty_state_%s_x%s_scroll.png" % (theme, scale)))
+                break
+    box = wireless.devices_box
+    need = box.layout().totalHeightForWidth(box.width())
+    print("empty box height=%d need=%d" % (box.height(), need))
+    if box.height() < need:
+        failed.append(("connection", "empty state squeezed (%d < %d)" % (box.height(), need)))
+    # カメラが 2 台以上のとき (カメラ切り替え・出力先の欄が出る状態): 接続・映像ページをカメラ 1 / 2 で撮る
+    win.resize(W, H)
+    win._add_camera()
+    _settle(app)
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app)
+        for cam in (0, 1):
+            win._select_camera(cam)
+            for i, (key, _icon) in enumerate(NAV_ITEMS):
+                if key not in ("connection", "video", "audio"):
+                    continue
+                win.select(i)
+                win._select_camera(cam)
+                _settle(app)
+                win.current_page().verticalScrollBar().setValue(0)
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, "multi_cam%d_%02d_%s_%s_x%s.png" % (cam + 1, i, key, theme, scale)))
+    failed += list(win.page_errors)
     win.close()
     if failed:
         for key, err in failed:

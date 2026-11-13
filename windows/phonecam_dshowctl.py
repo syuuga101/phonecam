@@ -91,7 +91,7 @@ class _BytesBackend:
 
 
 class _WinBackend:
-    def __init__(self):
+    def __init__(self, namespace):
         import ctypes
         from ctypes import wintypes
         self.ct = ctypes
@@ -122,11 +122,11 @@ class _WinBackend:
         if a.InitializeSecurityDescriptor(sd, 1) and a.SetSecurityDescriptorDacl(sd, True, None, False):
             sa = SECURITY_ATTRIBUTES(ctypes.sizeof(SECURITY_ATTRIBUTES), ctypes.cast(sd, ctypes.c_void_p), False)
         psa = ctypes.byref(sa) if sa is not None else None
-        self.mutex = k.CreateMutexW(psa, False, MUTEX_NAME)
+        self.mutex = k.CreateMutexW(psa, False, MUTEX_NAME.replace("PhoneCam/", namespace + "/"))
         if not self.mutex:
             raise OSError("CreateMutexW failed")
         INVALID = wintypes.HANDLE(-1)
-        self.map = k.CreateFileMappingW(INVALID, psa, 0x04, 0, BLOCK_SIZE, MAP_NAME)  # PAGE_READWRITE
+        self.map = k.CreateFileMappingW(INVALID, psa, 0x04, 0, BLOCK_SIZE, MAP_NAME.replace("PhoneCam/", namespace + "/"))  # PAGE_READWRITE
         if not self.map:
             k.CloseHandle(self.mutex)
             raise OSError("CreateFileMappingW failed")
@@ -163,9 +163,10 @@ class _WinBackend:
 
 
 class ControlBridge:
-    def __init__(self, backend=None, shutter_snap=None):
+    def __init__(self, backend=None, shutter_snap=None, namespace="PhoneCam"):
         """shutter_snap: シャッター値の候補 (例 SHUTTER_VALUES)。指定すると露出の値を一番近い候補にする。"""
         self._backend = backend
+        self._namespace = namespace
         self._own_backend = backend is None
         self._snap = list(shutter_snap) if shutter_snap else None
         self._lock = threading.Lock()
@@ -180,7 +181,7 @@ class ControlBridge:
             if not sys.platform.startswith("win"):
                 return False
             try:
-                self._backend = _WinBackend()
+                self._backend = _WinBackend(self._namespace)
             except Exception:
                 self._backend = None
                 return False

@@ -190,7 +190,7 @@ def _header_tick(app):
             _draw_dot(app, app._conn_dot)
         if snap["connected"]:
             name = st.get("deviceName") or st.get("name") or t("connection.device.default")
-            way = "Wi-Fi" if app.settings.get("mode") == "wifi" else "USB"
+            way = "Wi-Fi" if (snap.get("transport") or app.settings.get("mode")) == "wifi" else "USB"
             app.conn_device_var.set("%s · %s" % (name, way))
             app.conn_sub_var.set(app.stream_state_var.get() if key != "live" else "")
         else:

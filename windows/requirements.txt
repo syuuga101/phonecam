@@ -5,5 +5,7 @@ sounddevice
 sv-ttk
 darkdetect
 pillow
+qrcode
+zeroconf
 
 PySide6==6.8.3

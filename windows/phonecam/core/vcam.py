@@ -65,7 +65,8 @@ CAM_RELEASE_HOLD_SEC = 1.5  # カメラを作り直す間、共有メモリの�
 
 
 class VirtualCamOutput:
-    def __init__(self, settings, state):
+    def __init__(self, settings, state, slot=1):
+        self.slot = slot
         self.settings = settings
         self.state = state
         self.cam = None
@@ -147,7 +148,7 @@ class VirtualCamOutput:
 
     # -- 出力 -----------------------------------------------------------
     def _open_softcam(self, w, h):
-        path = softcam_load_path()
+        path = softcam_load_path(self.slot)
         if not os.path.isfile(path):
             if _is_frozen():
                 raise PhoneCamError(
@@ -171,7 +172,7 @@ class VirtualCamOutput:
         sender.close()
         sender.create(w, h)
         if _is_frozen():
-            st = registration_status()
+            st = registration_status(self.slot)
             if st == "missing":
                 self.state.update(error_text="PhoneCamカメラが未登録です。%s" % register_hint())
             elif st == "outdated":
@@ -179,7 +180,7 @@ class VirtualCamOutput:
             else:
                 self.state.update(error_text="")
             return sender
-        reg = softcam_registered_path()
+        reg = softcam_registered_path(self.slot)
         if reg is None:
             self.state.update(error_text="PhoneCamカメラが未登録です。%s" % register_hint())
         elif not _same_path(reg, path):

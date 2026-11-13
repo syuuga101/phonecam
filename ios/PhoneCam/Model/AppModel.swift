@@ -61,6 +61,8 @@ final class AppModel: ObservableObject {
     }
 
     let camera = CameraController()
+    let wirelessIdentity: WirelessIdentity
+    private var usbIdentityListener: USBIdentityListener?
     private let encoder = H264Encoder()
     private let security: SecurityManager
     private let server: StreamServer
@@ -75,9 +77,11 @@ final class AppModel: ObservableObject {
     private let encoderStopQueue = DispatchQueue(label: "phonecam.encoderstop")
 
     init() {
+        let identity = WirelessIdentity()
+        wirelessIdentity = identity
         let sec = SecurityManager()
         security = sec
-        server = StreamServer(security: sec)
+        server = StreamServer(security: sec, bonjourService: identity.service)
         audioServer = StreamServer(port: StreamServer.audioPort, ignoreIncoming: true, audioCapMs: 60,
                                    role: .audio, security: sec)
         wifiAllowed = sec.wifiAllowed
@@ -90,6 +94,7 @@ final class AppModel: ObservableObject {
     private var streamActive = true        // PC の "stream" (接続ごとに true から始まる)
     private var encoderLive = false        // videoQueue 上で encode を呼んだ (stop が必要)
     private var previewFlag = false
+    private var scannerActive = false
     private var lastCameraWant: Bool?
     private var waitingForKeyframe = true
     private var sentCount = 0
@@ -378,6 +383,7 @@ final class AppModel: ObservableObject {
         stateLock.unlock()
         // 起動時は未接続なので黒画面にはしない (保存値は接続時に再適用する)
 
+        usbIdentityListener = USBIdentityListener(id: wirelessIdentity.id)
         server.start()
         audioServer.start()
         updateCameraRunning()   // camera.start() より前に要求を積む (最初は停止)
@@ -488,6 +494,7 @@ final class AppModel: ObservableObject {
 
     private func withExtras(_ base: [String: Any]) -> [String: Any] {
         var s = base
+        s["deviceId"] = wirelessIdentity.id
         stateLock.lock()
         let lvl = batteryLevel
         let bst = batteryStateText
@@ -500,6 +507,8 @@ final class AppModel: ObservableObject {
         stateLock.unlock()
         s["streamActive"] = streamOn
         s["wifiAllowed"] = security.wifiAllowed
+        s["device_name"] = DeviceName.current
+        s["model"] = DeviceName.modelName
         s["authOk"] = true   // 認証前の接続にはここまで届かない (StreamServer が authRequired だけ返す)
         s["audioChannel"] = audioServer.hasClient
         s["sentFps"] = fpsOut
@@ -524,12 +533,23 @@ final class AppModel: ObservableObject {
     /// 条件: (接続中 && 配信オン) || 録画中 || プレビューオン
     func updateCameraRunning() {
         stateLock.lock()
-        let want = (active && streamActive) || previewFlag || recorder.isActive
+        let want = !scannerActive && ((active && streamActive) || previewFlag || recorder.isActive)
         if lastCameraWant != want {
             lastCameraWant = want
             camera.setRunning(want)   // sessionQueue へ積むだけ (順序は lock で保証)
         }
         stateLock.unlock()
+    }
+
+    func setScannerActive(_ active: Bool, completion: (() -> Void)? = nil) {
+        stateLock.lock()
+        scannerActive = active
+        if active {
+            lastCameraWant = false
+            camera.setRunning(false, completion: completion)
+        }
+        stateLock.unlock()
+        if !active { updateCameraRunning() }
     }
 
     /// PC の "stream": {"active": bool}
@@ -623,11 +643,18 @@ final class AppModel: ObservableObject {
     func setWifiAllowed(_ on: Bool) {
         security.setWifiAllowed(on)
         wifiAllowed = on
+        server.refreshAdvertisement()
         if !on {
             wifiAddress = String(localized: "オフ")
             server.disconnectNonLoopback()
             audioServer.disconnectNonLoopback()
         }
+        timerQueue.async { [weak self] in self?.sendFullStatus() }
+    }
+
+    /// 端末名を変えたとき: Bonjour の広告と PC への状態を更新する (メインスレッド)
+    func deviceNameChanged() {
+        server.updateBonjourService(wirelessIdentity.service)
         timerQueue.async { [weak self] in self?.sendFullStatus() }
     }
 
@@ -744,6 +771,10 @@ final class AppModel: ObservableObject {
     }
 
     func startRecording() {
+        stateLock.lock()
+        let scanning = scannerActive
+        stateLock.unlock()
+        guard !scanning else { return }
         let s = recorder.currentSettings()
         let hiRes = (s.resolution == "4k")
         guard recorder.claim() else {
@@ -796,24 +827,6 @@ final class AppModel: ObservableObject {
     // MARK: Wi-Fi の IPv4 アドレス (en0)
 
     static func wifiIPv4() -> String? {
-        var addrs: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&addrs) == 0, let first = addrs else { return nil }
-        defer { freeifaddrs(addrs) }
-
-        var cursor: UnsafeMutablePointer<ifaddrs>? = first
-        while let p = cursor {
-            let ifa = p.pointee
-            if let sa = ifa.ifa_addr,
-               sa.pointee.sa_family == UInt8(AF_INET),
-               String(cString: ifa.ifa_name) == "en0" {
-                var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                let r = getnameinfo(sa, socklen_t(sa.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
-                if r == 0 {
-                    return String(cString: host)
-                }
-            }
-            cursor = ifa.ifa_next
-        }
-        return nil
+        WirelessIdentity.addresses(wifiOnly: true).first
     }
 }

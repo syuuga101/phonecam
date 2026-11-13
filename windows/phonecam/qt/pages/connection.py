@@ -1,19 +1,16 @@
 # -*- coding: utf-8 -*-
 """接続ページ (Tk の ui/pages/connection_video.build_connection + ui/pages/preview.py の移植)
 
-状態 (点 + 文言 + iPhone 名/つなぎ方) と 開始/一時停止・接続/切断 → プレビュー → 数値の行
+状態 (点 + 文言 + iPhone 名/つなぎ方の1行) → プレビュー → 接続/切断・開始/一時停止 → 数値の行
 → 接続方法 → Wi-Fi → iPhone のカメラの動作。Controller と qt.widgets だけを使う。
 """
 
-from PySide6.QtCore import QPointF, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QButtonGroup,
-    QGridLayout,
+        QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QRadioButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -22,17 +19,20 @@ from PySide6.QtWidgets import (
 from phonecam.core.deps import np
 from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import t
+from phonecam.qt import icons
+from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
+    Card,
+    Combo,
     ErrorLabel,
     Hint,
     Page,
-    StatusValue,
     bound_combo,
-    bound_line,
     border_color,
     button,
     card_color,
     ok_color,
+    ref_palette,
     secondary_color,
 )
 
@@ -71,14 +71,18 @@ def frame_to_image(img, fmt, max_w, max_h):
     small = np.ascontiguousarray(small)
     sh, sw = small.shape[:2]
     qfmt = QImage.Format.Format_BGR888 if fmt == "bgr24" else QImage.Format.Format_RGB888
-    buf = small.tobytes()
-    qi = QImage(buf, sw, sh, small.strides[0], qfmt)
-    return qi.copy()   # buf から切り離す (buf はこの関数を出ると消える)
+    # small のメモリをそのまま参照する QImage (tobytes と copy の2回のコピーを省く)。
+    # 呼び出し側は、これを scaled() / copy() で別の画像にするまで _keep を手放さないこと (qi._keep が持つ)。
+    qi = QImage(small.data, sw, sh, small.strides[0], qfmt)
+    qi._keep = small
+    return qi
 
 
 class PreviewView(QWidget):
     """ライブプレビュー。内容列の幅 x ratio (既定 2/3) の 16:9 を左上に描き、右下のつまみで拡縮する。
     ratio は設定 preview_width_ratio に保存 (つまみを離したとき)。"""
+
+    rect_width_changed = Signal(int)   # 描く枠の幅 (論理px)。直下のボタンの行をこの幅に合わせる
 
     def __init__(self, ctrl):
         super().__init__()
@@ -121,6 +125,7 @@ class PreviewView(QWidget):
         if h != self.height():
             self.setFixedHeight(h)
         self._seq = -1   # 次の tick で今の大きさに合わせて描き直す
+        self.rect_width_changed.emit(w)
         self.update()
 
     def resizeEvent(self, e):
@@ -178,6 +183,9 @@ class PreviewView(QWidget):
     def _tick(self):
         if not self.isVisible():
             return
+        win = self.window()
+        if win is not None and win.isMinimized():
+            return   # 最小化中は見えないので変換しない
         w0, h0 = self._rect_size()
         if h0 != self.height():
             self._relayout()
@@ -198,7 +206,10 @@ class PreviewView(QWidget):
         qi = frame_to_image(img, fmt, pw, ph)
         if qi is None:
             return
-        qi = qi.scaled(QSize(pw, ph), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        if qi.width() <= pw and qi.height() <= ph:
+            qi = qi.copy()   # 拡大はしない。参照している numpy から切り離す
+        else:
+            qi = qi.scaled(QSize(pw, ph), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         pm = QPixmap.fromImage(qi)
         pm.setDevicePixelRatio(dpr)
         self._pix = pm
@@ -262,55 +273,94 @@ class ConnectionPage(Page):
         super().__init__()
         self.ctrl = ctrl
         self._build_header()
-        self.preview = self.add(PreviewView(ctrl))
-        self.connection_status = StatusValue()
-        self.column.addWidget(self.connection_status, 0, Qt.AlignmentFlag.AlignLeft)
+        self._build_preview()
         self._build_numbers()
-        self._build_method()
         self._build_wifi()
+        self._build_output()
         self._build_run()
         self.finish()
         ctrl.status_changed.connect(self.update_status)
         self.update_status(ctrl.status)
 
-    # -- 上部: 状態 + ボタン -----------------------------------------------------
+    # -- 上部: 状態のカード (1枚) -----------------------------------------------------
     def _build_header(self):
+        card = Card()
         box = QWidget()
         lay = QHBoxLayout(box)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(16, 14, 16, 14)
         lay.setSpacing(12)
         left = QVBoxLayout()
-        left.setSpacing(2)
+        left.setSpacing(3)
         top = QHBoxLayout()
         top.setSpacing(8)
         self.dot = Dot()
         top.addWidget(self.dot, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.state_label = QLabel(t("connection.state.off"))
+        self.state_label = QLabel(t("connection.card.off"))
         f = self.state_label.font()
         f.setPointSizeF(14.0)
         f.setWeight(QFont.Weight.DemiBold)
         self.state_label.setFont(f)
-        top.addWidget(self.state_label)
-        self.device_label = Hint("", wrap=False)
-        top.addWidget(self.device_label)
+        self.state_label.setWordWrap(False)
+        top.addWidget(self.state_label, 0)
+        self.check = QLabel()
+        self.check.setFixedSize(18, 18)
+        self.check.hide()
+        top.addWidget(self.check, 0, Qt.AlignmentFlag.AlignVCenter)
         top.addStretch(1)
         left.addLayout(top)
         self.sub_label = Hint("", wrap=True)
-        self.sub_label.setVisible(False)
         left.addWidget(self.sub_label)
         self.error_label = ErrorLabel("")
         left.addWidget(self.error_label)
         lay.addLayout(left, 1)
-        btns = QHBoxLayout()
-        btns.setSpacing(8)
+        card.layout().addWidget(box)
+        self.add(card)
+
+    # -- プレビューと、その直下の操作ボタン (つなぐ/切断 + 一時停止/開始) -------------------------
+    def _build_preview(self):
+        box = QWidget()
+        col = QVBoxLayout(box)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
+        self.preview = PreviewView(self.ctrl)
+        col.addWidget(self.preview)
+        self.btn_row = QWidget()
+        self.btn_row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        row = QHBoxLayout(self.btn_row)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
         self.start_btn = button(t("connection.button.start"), primary=True)
         self.start_btn.clicked.connect(self.ctrl.start_pause)
-        self.connect_btn = button(t("connection.button.connect"))
+        self.connect_btn = button(t("connection.button.connect"), primary=True)
+        self.connect_btn.setMinimumWidth(104)
         self.connect_btn.clicked.connect(lambda: self.ctrl.toggle_connect())
-        btns.addWidget(self.start_btn)
-        btns.addWidget(self.connect_btn)
-        lay.addLayout(btns, 0)
+        row.addWidget(self.connect_btn)
+        row.addWidget(self.start_btn)
+        row.addStretch(1)
+        col.addWidget(self.btn_row, 0, Qt.AlignmentFlag.AlignLeft)
+        self.preview.rect_width_changed.connect(self._fit_btn_row)
+        self._fit_btn_row(self.preview._rect_size()[0])
         self.add(box)
+
+    def _fit_btn_row(self, w):
+        self.btn_row.setFixedWidth(max(w, self.btn_row.minimumSizeHint().width()))
+
+    def _card_text(self, s):
+        """上のカードの (見出し, 補足, ✓ を出すか)。方式を選ばせない (auto) ときは 3 つの状態だけを出す。"""
+        auto = self.ctrl.get("mode") == "auto"
+        way = t("wireless.way.wifi" if s.get("transport") == "wifi" else "wireless.way.usb")
+        if s.connected:
+            name = (s.get("phone") or {}).get("deviceName") or (s.get("phone") or {}).get("name") \
+                or t("connection.device.default")
+            return t("connection.card.connected", name=self.wireless.display_name(s.get("peer"), name), way=way), \
+                s.sub, True
+        if not auto:
+            return s.state_text, s.sub, False
+        if not s.wanted:
+            return t("connection.card.off"), t("connection.card.off_hint"), False
+        if s.error_text and s.get("auth_state") not in ("failed", "refused"):
+            return t("connection.card.none"), t("connection.card.none_hint"), False
+        return t("connection.card.searching"), "", False
 
     # -- 数値の行 -------------------------------------------------------------------
     def _build_numbers(self):
@@ -331,53 +381,65 @@ class ConnectionPage(Page):
             self.num[key] = val
         self.add(box)
 
-    # -- 接続方法 -------------------------------------------------------------------
-    def _build_method(self):
-        sec = self.add_section(t("connection.method.title"))
-        row = sec.add_row("link", t("connection.method.label"))
-        self.mode_group = QButtonGroup(self)
-        self.mode_buttons = {}
-        for value, text in (("usb", "USB"), ("wifi", "Wi-Fi")):
-            rb = QRadioButton(text)
-            self.mode_group.addButton(rb)
-            self.mode_buttons[value] = rb
-            row.addControl(rb)
-            rb.clicked.connect(lambda _checked=False, v=value: self.ctrl.set_mode(v))
-        self._show_mode(self.ctrl.get("mode"))
-        self.ctrl.settings_changed.connect(lambda k, v: self._show_mode(v) if k == "mode" else None)
-
-    def _show_mode(self, value):
-        rb = self.mode_buttons.get(value)
-        if rb is not None and not rb.isChecked():
-            rb.setChecked(True)
-
     # -- Wi-Fi ----------------------------------------------------------------------
+    def _build_output(self):
+        group = getattr(self.ctrl, "camera_group", None)
+        if group is None:
+            return
+        slot = self.ctrl.get("camera_slot")
+        section = self.add_section(t("multi.output"))
+        row = section.add_row("camera", t("multi.output"))
+        outputs = Combo()
+        for number in range(1, 5):
+            outputs.addItem(t("multi.camera_number", n=number), number)
+        outputs.setCurrentIndex(outputs.findData(slot))
+
+        def change_output(index):
+            if not group.move_output(self.ctrl, outputs.itemData(index)):
+                self.ctrl.toast.emit(t("multi.output_busy"), "error")
+                outputs.setCurrentIndex(outputs.findData(self.ctrl.get("camera_slot")))
+
+        outputs.activated.connect(change_output)
+        self.ctrl.settings_changed.connect(lambda key, value: outputs.setCurrentIndex(outputs.findData(value))
+                                           if key == "camera_slot" else None)
+        row.addControl(outputs)
+        register = row.addControl(button(t("video.vcam.register")))
+        register.clicked.connect(lambda: self.ctrl.change_camera_registration("register"))
+
+        def refresh_registration():
+            state = self.ctrl.camera_registration
+            row.setHint(t(f"video.vcam.status.{state}") if self.ctrl.frozen else t("video.vcam.src_only"))
+            register.setEnabled(self.ctrl.frozen and not self.ctrl.camera_registration_busy
+                                and state in ("missing", "outdated"))
+
+        self.ctrl.camera_registration_changed.connect(refresh_registration)
+        refresh_registration()
+        audio = section.add_row("mic", t("multi.audio_source"))
+        audio_select = Combo()
+
+        def refresh_audio():
+            audio_select.clear()
+            for index, _ in enumerate(group.cameras):
+                audio_select.addItem(t("multi.camera_number", n=index + 1), index)
+            audio_select.setCurrentIndex(group.audio_index)
+            section.setVisible(len(group.cameras) > 1 or self.ctrl.get("camera_slot") != 1)
+
+        audio_select.activated.connect(group.select_audio)
+        audio.addControl(audio_select)
+        group.primary.settings_changed.connect(lambda key, value: refresh_audio()
+                                               if key in ("audio_camera", "camera_profiles") else None)
+        refresh_audio()
+        self.ctrl.settings_changed.connect(lambda key, value: refresh_audio() if key == "camera_slot" else None)
+
     def _build_wifi(self):
         sec = self.add_section(t("connection.wifi.title"))
-        row = sec.add_row("wifi", t("connection.wifi.ip"))
-        row.addControl(bound_line(self.ctrl, "ip", width=180))
+        self.wireless = WirelessOptions(self, sec, self.ctrl)
+        self.wifi_warning = self.wireless.warning
 
-        row = sec.add_row("link", t("connection.wifi.code"), t("connection.wifi.code_hint"))
-        self.code_edit = QLineEdit(self.ctrl.get("pair_code", "") or "")
-        self.code_edit.setMaxLength(6)
-        self.code_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_edit.setMinimumWidth(120)
-        f = self.code_edit.font()
-        f.setPointSizeF(14.0)
-        f.setWeight(QFont.Weight.DemiBold)
-        self.code_edit.setFont(f)
-        self.code_edit.textEdited.connect(self._code_edited)
-        row.addControl(self.code_edit)
-        self.ctrl.settings_changed.connect(self._code_setting)
-
-    def _code_edited(self, text):
-        code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
-        if code != text:
-            self.code_edit.setText(code)
-
-    def _code_setting(self, key, value):
-        if key == "pair_code" and self.code_edit.text() != str(value):
-            self.code_edit.setText(str(value))
+    def on_activated(self):
+        # つないでいる間は Wi-Fi の検索 (Bonjour / 走査) を始めない。一覧の「再検索」ボタンを押したときだけ動かす
+        if not self.ctrl.status.get("connected"):
+            self.wireless.start()
 
     # -- iPhone のカメラの動作 -----------------------------------------------------------
     def _build_run(self):
@@ -393,19 +455,36 @@ class ConnectionPage(Page):
         self.camera_row.addControl(self.camera_value)
 
     # -- status の反映 --------------------------------------------------------------------
+    @staticmethod
+    def _set_primary(b, on):
+        if b.isDefault() != bool(on):
+            b.setDefault(bool(on))
+            b.setAutoDefault(bool(on))
+            b.style().unpolish(b)
+            b.style().polish(b)
+            b.update()
+
     def update_status(self, s):
         if not s:
             return
-        level = "error" if s.error_text else "ok" if s.connected else "warning" if s.wanted else None
-        self.connection_status.set_status(t("compact.connected") if s.connected else s.state_text, level)
+        self.wireless.status(s)
+        headline, sub, checked = self._card_text(s)
         self.dot.set_key(s.key)
-        self.state_label.setText(s.state_text)
-        self.device_label.setText(s.device)
-        self.sub_label.setText(s.sub)
-        self.sub_label.setVisible(bool(s.sub))
-        self.error_label.setText(s.error_text)
+        self.state_label.setText(headline)
+        self.check.setVisible(checked)
+        if checked:
+            self.check.setPixmap(icons.pixmap("check", 18, ok_color(ref_palette(self)), self.devicePixelRatioF()))
+        self.sub_label.setText(sub)
+        self.sub_label.setVisible(bool(sub))
+        # 自動のときの「見つかりません」は上の見出しが言うので、赤字は認証の失敗などだけ出す
+        hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in ("failed", "refused")
+        self.error_label.setText("" if hide_error else s.error_text)
         self.start_btn.setText(t("connection.button.pause") if s.start_is_pause else t("connection.button.start"))
+        # 主ボタン (accent) は「つなぐ」「開始」。切断・一時停止は通常色
+        self._set_primary(self.start_btn, not s.start_is_pause)
+        self._set_primary(self.connect_btn, not s.wanted)
         self.start_btn.setEnabled(bool(s.start_enabled))
+        self.start_btn.setVisible(bool(s.start_enabled))   # つないでいる間だけ (主ボタンは「つなぐ / 切断」の1つ)
         self.connect_btn.setText(t("connection.button.disconnect") if s.wanted else t("connection.button.connect"))
         self.num["res"].setText(s.res_fps)
         self.num["latency"].setText(s.latency_text)

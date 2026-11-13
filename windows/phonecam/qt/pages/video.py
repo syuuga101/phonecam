@@ -38,8 +38,9 @@ def build(ctrl):
     orientation.add_row("rotate", t("video.rotate180.label")).addControl(bound_switch(ctrl, "rotate180"))
 
     output = send
-    output.add_row("camera", t("video.backend.label")).addControl(
-        bound_combo(ctrl, "backend", BACKEND_LABELS, setter=ctrl.set_backend))
+    if not ctrl.secondary:
+        output.add_row("camera", t("video.backend.label")).addControl(
+            bound_combo(ctrl, "backend", BACKEND_LABELS, setter=ctrl.set_backend))
     for name, key, choices in (
         ("outsize", "output_size", OUTPUT_SIZE_LABELS),
         ("canvas", "canvas", CANVAS_LABELS),
@@ -84,7 +85,7 @@ def build(ctrl):
         decoder_name = DECODER_LABELS.get(snapshot["decoder"], "-") if status.connected else "-"
         decoder_now.setText(t("status.pc.now", v=decoder_name))
         screen = ctrl.screen_state_text()
-        black.setHint(t("video.power.hint") + (" · " + screen if screen else ""))
+        black.setHint(t("video.power.hint_with_screen", hint=t("video.power.hint"), screen=screen) if screen else t("video.power.hint"))
 
     ctrl.status_changed.connect(refresh)
     refresh(ctrl.status)
