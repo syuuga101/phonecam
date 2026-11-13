@@ -1,18 +1,28 @@
 """Wi-Fi connection choices for the Qt connection page."""
 
+from dataclasses import replace
 from io import BytesIO
 from queue import Empty, SimpleQueue
 from threading import Thread
 import time
 
-from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QPixmap
+from PySide6.QtCore import QEvent, QRectF, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QFont, QPainter, QPen, QPixmap
 from PySide6.QtNetwork import QNetworkInterface
-from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PySide6.QtWidgets import (
+    QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+)
 
-from phonecam.core.wireless import PAIR_SECONDS, Pairing, discover, ipv4, merge_devices, read_device
+from phonecam.core.wireless import (
+    PAIR_SECONDS, Pairing, discover, hotspot_on, ipv4, merge_devices, on_tether, read_device, route_of,
+)
+from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
-from phonecam.qt.widgets import Combo, Hint, button
+from phonecam.qt import icons
+from phonecam.qt.widgets import (
+    IconLabel, Hint, Row, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
+    secondary_color, separator_color, text_color,
+)
 
 
 def local_addresses():
@@ -93,48 +103,409 @@ class PairDialog(QDialog):
         super().done(result)
 
 
+class Spinner(QWidget):
+    """小さな回転スピナー (16px)。start() の間だけタイマーを回す。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(16, 16)
+        self.angle = 0
+        self.timer = QTimer(self, interval=60)
+        self.timer.timeout.connect(self._step)
+        self.hide()
+
+    def start(self):
+        self.show()
+        self.timer.start()
+
+    def stop(self):
+        self.timer.stop()
+        self.hide()
+
+    def _step(self):
+        self.angle = (self.angle + 30) % 360
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(QPen(secondary_color(ref_palette(self)), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(QRectF(2, 2, 12, 12), -self.angle * 16, 270 * 16)
+        painter.end()
+
+
+class IconButton(QPushButton):
+    """アイコンだけのボタン (32px)。テーマが変わったらアイコンを塗り直す。"""
+
+    def __init__(self, name, tip, parent=None):
+        super().__init__(parent)
+        self._name = name
+        self.setFixedSize(32, 32)
+        self.setToolTip(tip)
+        self.setAccessibleName(tip)
+        self.setFlat(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._render()
+
+    def _render(self):
+        self.setIcon(icons.icon(self._name, text_color(self)))
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in _THEME_EVENTS and hasattr(self, "_name"):
+            self._render()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._render()
+
+
+class Separator(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(1)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), separator_color(ref_palette(self)))
+        painter.end()
+
+
+class NameLabel(QLabel):
+    doubled = Signal()
+
+    def mouseDoubleClickEvent(self, event):
+        self.doubled.emit()
+
+
+class Disclosure(QWidget):
+    """小さな折りたたみ (見出し + 中身)。Expander より軽く、カードの中に置く。"""
+
+    toggled = Signal(bool)
+
+    def __init__(self, title, parent=None):
+        super().__init__(parent)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self.header = _ExpanderHeader()
+        self.header.setCheckable(True)
+        self.header.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.header.setAccessibleName(title)
+        self.header.setMinimumHeight(44)
+        row = QHBoxLayout(self.header)
+        row.setContentsMargins(16, 8, 16, 8)
+        row.setSpacing(12)
+        self.arrow = IconLabel("chevron_down")
+        self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        label = QLabel(title)
+        label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        row.addWidget(self.arrow)
+        row.addWidget(label, 1)
+        outer.addWidget(self.header)
+        self.body = QWidget()
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(0, 0, 0, 8)
+        self.body_layout.setSpacing(0)
+        self.body.hide()
+        outer.addWidget(self.body)
+        self.header.clicked.connect(lambda: self.set_open(not self.body.isVisible()))
+
+    def add(self, widget):
+        self.body_layout.addWidget(widget)
+        return widget
+
+    def is_open(self):
+        return not self.body.isHidden()
+
+    def set_open(self, value):
+        value = bool(value)
+        if value == self.is_open():
+            return
+        self.body.setVisible(value)
+        self.header.setChecked(value)
+        self.arrow.set_icon("chevron_up" if value else "chevron_down")
+        self.toggled.emit(value)
+
+
+class CodeDialog(QDialog):
+    """未登録の iPhone に初めてつなぐときだけ出す、6桁コードの入力。"""
+
+    def __init__(self, parent, name):
+        super().__init__(parent)
+        self.setWindowTitle(t("wireless.code_title"))
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        head = QLabel(t("wireless.code_for", name=name))
+        font = head.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        head.setFont(font)
+        layout.addWidget(head)
+        note = Hint(t("wireless.code_note"))
+        note.setMinimumWidth(320)
+        layout.addWidget(note)
+        self.edit = QLineEdit()
+        self.edit.setMaxLength(6)
+        self.edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.edit.setPlaceholderText("000000")
+        big = self.edit.font()
+        big.setPointSizeF(18.0)
+        big.setWeight(QFont.Weight.DemiBold)
+        self.edit.setFont(big)
+        self.edit.textEdited.connect(self._edited)
+        self.edit.returnPressed.connect(self._accept)
+        layout.addWidget(self.edit)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = button(t("wireless.cancel"))
+        cancel.clicked.connect(self.reject)
+        self.ok = button(t("wireless.connect"), primary=True)
+        self.ok.setEnabled(False)
+        self.ok.clicked.connect(self._accept)
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.ok)
+        layout.addLayout(buttons)
+        self.code = ""
+
+    def _edited(self, text):
+        code = normalize_pair_code(text)
+        if code != text:
+            self.edit.setText(code)
+        self.ok.setEnabled(valid_pair_code(code))
+
+    def _accept(self):
+        code = normalize_pair_code(self.edit.text())
+        if valid_pair_code(code):
+            self.code = code
+            self.accept()
+
+
+class Entry:
+    """一覧の 1 行ぶんの情報。"""
+
+    def __init__(self, device, address, route, found):
+        self.device, self.address, self.route, self.found = device, address, route, found
+
+    @property
+    def name(self):
+        return self.device.title or t("wireless.unknown_device")
+
+    @property
+    def registered(self):
+        return bool(self.device.code)
+
+    def detail(self):
+        parts = [self.device.model, self.address]
+        if self.found:
+            parts.append(t("wireless.route." + self.route))
+            if self.registered:
+                parts.append(t("wireless.route.registered"))
+        else:
+            parts.append(t("wireless.route.registered"))
+            parts.append(t("wireless.not_found"))
+        return " · ".join(p for p in parts if p)
+
+    def key(self):
+        d = self.device
+        return (d.id, d.title, d.model, d.code, self.address, self.route, self.found)
+
+
+class DeviceRow(QWidget):
+    """見つかった iPhone 1 台: アイコン | 名前 + 詳細 | 状態 / つなぐ・切断 / …"""
+
+    def __init__(self, entry, state, owner, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(60)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(16, 10, 16, 10)
+        lay.setSpacing(12)
+        lay.addWidget(IconLabel("phone", 20), 0, Qt.AlignmentFlag.AlignVCenter)
+        texts = QVBoxLayout()
+        texts.setSpacing(2)
+        name = NameLabel(entry.name)
+        font = name.font()
+        font.setWeight(QFont.Weight.Bold)
+        name.setFont(font)
+        name.setWordWrap(True)
+        texts.addWidget(name)
+        texts.addWidget(Hint(entry.detail()))
+        lay.addLayout(texts, 1)
+        if entry.registered:
+            name.setToolTip(t("wireless.rename_tip"))
+            name.doubled.connect(lambda: owner.rename(entry))
+        if state == "connected":
+            status = StatusValue(wrap=False)
+            status.set_status(t("wireless.connected"), "ok")
+            lay.addWidget(status, 0, Qt.AlignmentFlag.AlignVCenter)
+        elif state == "connecting":
+            lay.addWidget(Hint(t("wireless.connecting"), wrap=False), 0, Qt.AlignmentFlag.AlignVCenter)
+        action = button(t("wireless.disconnect") if state else t("wireless.connect"))
+        action.setMinimumWidth(84)
+        if state:
+            action.clicked.connect(owner.disconnect)
+        else:
+            action.clicked.connect(lambda: owner.connect_entry(entry))
+        lay.addWidget(action, 0, Qt.AlignmentFlag.AlignVCenter)
+        if entry.registered:
+            more = IconButton("more", t("wireless.more"))
+            more.clicked.connect(lambda: owner.menu(entry, more))
+            lay.addWidget(more, 0, Qt.AlignmentFlag.AlignVCenter)
+
+
 class WirelessOptions:
-    def __init__(self, page, section, ctrl, warning):
+    """Wi-Fi 折りたたみの中身: 見つかった iPhone の一覧 / QR / 見つからないとき / IP 手入力。"""
+
+    def __init__(self, page, section, ctrl):
         self.page, self.ctrl = page, ctrl
-        self.discovered = []
+        self.discovered = list(getattr(ctrl, "demo_discovered", []) or [])
         self.inbox = SimpleQueue()
-        self.method = Combo()
-        for key in ("lan", "tether", "hotspot", "qr"):
-            self.method.addItem(t(f"wireless.{key}"), key)
-        self.method_row = section.add_row("wifi", t("wireless.method"))
-        self.method_row.addControl(self.method)
-        self.actions = section.add_row("link", t("wireless.actions"))
-        self.hotspot = self.actions.addControl(button(t("wireless.open_hotspot")))
-        self.hotspot.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("ms-settings:network-mobilehotspot")))
-        self.qr = self.actions.addControl(button(t("wireless.qr")))
-        self.qr.clicked.connect(self._show_qr)
-        self.scan = self.actions.addControl(button(t("wireless.scan")))
-        self.scan.clicked.connect(self.refresh)
-        self.devices = Combo()
-        self.devices.setMaximumWidth(300)
-        self.devices.activated.connect(self._select)
-        section.add_row("camera", t("wireless.devices")).addControl(self.devices)
-        self.warning = warning
+        self.addresses = local_addresses() if not ctrl.demo else []
+        self.scanned = bool(self.discovered)
+        self.started = False
+        self.expander = None
+        self._signature = None
+        self._pending = None
         self.timer = QTimer(page, interval=100)
         self.timer.timeout.connect(self._result)
         self.hint_timer = QTimer(page, interval=12000, singleShot=True)
         self.hint_timer.timeout.connect(self._show_hint)
-        self.method.currentIndexChanged.connect(self._mode_changed)
-        self.method.activated.connect(lambda _index: self._show_qr() if self.method.currentData() == "qr" else None)
-        self._mode_changed()
-        self._populate()
-        self.started = False
+        self.net_timer = QTimer(page, interval=3000)
+        self.net_timer.timeout.connect(self._refresh_net)
+
+        section.add(self._build_devices())
+        section.add(self._build_qr())
+        section.add(self._build_trouble())
+        section.add(self._build_manual())
+        self._render()
+
+    # -- 部品 -------------------------------------------------------------------
+    def _build_devices(self):
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        head = QWidget()
+        row = QHBoxLayout(head)
+        row.setContentsMargins(16, 10, 12, 6)
+        row.setSpacing(8)
+        title = QLabel(t("wireless.found_title"))
+        font = title.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        title.setFont(font)
+        row.addWidget(title)
+        self.spinner = Spinner()
+        row.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.scanning_label = Hint(t("wireless.scanning"), wrap=False)
+        self.scanning_label.hide()
+        row.addWidget(self.scanning_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addStretch(1)
+        self.scan = IconButton("refresh", t("wireless.rescan"))
+        self.scan.clicked.connect(self.refresh)
+        row.addWidget(self.scan)
+        lay.addWidget(head)
+        self.list = QVBoxLayout()
+        self.list.setSpacing(0)
+        lay.addLayout(self.list)
+        return box
+
+    def _build_qr(self):
+        row = Row("qr", t("wireless.qr_title"), t("wireless.qr_hint"))
+        self.qr = row.addControl(button(t("wireless.qr"), primary=True))
+        self.qr.setMinimumWidth(150)
+        self.qr.clicked.connect(self._show_qr)
+        row.setMinimumHeight(64)
+        return row
+
+    def _build_trouble(self):
+        self.trouble = Disclosure(t("wireless.trouble"))
+        self.trouble.toggled.connect(self._trouble_toggled)
+        self.tether_block = self._block(t("wireless.tether_title"), t("wireless.tether_steps"))
+        self.hotspot_block = self._block(t("wireless.hotspot_title"), t("wireless.hotspot_steps"))
+        self.hotspot_button = button(t("wireless.open_hotspot"))
+        self.hotspot_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("ms-settings:network-mobilehotspot")))
+        self.hotspot_block[1].addWidget(self.hotspot_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.warning = Hint(t("wireless.timeout"))
+        self.warning.hide()
+        self.trouble.add(self.warning_box())
+        self.trouble.add(self.tether_block[0])
+        self.trouble.add(self.hotspot_block[0])
+        return self.trouble
+
+    def warning_box(self):
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(44, 0, 16, 8)
+        lay.addWidget(self.warning)
+        return box
+
+    def _block(self, title, steps):
+        """(入れ物, 縦レイアウト, ✓ 表示, 手順文)。"""
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(44, 6, 16, 10)
+        lay.setSpacing(4)
+        head = QLabel(title)
+        font = head.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        head.setFont(font)
+        lay.addWidget(head)
+        ok = StatusValue(wrap=False)
+        lay.addWidget(ok, 0, Qt.AlignmentFlag.AlignLeft)
+        text = Hint(steps)
+        lay.addWidget(text)
+        return box, lay, ok, text
+
+    def _build_manual(self):
+        self.manual = Disclosure(t("wireless.manual"))
+        ip_row = Row("wifi", t("connection.wifi.ip"))
+        ip_row.addControl(bound_line(self.ctrl, "ip", width=180))
+        self.manual.add(ip_row)
+        code_row = Row("link", t("connection.wifi.code"), t("connection.wifi.code_hint"))
+        self.code_edit = QLineEdit(self.ctrl.get("pair_code", "") or "")
+        self.code_edit.setMaxLength(6)
+        self.code_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.code_edit.setMinimumWidth(120)
+        font = self.code_edit.font()
+        font.setPointSizeF(14.0)
+        font.setWeight(QFont.Weight.DemiBold)
+        self.code_edit.setFont(font)
+        self.code_edit.textEdited.connect(self._code_edited)
+        code_row.addControl(self.code_edit)
+        self.ctrl.settings_changed.connect(self._code_setting)
+        self.manual.add(code_row)
+        go_row = Row(None, t("wireless.manual_go"))
+        go = go_row.addControl(button(t("wireless.connect")))
+        go.clicked.connect(self._manual_connect)
+        self.manual.add(go_row)
+        return self.manual
+
+    def _code_edited(self, text):
+        code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
+        if code != text:
+            self.code_edit.setText(code)
+
+    def _code_setting(self, key, value):
+        if key == "pair_code" and self.code_edit.text() != str(value):
+            self.code_edit.setText(str(value))
+
+    def _manual_connect(self):
+        if self.ctrl.wanted:
+            self.ctrl.toggle_connect()
+        self.ctrl.set_mode("wifi")
+        self.ctrl.toggle_connect()
+
+    # -- 外から ---------------------------------------------------------------------
+    def bind_expander(self, expander):
+        self.expander = expander
+        self._signature = None
+        self._render()
 
     def start(self):
-        if not self.started and not self.ctrl.demo:
-            self.started = True
+        if self.started:
+            return
+        self.started = True
+        if not self.ctrl.demo:
             self.refresh()
-
-    def _mode_changed(self):
-        choice = self.method.currentData()
-        self.hotspot.setVisible(choice == "hotspot")
-        self.qr.setVisible(choice == "qr")
-        self.actions.setHint(t(f"wireless.help.{choice}"))
 
     def status(self, status):
         pending = status.wanted and not status.connected and self.ctrl.get("mode") == "wifi"
@@ -143,17 +514,22 @@ class WirelessOptions:
             self.warning.hide()
         elif not self.hint_timer.isActive() and self.warning.isHidden():
             self.hint_timer.start()
+        self._commit_pending(status)
+        self._render()
 
     def _show_hint(self):
         status = self.ctrl.status
-        self.warning.setVisible(status.wanted and not status.connected and self.ctrl.get("mode") == "wifi")
+        show = bool(status.get("wanted") and not status.get("connected") and self.ctrl.get("mode") == "wifi")
+        self.warning.setVisible(show)
+        if show:
+            self.trouble.set_open(True)
 
+    # -- 検索 -----------------------------------------------------------------------
     def refresh(self):
         if self.timer.isActive():
             return
-        self.scan.setEnabled(False)
-        self.scan.setText(t("wireless.scanning"))
-        addresses = local_addresses()
+        self.addresses = local_addresses()
+        addresses = self.addresses
         inbox = self.inbox
 
         def work():
@@ -164,6 +540,7 @@ class WirelessOptions:
 
         Thread(target=work, daemon=True).start()
         self.timer.start()
+        self._render()
 
     def _result(self):
         try:
@@ -171,31 +548,147 @@ class WirelessOptions:
         except Empty:
             return
         self.timer.stop()
-        self.scan.setEnabled(True)
-        self.scan.setText(t("wireless.scan"))
+        self.scanned = True
         if found is None:
             self.ctrl.toast.emit(t("wireless.scan_error"), "error")
         else:
             self.discovered = found
-            self._populate()
+        self._render()
 
+    def _refresh_net(self):
+        if not self.ctrl.demo:
+            self.addresses = local_addresses()
+        self._render_trouble()
+
+    def _trouble_toggled(self, opened):
+        if opened:
+            self._refresh_net()
+            self.net_timer.start()
+        else:
+            self.net_timer.stop()
+
+    # -- 一覧の組み立て -------------------------------------------------------------
     def _known(self):
         return [device for entry in self.ctrl.get("known_devices", []) if (device := read_device(entry))]
 
-    def _populate(self):
-        self.devices.clear()
-        self.devices.addItem(t("wireless.choose"))
+    def entries(self):
+        found_ips = {ip for device in self.discovered for ip in device.addresses}
+        out = []
         for device in merge_devices(self._known(), self.discovered):
-            for address in device.addresses:
-                name = device.name or t("wireless.unknown_device")
-                if device.code:
-                    name = t("wireless.known", name=name)
-                self.devices.addItem(f"{name} · {address}", (address, device.code))
+            live = [ip for ip in device.addresses if ip in found_ips]
+            address = live[0] if live else device.addresses[0]
+            out.append(Entry(device, address, route_of(address) if live else "registered", bool(live)))
+        return sorted(out, key=lambda e: not e.found)
 
-    def _select(self, index):
-        target = self.devices.itemData(index)
-        if target:
-            self._apply(*target)
+    def _state(self, entry):
+        """"connected" / "connecting" / "" (この行が今つないでいる相手か)。"""
+        if self.ctrl.get("mode") != "wifi" or not self.ctrl.wanted:
+            return ""
+        if self.ctrl.get("ip") not in entry.device.addresses:
+            return ""
+        return "connected" if self.ctrl.status.get("connected") else "connecting"
+
+    def _summary(self, entries):
+        status = self.ctrl.status
+        if self.ctrl.get("mode") == "wifi" and status and status.get("connected"):
+            for entry in entries:
+                if self._state(entry) == "connected":
+                    return t("wireless.summary.connected", name=entry.name)
+            name = (status.get("phone") or {}).get("deviceName") or t("connection.device.default")
+            return t("wireless.summary.connected", name=name)
+        count = sum(1 for entry in entries if entry.found)
+        if count:
+            return t("wireless.summary.found", n=count)
+        if self.timer.isActive() or not self.scanned:
+            return t("wireless.summary.searching")
+        return t("wireless.summary.none")
+
+    def _render(self):
+        entries = self.entries()
+        scanning = self.timer.isActive()
+        states = [self._state(entry) for entry in entries]
+        summary = self._summary(entries)
+        signature = (tuple(e.key() for e in entries), tuple(states), scanning, self.scanned, summary)
+        if signature == self._signature:
+            return
+        self._signature = signature
+        if self.expander is not None:
+            self.expander.set_summary(summary)
+        self.scan.setEnabled(not scanning)
+        self.scanning_label.setVisible(scanning)
+        if scanning:
+            self.spinner.start()
+        else:
+            self.spinner.stop()
+        while self.list.count():
+            item = self.list.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.hide()
+                widget.deleteLater()
+        if not entries:
+            self.list.addWidget(Separator())
+            self.list.addWidget(self._empty(scanning))
+        for entry, state in zip(entries, states):
+            self.list.addWidget(Separator())
+            self.list.addWidget(DeviceRow(entry, state, self))
+        self._render_trouble()
+
+    def _empty(self, scanning):
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(8)
+        lay.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        icon = IconLabel("phone", 32)
+        lay.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
+        title = QLabel(t("wireless.searching") if scanning and not self.scanned else t("wireless.empty_title"))
+        font = title.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        title.setFont(font)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(title)
+        if self.scanned or not scanning:
+            note = Hint(t("wireless.empty_note"))
+            note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lay.addWidget(note)
+            more = button(t("wireless.empty_more"))
+            more.clicked.connect(lambda: self.trouble.set_open(True))
+            lay.addWidget(more, 0, Qt.AlignmentFlag.AlignHCenter)
+        return box
+
+    def _render_trouble(self):
+        for block, ok_text, on in ((self.tether_block, t("wireless.tether_ok"), on_tether(self.addresses)),
+                                   (self.hotspot_block, t("wireless.hotspot_ok"), hotspot_on(self.addresses))):
+            box, _lay, ok, steps = block
+            ok.setVisible(on)
+            if on:
+                ok.set_status(ok_text, "ok")
+            steps.setVisible(not on)
+        self.hotspot_button.setVisible(not hotspot_on(self.addresses))
+
+    # -- 行の操作 -------------------------------------------------------------------
+    def connect_entry(self, entry):
+        if entry.registered:
+            self._start(entry.address, entry.device.code)
+            return
+        dialog = CodeDialog(self.page, entry.name)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        code = dialog.code
+        dialog.deleteLater()
+        if not accepted:
+            return
+        device = entry.device
+        self._pending = (replace(device, code=code, addresses=(entry.address,)) if device.id else None)
+        self._start(entry.address, code)
+
+    def _start(self, address, code):
+        self._apply(address, code)
+        self.ctrl.toggle_connect()
+
+    def disconnect(self):
+        if self.ctrl.wanted:
+            self.ctrl.toggle_connect()
 
     def _apply(self, address, code):
         if self.ctrl.wanted:
@@ -206,6 +699,45 @@ class WirelessOptions:
             self.ctrl.set_pair_code(code)
         self.ctrl.set_mode("wifi")
 
+    def _commit_pending(self, status):
+        pending = self._pending
+        if not pending:
+            return
+        if not self.ctrl.wanted:
+            self._pending = None
+        elif status.connected and self.ctrl.get("ip") == pending.addresses[0]:
+            self._pending = None
+            self._save_known([pending, *(item for item in self._known() if item.id != pending.id)])
+
+    def _save_known(self, devices):
+        self.ctrl.changed("known_devices", [item.stored() for item in devices[:64]])
+        self.ctrl.save_now()
+        self._signature = None
+        self._render()
+
+    def menu(self, entry, anchor):
+        menu = QMenu(self.page)
+        menu.addAction(t("wireless.rename")).triggered.connect(lambda: self.rename(entry))
+        menu.addAction(t("wireless.forget")).triggered.connect(lambda: self.forget(entry))
+        menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+        menu.deleteLater()
+
+    def rename(self, entry):
+        text, ok = QInputDialog.getText(self.page, t("wireless.rename"), t("wireless.rename_label"),
+                                        QLineEdit.EchoMode.Normal, entry.device.title)
+        if not ok:
+            return
+        alias = text.strip()[:128]
+        if alias == entry.device.name:
+            alias = ""   # 元の名前に戻した = PC 側の名前を使わない
+        self._save_known([replace(item, alias=alias) if item.id == entry.device.id else item for item in self._known()])
+
+    def forget(self, entry):
+        answer = QMessageBox.question(self.page, t("wireless.forget"), t("wireless.forget_ask", name=entry.name))
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._save_known([item for item in self._known() if item.id != entry.device.id])
+
     def _show_qr(self):
         dialog = PairDialog(self.page)
         dialog.exec()
@@ -213,9 +745,9 @@ class WirelessOptions:
         dialog.deleteLater()
         if not device:
             return
-        known = [device, *(item for item in self._known() if item.id != device.id)]
-        self.ctrl.changed("known_devices", [item.stored() for item in known[:64]])
-        self.ctrl.save_now()
-        self._populate()
+        old = next((item for item in self._known() if item.id == device.id), None)
+        if old and old.alias:
+            device = replace(device, alias=old.alias)
+        self._save_known([device, *(item for item in self._known() if item.id != device.id)])
         self._apply(device.addresses[0], device.code)
         self.ctrl.toggle_connect()

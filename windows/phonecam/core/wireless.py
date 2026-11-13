@@ -49,9 +49,24 @@ class Device:
     name: str
     addresses: tuple
     code: str = ""
+    model: str = ""    # 機種名 (iPhone 側が送る。古いアプリでは空)
+    alias: str = ""    # PC 側で付けた名前 (登録済み端末のみ。iPhone から届いた名前より優先)
+
+    @property
+    def title(self):
+        return self.alias or self.name
 
     def stored(self):
-        return {"id": self.id, "name": self.name, "addresses": list(self.addresses), "code": self.code}
+        data = {"id": self.id, "name": self.name, "addresses": list(self.addresses), "code": self.code}
+        if self.model:
+            data["model"] = self.model
+        if self.alias:
+            data["alias"] = self.alias
+        return data
+
+
+def _text(value, limit=128):
+    return value.strip()[:limit] if isinstance(value, str) else ""
 
 
 def read_device(data):
@@ -62,7 +77,7 @@ def read_device(data):
     name, code = data.get("name"), data.get("code")
     if not (ident and addresses and isinstance(name, str) and isinstance(code, str) and re.fullmatch(r"[0-9]{6}", code)):
         return None
-    return Device(ident, name.strip()[:128], addresses[:32], code)
+    return Device(ident, name.strip()[:128], addresses[:32], code, _text(data.get("model")), _text(data.get("alias")))
 
 
 class Pairing:
@@ -166,9 +181,40 @@ class Pairing:
             return None
         if data.get("v") != VERSION:
             return None
+        data.pop("alias", None)   # PC 側だけの名前。iPhone からは受け取らない
         if isinstance(data.get("addresses"), list):
             data["addresses"] = [peer, *data["addresses"]]
         return read_device(data)
+
+
+def route_of(address):
+    """見つかった経路: "tether" (iPhone のテザリング) / "hotspot" (PC のホットスポット) / "lan" (同じ Wi-Fi)。"""
+    if address == TETHER:
+        return "tether"
+    try:
+        if ipaddress.IPv4Address(address) in HOTSPOT:
+            return "hotspot"
+    except ValueError:
+        pass
+    return "lan"
+
+
+def on_tether(addresses):
+    """PC が iPhone のテザリング (172.20.10.0/28) につながっているか。"""
+    net = ipaddress.IPv4Network("172.20.10.0/28")
+    return any(_in(net, a) for a in addresses)
+
+
+def hotspot_on(addresses):
+    """PC のモバイルホットスポットがオンか (192.168.137.1 を持っている)。"""
+    return "192.168.137.1" in addresses
+
+
+def _in(net, address):
+    try:
+        return ipaddress.IPv4Address(address) in net
+    except ValueError:
+        return False
 
 
 def _port_open(ip):
@@ -215,8 +261,9 @@ def _bonjour(interfaces):
                 ident = device_id((info.properties.get(b"id") or b"").decode("ascii", errors="replace"))
                 addresses = ipv4(info.parsed_addresses())
                 label = (info.properties.get(b"name") or b"").decode("utf-8", errors="replace")
+                model = (info.properties.get(b"model") or b"").decode("utf-8", errors="replace")
                 if ident and addresses:
-                    devices.append(Device(ident, label[:128], addresses))
+                    devices.append(Device(ident, label.strip()[:128], addresses, "", model.strip()[:128]))
             return devices
         finally:
             browser.cancel()
@@ -250,7 +297,8 @@ def merge_devices(known, discovered):
     ids, ips = set(), set()
     for device in known:
         fresh = by_id.get(device.id)
-        item = Device(device.id, fresh.name or device.name, fresh.addresses, device.code) if fresh else device
+        item = (Device(device.id, fresh.name or device.name, fresh.addresses, device.code,
+                       fresh.model or device.model, device.alias) if fresh else device)
         result.append(item)
         ids.add(item.id)
         ips.update(item.addresses)

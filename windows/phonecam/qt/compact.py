@@ -23,7 +23,7 @@ PRIMARY = {
 # Section title, icon, and (where useful) the rows to summarize, in display order.
 GROUPS = {
     "connection": (
-        ("connection.wifi.title", "wifi", ("wireless.method", "connection.wifi.ip")),
+        ("connection.wifi.title", "wifi", ()),
         ("connection.run.title", "play", ("connection.run.mode", "connection.run.idle")),
     ),
     "video": (
@@ -163,6 +163,9 @@ def compact_page(page, ctrl, key):
             expander.add(child)
             child.setVisible(not hidden)
         page.column.addWidget(expander)
+        if title_key == "connection.wifi.title" and hasattr(page, "wireless"):
+            page.wireless.bind_expander(expander)   # 要約は Wi-Fi 側が「接続中 · 名前」などを出す
+            continue
         summary_rows = ([rows[t(name)] for name in summary_keys if t(name) in rows]
                         if summary_keys else [child for child, _ in children if isinstance(child, Row)])
         refresh = partial(_set_summary, expander, summary_rows[:3])

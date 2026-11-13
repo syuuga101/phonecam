@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QRadioButton,
     QSizePolicy,
     QVBoxLayout,
@@ -29,7 +28,6 @@ from phonecam.qt.widgets import (
     Page,
     StatusValue,
     bound_combo,
-    bound_line,
     border_color,
     button,
     card_color,
@@ -266,8 +264,6 @@ class ConnectionPage(Page):
         self.preview = self.add(PreviewView(ctrl))
         self.connection_status = StatusValue()
         self.column.addWidget(self.connection_status, 0, Qt.AlignmentFlag.AlignLeft)
-        self.wifi_warning = self.add(Hint(t("wireless.timeout")))
-        self.wifi_warning.hide()
         self._build_numbers()
         self._build_method()
         self._build_wifi()
@@ -357,34 +353,11 @@ class ConnectionPage(Page):
     # -- Wi-Fi ----------------------------------------------------------------------
     def _build_wifi(self):
         sec = self.add_section(t("connection.wifi.title"))
-        self.wireless = WirelessOptions(self, sec, self.ctrl, self.wifi_warning)
-        row = sec.add_row("wifi", t("connection.wifi.ip"))
-        row.addControl(bound_line(self.ctrl, "ip", width=180))
-
-        row = sec.add_row("link", t("connection.wifi.code"), t("connection.wifi.code_hint"))
-        self.code_edit = QLineEdit(self.ctrl.get("pair_code", "") or "")
-        self.code_edit.setMaxLength(6)
-        self.code_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_edit.setMinimumWidth(120)
-        f = self.code_edit.font()
-        f.setPointSizeF(14.0)
-        f.setWeight(QFont.Weight.DemiBold)
-        self.code_edit.setFont(f)
-        self.code_edit.textEdited.connect(self._code_edited)
-        row.addControl(self.code_edit)
-        self.ctrl.settings_changed.connect(self._code_setting)
+        self.wireless = WirelessOptions(self, sec, self.ctrl)
+        self.wifi_warning = self.wireless.warning
 
     def on_activated(self):
         self.wireless.start()
-
-    def _code_edited(self, text):
-        code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
-        if code != text:
-            self.code_edit.setText(code)
-
-    def _code_setting(self, key, value):
-        if key == "pair_code" and self.code_edit.text() != str(value):
-            self.code_edit.setText(str(value))
 
     # -- iPhone のカメラの動作 -----------------------------------------------------------
     def _build_run(self):
