@@ -112,6 +112,8 @@ DEFAULT_SETTINGS = {
     "language": "system",        # "system" / "ja" / "en" ...
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
     "idle_stop_sec": 10,
+    "window_maximized": True,    # Qt UI: 最大化で起動する
+    "window_geometry": "",       # Qt UI: 最大化を解除して閉じたときの位置と大きさ (saveGeometry() の base64)
     # 初回セットアップ (ウィザード) を終えたか
     "setup_done": False,
     "setup_shown_version": "",   # セットアップウィザードを最後に出した版 (更新後の初回起動で再表示するため)
@@ -352,6 +354,9 @@ def sanitize_settings(s):
     except Exception:
         ratio = DEFAULT_SETTINGS["preview_width_ratio"]
     s["preview_width_ratio"] = min(1.0, max(1.0 / 3.0, ratio))
+    s["window_maximized"] = bool(s.get("window_maximized", True))
+    if not isinstance(s.get("window_geometry"), str) or len(s["window_geometry"]) > 4096:
+        s["window_geometry"] = ""
     # カメラの動かし方
     if s.get("run_mode") not in RUN_MODES:
         s["run_mode"] = DEFAULT_SETTINGS["run_mode"]

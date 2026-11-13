@@ -144,3 +144,47 @@ jobs:
           name: PhoneCamReceiver
           path: windows/dist/PhoneCamReceiver.exe
           if-no-files-found: error
+
+  # ---- Qt UI (PySide6) のスクリーンショット。移植中の確認用で、失敗してもリリースを止めない ----
+  qt-screenshots:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r windows/requirements.txt -r windows/requirements-qt.txt
+
+      # 倍率 1.0 / 2.0 (QT_SCALE_FACTOR を変えた子プロセス) x ライト/ダーク x 全ページ を撮る
+      - name: Qt screenshots (windows platform)
+        id: qt_windows
+        continue-on-error: true
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: python windows/qt_smoke.py --out qt-screens
+
+      # windows プラットフォームで撮れなかったときの代替 (offscreen)
+      - name: Qt screenshots (offscreen fallback)
+        if: steps.qt_windows.outcome == 'failure'
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python windows/qt_smoke.py --out qt-screens
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-screens
+          path: qt-screens
+          if-no-files-found: warn
