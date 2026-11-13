@@ -249,16 +249,8 @@ struct PreviewPanel: View {
                                   canvasAspect: canvasAspect, crop: model.outputCanvas?.crop ?? false)
     }
 
-    private var badgeText: String {
-        let landscape = (model.rotationAngle == 0 || model.rotationAngle == 180)
-        let live = model.isConnected && model.streamActiveUI
-        let dir = landscape ? String(localized: "横向き") : String(localized: "縦向き")
-        return live ? String(localized: "\(dir)で配信中") : String(localized: "\(dir) · 待機中")
-    }
-
     var body: some View {
         let lay = layout
-        let landscape = (model.rotationAngle == 0 || model.rotationAngle == 180)
         ZStack {
             Color.black
             CameraPreview(session: model.camera.session,
@@ -273,25 +265,6 @@ struct PreviewPanel: View {
                     .position(x: lay.image.midX, y: lay.image.midY)
                     .allowsHitTesting(false)
             }
-            VStack {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: landscape ? "rectangle" : "rectangle.portrait")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(badgeText)
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Capsule())
-                    Spacer()
-                }
-                Spacer()
-            }
-            .padding(10)
-            .allowsHitTesting(false)
         }
         .frame(width: region.width, height: region.height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

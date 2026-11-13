@@ -49,9 +49,11 @@ struct InfoRow: View {
     }
 }
 
-extension ContentView {
-    /// 「配信情報」セクション (inset grouped List の中に置く)
-    var infoSection: some View {
+/// 「配信情報」セクション (inset grouped List の中に置く)。刻々と変わる情報は操作より下に出す。
+struct StreamInfoSection: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
         Section {
             InfoRow(symbol: "cable.connector", title: "接続",
                     value: model.isConnected ? model.connectionKind : String(localized: "未接続"))
@@ -59,6 +61,9 @@ extension ContentView {
                 InfoRow(symbol: "wifi", title: "Wi-Fi アドレス", value: model.wifiAddress)
             }
             InfoRow(symbol: "video", title: "映像", value: model.formatText)
+            InfoRow(symbol: "rectangle.portrait.rotate", title: "向き",
+                    value: (model.rotationAngle == 0 || model.rotationAngle == 180)
+                        ? String(localized: "横向き") : String(localized: "縦向き"))
             InfoRow(symbol: "speedometer", title: "ビットレート", value: model.bitrateText)
             InfoRow(symbol: "film", title: "送信 fps", value: "\(model.sentFps)")
             InfoRow(symbol: "thermometer.medium", title: "温度状態", value: model.thermalText)
@@ -67,25 +72,11 @@ extension ContentView {
             Text("配信情報")
         }
     }
+}
 
-    var recordRow: some View {
-        HStack(spacing: 12) {
-            RowIcon(symbol: "circle.inset.filled")
-            Text("録画")
-            Spacer()
-            if model.recActive {
-                Text(ContentView.timeText(model.recSeconds))
-                    .font(.system(size: 17, design: .monospaced))
-                    .foregroundStyle(.red)
-            }
-            Circle()
-                .fill(Color.red)
-                .frame(width: 10, height: 10)
-            Button(action: { model.toggleRecording() }) {
-                Text(model.recActive ? "停止" : "録画開始")
-            }
-            .buttonStyle(.borderless)
-        }
+extension ContentView {
+    var infoSection: some View {
+        StreamInfoSection()
     }
 
     var footnotes: some View {

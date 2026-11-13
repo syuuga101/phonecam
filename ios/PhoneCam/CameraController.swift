@@ -272,7 +272,9 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         s["phoneEdit"] = [
             "seq": phoneEditSeq,
             "lens": activeLens,
-            "micMuted": micMuted
+            "micMuted": micMuted,
+            "zoom": fin(zoom),
+            "torch": torch
         ] as [String: Any]
 
         guard let dev = device else {
@@ -430,18 +432,35 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     /// iPhone 側で操作されたレンズ / ミュートを適用し、phoneEdit.seq を 1 つ進める。どのスレッドからでも可。
     /// 変化がなければ何もしない (seq も進めない)。
-    func phoneChange(lens: String?, micMuted newMuted: Bool?) {
+    /// zoom / torch も iPhone 側の操作として同じ経路 (applyOnQueue) で適用する。
+    /// ピンチ中の途中経過は zoomFinal = false で呼ぶ (seq を進めず、PC への通知は最後の 1 回だけにする)。
+    /// レンズを切り替えるときはライトを消し、ズームを 1× に戻す。
+    func phoneChange(lens: String? = nil, micMuted newMuted: Bool? = nil, zoom newZoom: Double? = nil,
+                     torch newTorch: Bool? = nil, zoomFinal: Bool = true) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             var json: [String: Any] = [:]
+            var bump = false
             if let l = lens, (l == "wide" || l == "ultrawide" || l == "front"), l != self.reqLens {
                 json["lens"] = l
+                json["torch"] = NSNumber(value: false)
+                json["zoom"] = NSNumber(value: 1.0)
+                bump = true
             }
             if let m = newMuted, m != self.micMuted {
                 json["micMuted"] = NSNumber(value: m)
+                bump = true
+            }
+            if json["torch"] == nil, let t = newTorch, t != self.torch {
+                json["torch"] = NSNumber(value: t)
+                bump = true
+            }
+            if json["zoom"] == nil, let z = newZoom, z.isFinite, abs(z - self.zoom) > 0.0005 {
+                json["zoom"] = NSNumber(value: z)
+                if zoomFinal { bump = true }
             }
             guard !json.isEmpty else { return }
-            self.phoneEditSeq += 1
+            if bump { self.phoneEditSeq += 1 }
             self.applyOnQueue(json)
         }
     }
@@ -529,8 +548,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         if let old = oldInput {
             // 切り替え前のカメラのライトが点いたままにならないよう消す
             let oldDev = old.device
-            if oldDev !== dev, oldDev.hasTorch, oldDev.torchMode != .off {
-                if (try? oldDev.lockForConfiguration()) != nil {
+            if oldDev !== dev {
+                // 切り替え先のカメラでライトが勝手に点かないよう、要求値も落とす
+                torch = false
+                if oldDev.hasTorch, oldDev.torchMode != .off, (try? oldDev.lockForConfiguration()) != nil {
                     oldDev.torchMode = .off
                     oldDev.unlockForConfiguration()
                 }

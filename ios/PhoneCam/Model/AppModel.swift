@@ -48,6 +48,12 @@ final class AppModel: ObservableObject {
     @Published var lens = "wide"
     @Published var lenses: [String] = ["wide"]
     @Published var micEnabled = false
+    @Published var zoom = 1.0              // カメラの videoZoomFactor (PC のズームと同じ値)
+    @Published var zoomMax = 10.0
+    @Published var torchOn = false
+    @Published var torchAvailable = false
+    /// ピンチ中は、遅れて届くステータスの zoom で画面の値を戻さない
+    var zoomGestureActive = false
     @Published var micMuted = false
     @Published var outputCanvas: OutputCanvas?
     @Published var cameraSize = CGSize(width: 1920, height: 1080)   // カメラ素の向き (横長) のサイズ
@@ -226,6 +232,10 @@ final class AppModel: ObservableObject {
             let lensNow = status["lens"] as? String
             let lensList = status["lenses"] as? [String]
             let mutedNow = status["micMuted"] as? Bool
+            let zoomNow = (status["zoom"] as? NSNumber)?.doubleValue
+            let zoomMaxNow = (status["zoomMax"] as? NSNumber)?.doubleValue
+            let torchNow = status["torch"] as? Bool
+            let torchAvailNow = status["torchAvailable"] as? Bool
             var micEnabledNow: Bool?
             var micTextNow: String?
             if let mic = status["mic"] as? [String: Any] {
@@ -240,6 +250,10 @@ final class AppModel: ObservableObject {
                 if let m = mutedNow, self.micMuted != m { self.micMuted = m }
                 if let l = lensNow, self.lens != l { self.lens = l }
                 if let list = lensList, self.lenses != list { self.lenses = list }
+                if let z = zoomNow, !self.zoomGestureActive, abs(self.zoom - z) > 0.0005 { self.zoom = z }
+                if let zm = zoomMaxNow, zm >= 1, self.zoomMax != zm { self.zoomMax = zm }
+                if let t = torchNow, self.torchOn != t { self.torchOn = t }
+                if let a = torchAvailNow, self.torchAvailable != a { self.torchAvailable = a }
             }
         }
         camera.onDevice = { [weak self] dev in
@@ -667,8 +681,31 @@ final class AppModel: ObservableObject {
     func selectLens(_ l: String) {
         guard lens != l else { return }
         lens = l   // 先に UI へ反映 (実際の値は onApplied のステータスで上書きされる)
+        torchOn = false   // レンズを変えるとライトは消え、ズームは 1× に戻る
+        zoom = 1.0
         camera.phoneChange(lens: l, micMuted: nil)
     }
+
+    /// ライト (トーチ)。PC からの torch と同じ経路 (CameraController.applyOnQueue) で適用される。
+    func toggleTorch() {
+        guard torchAvailable else { return }
+        let v = !torchOn
+        torchOn = v   // 先に UI へ反映 (実際の値は onApplied のステータスで上書きされる)
+        camera.phoneChange(torch: v)
+    }
+
+    /// ピンチなどでズームする。PC のズームと同じ videoZoomFactor で、PC へはステータスの zoom / phoneEdit で届く。
+    /// final = false はピンチの途中 (間引いて送る)。
+    func setZoom(_ value: Double, final: Bool) {
+        let v = min(max(value, 1.0), max(1.0, zoomMax))
+        if abs(zoom - v) > 0.0005 { zoom = v }
+        let now = ProcessInfo.processInfo.systemUptime
+        if !final && now - lastZoomSend < 0.04 { return }
+        lastZoomSend = now
+        camera.phoneChange(zoom: v, zoomFinal: final)
+    }
+
+    private var lastZoomSend = 0.0
 
     func toggleMute() {
         let v = !micMuted
