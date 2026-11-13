@@ -66,7 +66,7 @@ def build(ctrl):
         rec = rec if isinstance(rec, dict) else {}
         start.setEnabled(status.rec_enabled)
         start.setText(t("recording.button.stop" if status.rec_active else "recording.button.start"))
-        state = "-"
+        state = t("shell.sync.rec_stopped") if status.get("connected") else "-"   # 折りたたみの要約が「—」だけにならないように
         if rec:
             state = (t("shell.sync.rec_active", time=format_mmss(rec.get("seconds", 0)))
                      if status.rec_active else t("shell.sync.rec_stopped"))

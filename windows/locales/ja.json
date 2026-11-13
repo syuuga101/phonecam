@@ -702,6 +702,8 @@
  "update.banner.phone_new": "iPhoneアプリにも新しいバージョンがあります（AltStoreの「My Apps」で更新できます）",
  "update.banner.skip": "このバージョンを通知しない",
  "update.banner.title": "新しいバージョン v{version} があります",
+ "update.check.busy": "確認中…",
+ "update.check.busy_hint": "確認が終わるまで押せません (数秒で終わります)",
  "update.check.button": "更新を確認",
  "update.check.label": "更新を確認",
  "update.confirm.restart": "更新するとアプリが再起動し、接続中の映像はいったん切れます。更新しますか？",

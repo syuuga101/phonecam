@@ -297,9 +297,12 @@ class Entry:
     def registered(self):
         return bool(self.device.code)
 
-    def detail(self):
+    def detail(self, state=""):
         parts = [self.device.model, self.address]
-        if self.found:
+        if state == "connected":
+            # つながっている行に「今は見つかりません」は矛盾するので出さない (検索に出ない USB / 検索前でも)
+            parts.append(t("wireless.route.registered") if self.registered else "")
+        elif self.found:
             parts.append(t("wireless.route." + self.route))
             if self.registered:
                 parts.append(t("wireless.route.registered"))
@@ -330,7 +333,7 @@ class DeviceRow(FitBox):
         font.setWeight(QFont.Weight.Bold)
         name.setFont(font)
         texts.addWidget(name)
-        texts.addWidget(FixedHint(entry.detail()))
+        texts.addWidget(FixedHint(entry.detail(state)))
         lay.addLayout(texts, 1)
         if entry.registered:
             name.setToolTip(t("wireless.rename_tip"))
@@ -378,6 +381,7 @@ class WirelessOptions:
         self.started = False
         self.expander = None
         self._signature = None
+        self._last_status = None
         self._pending = None
         self._pending_camera = None
         self.timer = QTimer(page, interval=100)
@@ -556,6 +560,7 @@ class WirelessOptions:
             self.refresh()
 
     def status(self, status):
+        self._last_status = status
         pending = status.wanted and not status.connected and self.ctrl.get("mode") != "usb"
         if not pending:
             self.hint_timer.stop()
@@ -660,11 +665,12 @@ class WirelessOptions:
         combo.setCurrentIndex(combo.findData(camera.get("camera_slot")))
 
     def _summary(self, entries):
-        status = self.ctrl.status
+        # 今選んでいるカメラ (このページの ctrl) 自身の接続の方式。上のカードと同じ status を見る
+        status = self._last_status or self.ctrl.status
         if status and status.get("connected"):
             way = t("wireless.way." + ("wifi" if status.get("transport") == "wifi" else "usb"))
             for entry in entries:
-                if self._state(entry) == "connected":
+                if self._camera(entry) is self.ctrl and self._state(entry) == "connected":
                     return t("wireless.summary.connected", name=entry.name, way=way)
             name = (status.get("phone") or {}).get("deviceName") or t("connection.device.default")
             return t("wireless.summary.connected", name=name, way=way)

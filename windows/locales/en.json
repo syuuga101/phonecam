@@ -702,6 +702,8 @@
  "update.banner.phone_new": "A new version of the iPhone app is also available (update it from \"My Apps\" in AltStore)",
  "update.banner.skip": "Skip this version",
  "update.banner.title": "A new version, v{version}, is available",
+ "update.check.busy": "Checking…",
+ "update.check.busy_hint": "Available again when the check finishes (a few seconds)",
  "update.check.button": "Check for updates",
  "update.check.label": "Check for updates",
  "update.confirm.restart": "The app will restart to update, and the live video will be interrupted. Update now?",

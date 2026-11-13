@@ -156,6 +156,7 @@ class Controller:
         self.update_action = CallbackList()
         self._update_status = ("update.status.never", {})
         self.update_check_busy = False
+        self._update_started = 0.0
         self._dismissed_update = None
         self._setup_process = None
         self._next_update = time.monotonic() + 3
@@ -545,9 +546,16 @@ class Controller:
                 self._show_update_status("update.status.dev")
             return
         self._show_update_status("update.status.checking", busy=True)
+        self._update_started = time.monotonic()
         self.run_background(lambda: phonecam_update.fetch_latest(APP_REPO, APP_VERSION), lambda result: self._finish_update_check(result, auto))
 
     def _finish_update_check(self, result, auto):
+        try:
+            self._apply_update_result(result, auto)
+        except Exception as error:   # 確認中のまま (ボタンが無効のまま) 固まらないよう、必ず結果の表示に戻す
+            self._show_update_status("update.status.error", time=time.strftime("%m/%d %H:%M"), error=error)
+
+    def _apply_update_result(self, result, auto):
         stamp = time.strftime("%m/%d %H:%M")
         if isinstance(result, Exception):
             self._show_update_status("update.status.error", time=stamp, error=result)
@@ -759,6 +767,11 @@ class Controller:
             except Empty:
                 break
             done(result)
+        if (self.update_check_busy and phonecam_update
+                and time.monotonic() - self._update_started > phonecam_update.CHECK_TIMEOUT_SEC + 15):
+            # 応答が返らないまま確認中で止まったら、ボタンを押せる状態へ戻す
+            self._show_update_status("update.status.error", time=time.strftime("%m/%d %H:%M"),
+                                     error=t("update.status.failed_short"))
         if not self.secondary and not self.demo and phonecam_update and now >= self._next_update:
             if self._setup_process is not None:
                 self._next_update = now + 1.0
