@@ -383,7 +383,7 @@ class WirelessOptions:
 
     # -- 部品 -------------------------------------------------------------------
     def _build_devices(self):
-        box = QWidget()
+        box = FitBox()
         self.devices_box = box
         lay = QVBoxLayout(box)
         lay.setContentsMargins(0, 0, 0, 0)

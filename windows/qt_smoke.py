@@ -54,7 +54,7 @@ def _sample_frame():
 
 def child(scale, out):
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QWidget
+    from PySide6.QtWidgets import QApplication
     from phonecam.i18n import set_language
     set_language("ja")   # ui/labels.py は import 時に t() を評価するので、Controller を読む前に言語を決める
     from phonecam.controller import Controller
@@ -164,22 +164,10 @@ def child(scale, out):
                 win.grab().save(os.path.join(out, "empty_state_%s_x%s_scroll.png" % (theme, scale)))
                 break
     box = wireless.devices_box
-    print("empty box height=%d min=%d" % (box.height(), box.minimumSizeHint().height()))
-    from phonecam.qt.widgets import EmptyState
-    es = box.findChildren(EmptyState)
-    if es:
-        e = es[0]
-        print("DBG empty h=%d w=%d minH=%d hfw=%d lay.hfw=%d sizeHint=%d" % (
-            e.height(), e.width(), e.minimumHeight(), e.heightForWidth(e.width()),
-            e.layout().totalHeightForWidth(e.width()), e.sizeHint().height()))
-        for c in e.findChildren(QWidget):
-            print("DBG   %s y=%d h=%d minH=%d" % (type(c).__name__, c.y(), c.height(), c.minimumHeight()))
-    w = box
-    while w is not None:
-        print("DBG chain %s h=%d minH=%d maxH=%d" % (type(w).__name__, w.height(), w.minimumHeight(), w.maximumHeight()))
-        w = w.parentWidget()
-    if box.height() < box.minimumSizeHint().height():
-        failed.append(("connection", "empty state squeezed"))
+    need = box.layout().totalHeightForWidth(box.width())
+    print("empty box height=%d need=%d" % (box.height(), need))
+    if box.height() < need:
+        failed.append(("connection", "empty state squeezed (%d < %d)" % (box.height(), need)))
     win.close()
     if failed:
         for key, err in failed:

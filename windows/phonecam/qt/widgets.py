@@ -433,6 +433,35 @@ class _ExpanderHeader(QPushButton):
             painter.drawRoundedRect(self.rect().adjusted(3, 3, -4, -4), 3, 3)
 
 
+class _ExpanderContent(QWidget):
+    """Expander の中身。開いているあいだは、今の幅で必要な高さを minimumHeight にする。
+    (入れ子の折り返しラベルの heightForWidth だけだと、親が足りない高さを割り当てて重なることがある)"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._fitting = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fit()
+
+    def fit(self):
+        layout = self.layout()
+        if self._fitting or layout is None or self.width() <= 0:
+            return
+        self._fitting = True
+        try:
+            if self.maximumHeight() < 16777215:   # 開閉アニメーション中・閉じている間は固定しない
+                need = 0
+            else:
+                need = layout.totalHeightForWidth(self.width())
+            if need != self.minimumHeight():
+                self.setMinimumHeight(need)
+                self.updateGeometry()
+        finally:
+            self._fitting = False
+
+
 class Expander(Card):
     """折りたたみ状態を設定に保存するカード。"""
 
@@ -468,7 +497,7 @@ class Expander(Card):
         self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         header_layout.addWidget(self.arrow)
         self.layout().addWidget(self.header)
-        self.content = QWidget()
+        self.content = _ExpanderContent()
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(1, 0, 1, 1)
         content_layout.setSpacing(0)
@@ -548,6 +577,7 @@ class Expander(Card):
         self.header.setChecked(expanded)
         self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
         self.animation.stop()
+        self.content.setMinimumHeight(0)   # 前回測った高さを外す (アニメーション中は上限で高さを決める)
         if animate and self.isVisible():
             start = self.content.height() if self.content.isVisible() else 0
             self.content.show()
@@ -569,6 +599,7 @@ class Expander(Card):
         self.content.setVisible(self.expanded)
         if self.expanded:
             self.content.setMaximumHeight(16777215)
+            self.content.fit()
 
     def fit_content(self):
         """中身が変わったとき、開閉アニメーションで固定した高さを外して中身の高さに合わせ直す。"""
@@ -576,6 +607,7 @@ class Expander(Card):
             self.animation.stop()
         self.content.setVisible(self.expanded)
         self.content.setMaximumHeight(16777215 if self.expanded else 0)
+        self.content.fit()
         self.content.layout().invalidate()
         self.content.layout().activate()
         self.layout().invalidate()
@@ -599,6 +631,8 @@ def _refit_chain(widget):
             if layout is not None:
                 layout.invalidate()
                 layout.activate()
+            if isinstance(node, FitBox):
+                node._fit()
             if isinstance(node, Expander):
                 node.fit_content()
             node.updateGeometry()
