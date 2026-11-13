@@ -10,7 +10,7 @@ from phonecam.core.canvas import canvas_size
 from phonecam.core.decoder import THIN_NOTICE_SEC
 from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph_window, range_label
 from phonecam.i18n import t
-from phonecam.qt.widgets import Combo, Hint, Page, button, error_color, secondary_color, separator_color
+from phonecam.qt.widgets import Combo, ErrorLabel, Hint, Page, button, error_color, secondary_color, separator_color
 from phonecam.ui.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
 
 
@@ -72,6 +72,8 @@ class _History(QWidget):
                 previous = point
         painter.setPen(secondary_color(palette))
         painter.drawText(left, 199, range_label(self.minutes))
+        mid = range_label(self.minutes, 0.5)
+        painter.drawText(int((left + right - self.fontMetrics().horizontalAdvance(mid)) / 2), 199, mid)
         now = t("status.graph.now")
         painter.drawText(right - self.fontMetrics().horizontalAdvance(now), 199, now)
 
@@ -119,8 +121,11 @@ def build(ctrl):
         card = page.add_section(t(f"status.{name}.title"))
         for key, icon in specs:
             rows[name, key] = card.add_row(icon, t(f"status.{name}.{key}"))
+        if name == "iphone":
+            version_note = Hint("")
+            card.add_padded(version_note)
         if name == "pc":
-            thin = Hint("")
+            thin = ErrorLabel("")
             card.add_padded(thin)
         if name in ("video", "pc", "latency"):
             hint = "watch_hint" if name == "pc" else "hint"
@@ -165,6 +170,8 @@ def build(ctrl):
         thinning = status.connected and status.thin_total and time.monotonic() - status.thin_last < THIN_NOTICE_SEC
         thin.setText(t("status.pc.thin", text=THIN_TEXT, n=status.thin_total) if thinning else "")
         thin.setVisible(bool(thinning))
+        version_note.setText(ctrl.phone_version_note())
+        version_note.setVisible(bool(version_note.text()))
         snap = ctrl.state.snapshot()
         rec = phone.get("recording")
         cam, net = phone.get("cameraDroppedFrames"), phone.get("networkDroppedFrames")
@@ -180,7 +187,7 @@ def build(ctrl):
         factors = phone.get("pressureFactors")
         factor_names = {"systemTemperature", "peakPower", "depthModuleTemperature", "cameraTemperature"}
         factor_text = ", ".join(t(f"status.iphone.factor.{f}") if f in factor_names else f
-                                for f in factors if isinstance(f, str)) if isinstance(factors, list) else ""
+                                for f in factors if isinstance(f, str)) if pressure and isinstance(factors, list) else ""
         low = phone.get("lowPowerMode")
         codec = snap["codec_in_use"] or phone.get("codec")
         decoder = DECODER_LABELS.get(snap["decoder"], "-") if status.connected else "-"

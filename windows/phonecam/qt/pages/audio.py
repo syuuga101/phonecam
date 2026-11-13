@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QWidget
 from phonecam.core.audio_engine import SYSTEM_DEFAULT_KEY, find_vbcable_control_panel, list_output_devices
 from phonecam.core.settings import AUDIO_AVAILABLE
 from phonecam.i18n import t
-from phonecam.qt.widgets import Page, bound_combo, bound_slider, bound_switch, button, separator_color
+from phonecam.qt.widgets import Page, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
 from phonecam.ui.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
 
 
@@ -16,7 +16,7 @@ class _Meter(QWidget):
         super().__init__()
         self.ctrl = ctrl
         self.db = METER_MIN_DB
-        self.setMinimumSize(170, 26)
+        self.setMinimumSize(280, 26)
         self.timer = QTimer(self)
         self.timer.setInterval(50)
         self.timer.timeout.connect(self._sample)
@@ -36,11 +36,12 @@ class _Meter(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         palette = self.palette()
-        width = max(0, self.width() - 68)
+        width = max(0, self.width() - 84)
         bar = QRectF(0, (self.height() - 8) / 2, width, 8)
         painter.fillRect(bar, separator_color(palette))
         bar.setWidth(width * min(1, max(0, (self.db - METER_MIN_DB) / -METER_MIN_DB)))
-        painter.fillRect(bar, palette.color(QPalette.ColorRole.Highlight))
+        hot = self.db >= -3   # Tk 版と同じ: -3dB 以上は警告色
+        painter.fillRect(bar, error_color(palette) if hot else palette.color(QPalette.ColorRole.Highlight))
         painter.setPen(palette.color(QPalette.ColorRole.WindowText))
         painter.drawText(width + 8, int((self.height() + self.fontMetrics().ascent()) / 2) - 1, f"{self.db:.0f} dBFS")
 
@@ -124,6 +125,8 @@ def build(ctrl):
                                mode="\n".join(filter(None, (audio.notice, mode))) or "-",
                                latency=latency_text + " · " + t("audio.latency.hint"), under=under).items():
             rows[key].setHint(value)
+            if key in ("info", "error", "under"):
+                rows[key].setVisible(bool(value))   # 空のときは行ごと隠す (見出しだけの空行を残さない)
 
     ctrl.status_changed.connect(refresh)
     ctrl.settings_changed.connect(lambda *_: refresh(ctrl.status))

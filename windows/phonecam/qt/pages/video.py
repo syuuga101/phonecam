@@ -1,7 +1,7 @@
 """Video input, output and power settings."""
 
 from phonecam.i18n import t
-from phonecam.qt.widgets import Page, bound_combo, bound_slider, bound_switch, button
+from phonecam.qt.widgets import Hint, Page, bound_combo, bound_slider, bound_switch, button
 from phonecam.ui.labels import (
     BACKEND_LABELS, CANVAS_LABELS, CODEC_LABELS, DECODER_LABELS, FIT_LABELS,
     FPS_LABELS, LENS_LABELS, ORIENT_LABELS, OUTPUT_SIZE_LABELS, RES_LABELS, SCREEN_AUTO_LABELS,
@@ -20,9 +20,14 @@ def build(ctrl):
             bound_combo(ctrl, key, choices, group=group, setter=setter))
     send.add_row("download", t("video.bitrate.label")).addControl(
         bound_slider(ctrl, "bitrate", 5, 50, 1, lambda v: f"{v} Mbps", group="bitrate", as_int=True))
-    codec = send.add_row("video", t("video.codec.label"))
+    # 「現在: …」は補足文に混ぜず、操作の左に小さく置く (Tk 版と同じ。補足文が長くて切れるのを避ける)
+    codec = send.add_row("video", t("video.codec.label"), t("video.codec.hint"))
+    codec_now = Hint("", wrap=False)
+    codec.addControl(codec_now)
     codec.addControl(bound_combo(ctrl, "codec", CODEC_LABELS, group="codec"))
-    decoder = send.add_row("gear", t("video.hw.label"))
+    decoder = send.add_row("gear", t("video.hw.label"), t("video.hw.hint"))
+    decoder_now = Hint("", wrap=False)
+    decoder.addControl(decoder_now)
     decoder.addControl(bound_switch(ctrl, "hw_decode", setter=ctrl.set_hw_decode))
 
     orientation = page.add_section(t("video.orient.title"))
@@ -64,17 +69,19 @@ def build(ctrl):
     refresh_registration()
 
     power = page.add_section(t("video.power.title"))
-    power.add_row("sun", t("video.power.black"), t("video.power.hint")).addControl(
-        bound_switch(ctrl, "screen_black", setter=lambda v: ctrl.set_screen("screen_black", v)))
+    black = power.add_row("sun", t("video.power.black"), t("video.power.hint"))
+    black.addControl(bound_switch(ctrl, "screen_black", setter=lambda v: ctrl.set_screen("screen_black", v)))
     power.add_row("clock", t("video.power.auto")).addControl(
         bound_combo(ctrl, "screen_auto", SCREEN_AUTO_LABELS, setter=lambda v: ctrl.set_screen("screen_auto", v)))
 
     def refresh(status):
         snapshot = ctrl.state.snapshot()
         codec_id = snapshot["codec_in_use"] or status.phone.get("codec") if status.connected else None
-        codec.setHint(t("video.codec.hint") + " " + t("status.pc.now", v=dict(CODEC_LABELS).get(codec_id, "-")))
+        codec_now.setText(t("status.pc.now", v=dict(CODEC_LABELS).get(codec_id, "-")))
         decoder_name = DECODER_LABELS.get(snapshot["decoder"], "-") if status.connected else "-"
-        decoder.setHint(t("video.hw.hint") + " " + t("status.pc.now", v=decoder_name))
+        decoder_now.setText(t("status.pc.now", v=decoder_name))
+        screen = ctrl.screen_state_text()
+        black.setHint(t("video.power.hint") + (" · " + screen if screen else ""))
 
     ctrl.status_changed.connect(refresh)
     refresh(ctrl.status)

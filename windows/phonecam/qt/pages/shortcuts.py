@@ -34,7 +34,8 @@ def build(ctrl):
             seq = _sequence(bindings.get(action, ""))
             if editor.keySequence() != seq:
                 editor.setKeySequence(seq)
-            rows[action].setHint(t("shortcuts.taken") if action in ctrl.hotkey_conflicts else "")
+            taken = ctrl.get("hotkeys_enabled", True) and bindings.get(action) and action in ctrl.hotkey_conflicts
+            rows[action].setHint(t("shortcuts.taken") if taken else "")
 
     def assign(action, combo):
         bindings = dict(ctrl.get("hotkeys") or {})

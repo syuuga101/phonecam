@@ -698,7 +698,7 @@ _bind_setup()
 
 def main():
     args = sys.argv[1:]
-    setup_window = args in (["--setup"], ["--setup", "--diagnose"])
+    setup_window = args in (["--setup-wizard"], ["--setup-diagnose"])
     helper = None if setup_window else helper_main(args)
     if helper is not None:
         return helper
@@ -718,7 +718,7 @@ def main():
             messagebox.showerror("PhoneCam", t("setup.unavailable"), parent=root)
             root.destroy()
             return 1
-        if "--diagnose" in args:
+        if "--setup-diagnose" in args:
             dialog = phonecam_setup.open_diagnostics(root, open_url=webbrowser_open)
         else:
             controller = phonecam_setup.SetupController(root)

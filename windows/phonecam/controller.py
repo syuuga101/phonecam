@@ -350,9 +350,7 @@ class Controller:
         args = [sys.executable]
         if not self.frozen:
             args.append(str(Path(__file__).resolve().parents[1] / "phonecam_receiver.py"))
-        args.append("--setup")
-        if diagnose:
-            args.append("--diagnose")
+        args.append("--setup-diagnose" if diagnose else "--setup-wizard")
         try:
             subprocess.Popen(args)
         except OSError as error:
@@ -393,6 +391,34 @@ class Controller:
 
     def version_text(self):
         return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION
+
+    def phone_version_note(self):
+        """iPhone アプリと PC の major.minor が違うときの注意文 (違わなければ "")。Tk の _update_note_phone_version と同じ判定。"""
+        ver = self.status.phone.get("appVersion") if self.status else None
+        if not isinstance(ver, str) or not ver or phonecam_update is None:
+            return ""
+        try:
+            if (phonecam_update.parse_version(ver) is not None and phonecam_update.parse_version(APP_VERSION) is not None
+                    and not phonecam_update.same_major_minor(ver, APP_VERSION)):
+                return t("update.note.version_mismatch", pc=phonecam_update.display_version(APP_VERSION),
+                         iphone=phonecam_update.display_version(ver))
+        except Exception:
+            pass
+        return ""
+
+    def screen_state_text(self):
+        """接続中の iPhone の画面状態 (「現在のiPhoneの画面: 黒（自動: 30秒）」)。未接続なら ""。Tk の phone_sync と同じ。"""
+        from phonecam.core.settings import SCREEN_AUTO_VALUES
+        phone = self.status.phone if self.status else {}
+        if not (self.status and self.status.connected and "screenBlack" in phone):
+            return ""
+        auto = phone.get("autoBlackSeconds")
+        extra = ""
+        if auto in SCREEN_AUTO_VALUES:
+            label = t("labels.screen_auto.0") if auto == 0 else t(f"labels.sec.{auto}")
+            extra = t("shell.sync.screen_auto", v=label)
+        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
+        return t("shell.sync.screen", state=state, extra=extra)
 
     def _show_update_status(self, text, busy=False):
         self.update_status_text = text
