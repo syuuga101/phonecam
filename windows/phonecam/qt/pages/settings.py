@@ -9,7 +9,7 @@ from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, bound_combo, bound_switch, button
 
 _REPO = "https://github.com/syuuga101/phonecam"
-_TRANSLATE_URL = ""  # Crowdin プロジェクト作成後に URL を入れる (空のあいだは翻訳協力の行を出さない)
+_TRANSLATE_URL = "https://crowdin.com/project/phonecam"  # 翻訳協力 (Crowdin)。空にすると行を隠す
 
 
 def build(ctrl):
