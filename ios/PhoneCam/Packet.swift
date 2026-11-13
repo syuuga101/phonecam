@@ -36,10 +36,6 @@ struct PacketParser {
         buffer.append(data)
     }
 
-    mutating func reset() {
-        buffer = Data()
-    }
-
     /// 完全なメッセージが溜まっていれば1つ取り出す
     mutating func next() -> (type: UInt8, payload: Data)? {
         guard buffer.count >= 5 else { return nil }

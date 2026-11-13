@@ -21,8 +21,8 @@ final class EffectsProcessor {
     private var settings = Settings()
     private var avgMs = 0.0
 
-    // 以下は process (videoQueue) からのみ触る
-    private let ciContext: CIContext = {
+    // 以下は process (videoQueue) からのみ触る。エフェクトを使うまで作らない (lazy)
+    private lazy var ciContext: CIContext = {
         let options: [CIContextOption: Any] = [
             .workingColorSpace: NSNull(),
             .cacheIntermediates: false
@@ -32,12 +32,12 @@ final class EffectsProcessor {
         }
         return CIContext(options: options)
     }()
-    private let segRequest: VNGeneratePersonSegmentationRequest = {
+    private lazy var segRequest: VNGeneratePersonSegmentationRequest = {
         let r = VNGeneratePersonSegmentationRequest()
         r.outputPixelFormat = kCVPixelFormatType_OneComponent8
         return r
     }()
-    private let seqHandler = VNSequenceRequestHandler()
+    private lazy var seqHandler = VNSequenceRequestHandler()
     private var pool: CVPixelBufferPool?
     private var poolWidth = 0
     private var poolHeight = 0

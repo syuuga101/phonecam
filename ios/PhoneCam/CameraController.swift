@@ -220,18 +220,23 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         return s
     }
 
-    private func buildStatusUncached() -> [String: Any] {
-        var s: [String: Any] = [:]
-        s["appVersion"] = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
+    /// 搭載レンズの一覧。端末の構成は変わらないので 1 回だけ調べる (毎秒の状態作成で AVCaptureDevice を探し直さない)
+    private lazy var availableLenses: [String] = {
         var lenses = ["wide"]
         if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
             lenses.append("ultrawide")
         }
-        if frontDevice() != nil {
+        if self.frontDevice() != nil {
             lenses.append("front")
         }
+        return lenses
+    }()
+
+    private func buildStatusUncached() -> [String: Any] {
+        var s: [String: Any] = [:]
+        s["appVersion"] = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
         s["lens"] = activeLens
-        s["lenses"] = lenses
+        s["lenses"] = availableLenses
         let size = reportedSize()
         s["width"] = size.0
         s["height"] = size.1

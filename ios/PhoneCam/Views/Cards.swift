@@ -1,22 +1,6 @@
 import SwiftUI
 import UIKit
 
-struct MutePill: View {
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "mic.slash.fill")
-                .font(.system(size: 12, weight: .semibold))
-            Text("ミュート中")
-                .font(.system(size: 13, weight: .semibold))
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color.red)
-        .clipShape(Capsule())
-    }
-}
-
 /// 行の左に置く SF Symbols (幅 28pt の列にそろえる)
 struct RowIcon: View {
     let symbol: String

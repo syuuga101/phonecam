@@ -1,7 +1,6 @@
 import SwiftUI
 import AVFoundation
 import UIKit
-import CoreMotion
 
 // MARK: - プレビュー
 
