@@ -1,67 +1,52 @@
 # -*- coding: utf-8 -*-
-"""PyInstaller が exe に入れたファイルをサイズ順に並べる (CI のログで同梱物を確認するための診断用)。
+"""PyInstaller の onefile exe の中身を、圧縮後のサイズ順に並べる (CI のログで同梱物を確認するための診断用)。
 
-    python .github/scripts/list_bundle.py windows/build/PhoneCamReceiver [上位の件数]
+    python .github/scripts/list_bundle.py windows/dist/PhoneCamReceiver.exe [上位の件数]
 """
-import ast
-import os
 import sys
 from collections import defaultdict
 
-
-def load(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return ast.literal_eval(f.read())
+from PyInstaller.archive.readers import CArchiveReader
 
 
 def main():
-    base = sys.argv[1]
+    exe = sys.argv[1]
     top = int(sys.argv[2]) if len(sys.argv) > 2 else 70
+    reader = CArchiveReader(exe)
     rows = []
-    toc = os.path.join(base, "PKG-00.toc")
-    if not os.path.exists(toc):
-        print("PKG-00.toc がありません:", toc)
-        return 0
-    data = load(toc)
-    if isinstance(data, dict):
-        print("PKG-00.toc は dict (keys: %s)" % list(data.keys())[:10])
-        data = data.get("toc") or data.get("entries") or list(data.values())[0] if data else []
-    if data:
-        print("sample entry:", repr(list(data)[0])[:300])
-    for ent in data:
-        if isinstance(ent, dict):
-            name = ent.get("dest_name") or ent.get("name")
-            src = ent.get("src_name") or ent.get("src") or ent.get("path")
-            typ = ent.get("typecode") or ent.get("type") or ""
-        else:
-            name, src, typ = ent[0], ent[1], ent[2]
-        if typ in ("PYMODULE", "PYSOURCE", "PYZ") or not src or not os.path.isfile(src):
-            continue
-        rows.append((os.path.getsize(src), name, typ))
+    for name, ent in reader.toc.items():
+        pos, dlen, ulen, flag, typ = ent[:5]
+        rows.append((dlen, ulen, name.replace("\\", "/"), typ))
     rows.sort(reverse=True)
-    total = sum(r[0] for r in rows)
-    print("files: %d, total (uncompressed, excluding .pyc): %.1f MB" % (len(rows), total / 1048576))
-    print("---- top %d ----" % top)
-    for size, name, typ in rows[:top]:
-        print("%8.2f MB  %-8s %s" % (size / 1048576, typ, name))
-    groups = defaultdict(int)
-    for size, name, typ in rows:
-        parts = name.replace("\\", "/").split("/")
-        key = "/".join(parts[:3]) if parts[0] == "PySide6" else parts[0]
-        groups[key] += size
-    print("---- by group ----")
-    for key, size in sorted(groups.items(), key=lambda kv: -kv[1])[:40]:
-        print("%8.2f MB  %s" % (size / 1048576, key))
-    print("---- PySide6 dll/pyd names ----")
-    for size, name, typ in rows:
-        n = name.replace("\\", "/")
-        if n.startswith("PySide6/") and n.lower().endswith((".dll", ".pyd")):
-            print("%8.2f MB  %s" % (size / 1048576, n))
-    print("---- translations / plugins ----")
-    for size, name, typ in sorted(rows, key=lambda r: r[1]):
-        n = name.replace("\\", "/").lower()
-        if "translations" in n or "/plugins/" in n:
-            print("%8.3f MB  %s" % (size / 1048576, name))
+    mb = 1048576.0
+    print("entries: %d, compressed %.1f MB, uncompressed %.1f MB" % (
+        len(rows), sum(r[0] for r in rows) / mb, sum(r[1] for r in rows) / mb))
+    print("---- top %d (compressed MB / uncompressed MB / type / name) ----" % top)
+    for dlen, ulen, name, typ in rows[:top]:
+        print("%7.2f %7.2f  %-3s %s" % (dlen / mb, ulen / mb, typ, name))
+    groups = defaultdict(lambda: [0, 0, 0])
+    for dlen, ulen, name, typ in rows:
+        parts = name.split("/")
+        if parts[0] in ("PySide6", "PIL", "numpy", "av", "tcl8.6", "tk8.6", "_tcl_data", "_tk_data") and len(parts) > 2:
+            key = "/".join(parts[:2])
+        elif len(parts) > 1:
+            key = parts[0]
+        elif name.lower().endswith((".dll", ".pyd")):
+            key = "(top-level dll/pyd)"
+        else:
+            key = "(top-level other)"
+        g = groups[key]
+        g[0] += dlen
+        g[1] += ulen
+        g[2] += 1
+    print("---- by group (compressed MB / uncompressed MB / count) ----")
+    for key, g in sorted(groups.items(), key=lambda kv: -kv[1][0])[:45]:
+        print("%7.2f %7.2f %4d  %s" % (g[0] / mb, g[1] / mb, g[2], key))
+    print("---- top-level dll/pyd, translations, plugins ----")
+    for dlen, ulen, name, typ in sorted(rows, key=lambda r: r[2]):
+        n = name.lower()
+        if ("/" not in n and n.endswith((".dll", ".pyd"))) or "translations" in n or "/plugins/" in n:
+            print("%7.3f %7.3f  %s" % (dlen / mb, ulen / mb, name))
     return 0
 
 
