@@ -504,6 +504,8 @@ final class AppModel: ObservableObject {
         stateLock.unlock()
         s["streamActive"] = streamOn
         s["wifiAllowed"] = security.wifiAllowed
+        s["device_name"] = DeviceName.current
+        s["model"] = DeviceName.modelName
         s["authOk"] = true   // 認証前の接続にはここまで届かない (StreamServer が authRequired だけ返す)
         s["audioChannel"] = audioServer.hasClient
         s["sentFps"] = fpsOut
@@ -644,6 +646,12 @@ final class AppModel: ObservableObject {
             server.disconnectNonLoopback()
             audioServer.disconnectNonLoopback()
         }
+        timerQueue.async { [weak self] in self?.sendFullStatus() }
+    }
+
+    /// 端末名を変えたとき: Bonjour の広告と PC への状態を更新する (メインスレッド)
+    func deviceNameChanged() {
+        server.updateBonjourService(wirelessIdentity.service)
         timerQueue.async { [weak self] in self?.sendFullStatus() }
     }
 

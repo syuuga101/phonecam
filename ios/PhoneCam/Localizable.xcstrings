@@ -1664,6 +1664,38 @@
           }
         }
       }
+    },
+    "この端末の名前": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末の名前"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device name"
+          }
+        }
+      }
+    },
+    "PCの接続先の一覧に表示されます": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PCの接続先の一覧に表示されます"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown in the list of devices on your PC"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

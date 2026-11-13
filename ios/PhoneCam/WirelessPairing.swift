@@ -4,7 +4,10 @@ import UIKit
 
 struct WirelessIdentity {
     let id: String
-    let name: String
+
+    /// PC の一覧に出す名前 (設定で変更可。未設定なら機種名)
+    var name: String { DeviceName.current }
+    var model: String { DeviceName.modelName }
 
     init() {
         let key = "wirelessPairingDeviceID"
@@ -12,11 +15,12 @@ struct WirelessIdentity {
         let uuid = defaults.string(forKey: key).flatMap { UUID(uuidString: $0) } ?? UUID()
         id = uuid.uuidString.lowercased()
         defaults.set(id, forKey: key)
-        name = UIDevice.current.name
     }
 
     var service: NWListener.Service {
-        let fields = ["id=\(id)", "name=\(name)", "v=1"]
+        // TXT の値は 63 バイト以内 (UTF-8 の文字境界で切る)
+        let fields = ["id=\(id)", "name=\(DeviceName.truncate(name, maxBytes: 63))",
+                      "model=\(DeviceName.truncate(model, maxBytes: 63))", "v=1"]
         let txt = fields.reduce(into: Data()) { record, field in
             let bytes = Array(field.utf8.prefix(255))
             record.append(UInt8(bytes.count))
@@ -95,7 +99,7 @@ final class WirelessPairClient {
     func send(_ invite: WirelessInvite, identity: WirelessIdentity, code: String,
               completion: @escaping (Bool) -> Void) {
         let payload: [String: Any] = ["v": 1, "token": invite.token, "id": identity.id,
-                                      "name": identity.name, "code": code,
+                                      "name": identity.name, "model": identity.model, "code": code,
                                       "addresses": WirelessIdentity.addresses()]
         guard var data = try? JSONSerialization.data(withJSONObject: payload) else {
             completion(false)
