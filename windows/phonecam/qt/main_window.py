@@ -244,6 +244,8 @@ class MainWindow(QMainWindow):
         try:
             mod = importlib.import_module("phonecam.qt.pages." + key)
             page = mod.build(self.ctrl)
+            from phonecam.qt.compact import compact_page
+            compact_page(page, self.ctrl, key)
         except Exception as e:   # 1ページの不具合でアプリ本体を止めない
             import traceback
             traceback.print_exc()

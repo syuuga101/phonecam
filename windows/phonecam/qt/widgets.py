@@ -14,7 +14,7 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEvent, QPointF, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -369,6 +369,111 @@ class Section(QWidget):
         """Row ではない中身 (グラフやメーター等) をカードへ余白つきで入れる。"""
         box = _Padded(widget, margins)
         return self.add(box)
+
+
+class _ExpanderContent(QWidget):
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in _THEME_EVENTS:
+            self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        palette = ref_palette(self)
+        painter.fillRect(self.rect(), blend(card_color(palette), _role(palette, QPalette.ColorRole.WindowText), 0.035))
+
+
+class Expander(Card):
+    """折りたたみ状態を設定に保存するカード。"""
+
+    def __init__(self, ctrl, key, icon_name, title, summary, parent=None):
+        super().__init__(parent)
+        self.ctrl, self.key = ctrl, key
+        self.expanded = False
+        self.header = QPushButton()
+        self.header.setFlat(True)
+        self.header.setCheckable(True)
+        self.header.setMinimumHeight(64)
+        self.header.setAccessibleName(title)
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(16, 10, 16, 10)
+        header_layout.setSpacing(12)
+        header_layout.addWidget(IconLabel(icon_name))
+        labels = QVBoxLayout()
+        labels.setSpacing(2)
+        self.title_label = QLabel(title)
+        font = self.title_label.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        self.title_label.setFont(font)
+        self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.summary_label = Hint(summary, wrap=False)
+        self.summary_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.summary_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        labels.addWidget(self.title_label)
+        labels.addWidget(self.summary_label)
+        header_layout.addLayout(labels, 1)
+        self.controls = QHBoxLayout()
+        header_layout.addLayout(self.controls)
+        self.arrow = IconLabel("chevron_down")
+        self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        header_layout.addWidget(self.arrow)
+        self.layout().addWidget(self.header)
+        self.content = _ExpanderContent()
+        content_layout = QVBoxLayout(self.content)
+        content_layout.setContentsMargins(12, 8, 12, 12)
+        content_layout.setSpacing(12)
+        self.layout().addWidget(self.content)
+        self.animation = QPropertyAnimation(self.content, b"maximumHeight", self)
+        self.animation.setDuration(160)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.animation.finished.connect(self._animation_finished)
+        self.header.clicked.connect(lambda: self.set_expanded(not self.expanded))
+        ctrl.settings_changed.connect(self._settings_changed)
+        saved = ctrl.get("ui_expanded", {})
+        self.set_expanded(bool(saved.get(key, False)) if isinstance(saved, dict) else False, animate=False, save=False)
+
+    def add(self, widget):
+        self.content.layout().addWidget(widget)
+        return widget
+
+    def addControl(self, widget):
+        self.controls.addWidget(widget)
+        return widget
+
+    def _settings_changed(self, key, value):
+        if key == "ui_expanded" and isinstance(value, dict):
+            self.set_expanded(bool(value.get(self.key, False)), save=False)
+
+    def set_expanded(self, expanded, animate=True, save=True):
+        expanded = bool(expanded)
+        if expanded == self.expanded and animate:
+            return
+        self.expanded = expanded
+        self.header.setChecked(expanded)
+        self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
+        self.header.setAccessibleDescription(self.summary_label.text())
+        self.animation.stop()
+        if animate and self.isVisible():
+            start = self.content.height() if self.content.isVisible() else 0
+            self.content.show()
+            self.content.layout().activate()
+            target = self.content.sizeHint().height() if expanded else 0
+            self.animation.setStartValue(start)
+            self.animation.setEndValue(target)
+            self.animation.start()
+        else:
+            self.content.setVisible(expanded)
+            self.content.setMaximumHeight(16777215 if expanded else 0)
+        if save:
+            saved = self.ctrl.get("ui_expanded", {})
+            states = dict(saved) if isinstance(saved, dict) else {}
+            states[self.key] = expanded
+            self.ctrl.changed("ui_expanded", states)
+
+    def _animation_finished(self):
+        self.content.setVisible(self.expanded)
+        if self.expanded:
+            self.content.setMaximumHeight(16777215)
 
 
 class Page(QScrollArea):

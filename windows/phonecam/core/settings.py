@@ -115,6 +115,7 @@ DEFAULT_SETTINGS = {
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
     "idle_stop_sec": 10,
     "window_maximized": True,    # Qt UI: 最大化で起動する
+    "ui_expanded": {},           # Qt UI: ページごとの詳細表示状態
     "tk_window_geometry": "",    # Tk UI: 最大化していないときの位置と大きさ ("WxH+X+Y")
     "window_geometry": "",       # Qt UI: 最大化を解除して閉じたときの位置と大きさ (saveGeometry() の base64)
     # 初回セットアップ (ウィザード) を終えたか
@@ -304,6 +305,8 @@ def mirror_key(settings):
 
 def sanitize_settings(s):
     """読み込んだ設定の新規項目を検証し、不正値は既定値へ戻す (古い設定ファイルとの互換用)。"""
+    expanded = s.get("ui_expanded")
+    s["ui_expanded"] = {k: v for k, v in expanded.items() if isinstance(k, str) and isinstance(v, bool)} if isinstance(expanded, dict) else {}
     if s.get("lens") not in LENSES:
         s["lens"] = DEFAULT_SETTINGS["lens"]
     for key in ("mirror", "mirror_front"):

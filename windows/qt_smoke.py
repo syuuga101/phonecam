@@ -60,6 +60,7 @@ def child(scale, out):
     from phonecam.controller import Controller
     from phonecam.qt.app import configure
     from phonecam.qt.main_window import NAV_ITEMS, MainWindow
+    from phonecam.qt.widgets import Expander
 
     ctrl = Controller.demo_connected("ja")
     frame = _sample_frame()
@@ -83,6 +84,20 @@ def child(scale, out):
             _settle(app)
             base = "%02d_%s_%s_x%s" % (i, key, theme, scale)
             win.grab().save(os.path.join(out, base + ".png"))
+            expanders = win.current_page().findChildren(Expander)
+            if not expanders:
+                failed.append((key, "no expander"))
+            else:
+                expanders[0].set_expanded(True, animate=False, save=False)
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, base + "_expanded.png"))
+                win.resize(W, SCROLL_H)
+                _settle(app, 150)
+                expanded_bar = win.current_page().verticalScrollBar()
+                expanded_bar.setValue(expanded_bar.maximum() // 2)
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, base + "_expanded_scroll.png"))
+                expanders[0].set_expanded(False, animate=False, save=False)
             # スクロール: 低いウィンドウで中ほどまで送る
             win.resize(W, SCROLL_H)
             _settle(app, 150)
