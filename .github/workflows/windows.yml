@@ -7,6 +7,11 @@ on:
       - ".github/workflows/windows.yml"
   workflow_dispatch:
   workflow_call:
+    inputs:
+      skip_screens:
+        description: "Qt のスクリーンショット (確認用) を撮らない。リリースのときは true"
+        type: boolean
+        default: false
 
 env:
   # softcam (MIT, https://github.com/tshino/softcam) の固定バージョン
@@ -26,31 +31,65 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: windows/requirements.txt
 
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r windows/requirements.txt pyinstaller
+          python -m pip install -r windows/requirements.txt pyinstaller==6.22.3
 
       # ---- 専用仮想カメラ "PhoneCam" (softcam を改名してビルド) ----
+      # ビルド結果 (softcam-out) はタグ・パッチ・ビルドスクリプトが同じなら同じなので、キャッシュして毎回のビルドを省く。
+      # 鍵に入れるもの: SOFTCAM_TAG と windows/softcam_ext/ の全ファイル (apply.ps1, build-slots.ps1, PhoneCamControls.h, REVISION)。
+      # softcam.rev (下の Compute softcam revision) は同じ入力から毎回計算し直すので、キャッシュの有無で値は変わらない。
+      # キャッシュのやり直しが要るときは鍵の "v1" を上げる。
+      - name: Restore softcam build cache
+        id: softcam_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: softcam-out
+          key: softcam-${{ env.SOFTCAM_TAG }}-v1-${{ hashFiles('windows/softcam_ext/**') }}
+
       - name: Clone softcam
+        if: steps.softcam_cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           git clone --depth 1 --branch $env:SOFTCAM_TAG https://github.com/tshino/softcam softcam-src
           if ($LASTEXITCODE -ne 0) { throw "softcam の取得に失敗しました" }
 
       - name: Setup MSBuild
+        if: steps.softcam_cache.outputs.cache-hit != 'true'
         uses: microsoft/setup-msbuild@v2
 
       - name: Build four independent softcam filters (x64)
+        if: steps.softcam_cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: ./windows/softcam_ext/build-slots.ps1 -SoftcamDir softcam-src -OutputDir softcam-out
 
       - name: Build four independent softcam filters (Win32, optional)
+        if: steps.softcam_cache.outputs.cache-hit != 'true'
         shell: pwsh
         continue-on-error: true
         run: ./windows/softcam_ext/build-slots.ps1 -SoftcamDir softcam-src -OutputDir softcam-out -Platform Win32
+
+      # Win32 は任意なので、8 個 (4 スロット x 2 ビット数) そろったときだけ保存する (欠けたものを固定しないため)
+      - name: Check softcam build is complete
+        if: steps.softcam_cache.outputs.cache-hit != 'true'
+        id: softcam_complete
+        shell: pwsh
+        run: |
+          $n = @(Get-ChildItem softcam-out -Recurse -Include softcam.dll, softcam32.dll).Count
+          Write-Host "softcam dll count: $n"
+          "complete=$(if ($n -eq 8) { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+
+      - name: Save softcam build cache
+        if: steps.softcam_cache.outputs.cache-hit != 'true' && steps.softcam_complete.outputs.complete == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: softcam-out
+          key: softcam-${{ env.SOFTCAM_TAG }}-v1-${{ hashFiles('windows/softcam_ext/**') }}
 
       # ---- softcam の版 (softcam.rev) ----
       # DLL は MSVC のリンク時刻・PDB の GUID でビルドごとに数バイト変わる (v2.2.1 と v2.3.0 は 24 バイトだけ違った)。
@@ -104,9 +143,90 @@ jobs:
             "--add-binary", "$(Join-Path $qtPlugins 'iconengines/qsvgicon.dll');PySide6/plugins/iconengines",
             "--add-binary", "$(Join-Path $qtPlugins 'styles/qmodernwindowsstyle.dll');PySide6/plugins/styles"
           )
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
+          # --exclude-module ではモジュールしか除けないので、.spec を作って、Qt の使わない DLL・プラグイン・翻訳などを
+          # 名前で取り除く処理 (.github/scripts/slim_spec.py) を差し込んでからビルドする
+          pyi-makespec --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
+          if ($LASTEXITCODE -ne 0) { throw "pyi-makespec に失敗しました" }
+          python ../.github/scripts/slim_spec.py PhoneCamReceiver.spec
+          if ($LASTEXITCODE -ne 0) { throw "slim_spec.py に失敗しました" }
+          python -m PyInstaller --noconfirm --clean PhoneCamReceiver.spec
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller に失敗しました" }
           if (-not (Test-Path dist/PhoneCamReceiver.exe)) { throw "PhoneCamReceiver.exe が作成されませんでした" }
+
+      # exe に何が何MB入っているかをログに出す (軽量化の確認用。失敗してもビルドは止めない)
+      - name: List bundled files
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python .github/scripts/list_bundle.py windows/dist/PhoneCamReceiver.exe 70
+          $exe = Get-Item windows/dist/PhoneCamReceiver.exe
+          Write-Host ("PhoneCamReceiver.exe: {0:N2} MB" -f ($exe.Length / 1MB))
+
+      # ---- 起動テスト: 出来上がった exe を実際に起動する (起動しない exe は自動更新でも直せないため) ----
+      - name: Launch smoke test
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PHONECAM_SMOKE: "1"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = (Resolve-Path windows/dist/PhoneCamReceiver.exe).Path
+          $appdata = Join-Path $env:RUNNER_TEMP "smoke-appdata"
+          Remove-Item -Recurse -Force $appdata -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force (Join-Path $appdata "PhoneCam") | Out-Null
+          $env:APPDATA = $appdata
+          $logDir = Join-Path $appdata "PhoneCam"
+          # ウィザード・更新確認が出ないように設定を事前に置く
+          '{"setup_done": true, "setup_shown_version": "", "update_check": false}' | Set-Content -Path (Join-Path $logDir "phonecam_settings.json") -Encoding utf8
+          $failed = $false
+          function Show-Logs {
+            foreach ($n in @("phonecam_crash.log", "phonecam_error.log", "selftest.txt")) {
+              $f = Join-Path $logDir $n
+              if (Test-Path $f) { Write-Host "---- $n ----"; Get-Content $f -Raw | Write-Host }
+            }
+          }
+          function Has-Traceback {
+            foreach ($n in @("phonecam_crash.log", "phonecam_error.log")) {
+              $f = Join-Path $logDir $n
+              if ((Test-Path $f) -and ((Get-Content $f -Raw) -match "Traceback")) { return $true }
+            }
+            return $false
+          }
+
+          # 1. 本体を起動して 15 秒生きているか
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) {
+            Write-Host "::error::exe が起動後 15 秒以内に終了しました (exit code $($p.ExitCode))"
+            $failed = $true
+          } else {
+            Write-Host "exe は 15 秒後も動作中 (pid $($p.Id))"
+            Stop-Process -Id $p.Id -Force
+          }
+          Show-Logs
+          if (Has-Traceback) { Write-Host "::error::クラッシュ/エラーログに Traceback があります"; $failed = $true }
+
+          # 2. --selftest (import・QR・QImage)
+          $t = Start-Process -FilePath $exe -ArgumentList "--selftest" -PassThru
+          if (-not $t.WaitForExit(90000)) { Stop-Process -Id $t.Id -Force; Write-Host "::error::--selftest が 90 秒で終わりませんでした"; $failed = $true }
+          elseif ($t.ExitCode -ne 0) { Write-Host "::error::--selftest が失敗しました (exit code $($t.ExitCode))"; $failed = $true }
+          else { Write-Host "--selftest 成功" }
+          Show-Logs
+
+          # 3. --setup-diagnose (Tk とウィザードの経路の import)。5 秒生きていれば成功、先に終了したときは exit code 0 のみ成功
+          $d = Start-Process -FilePath $exe -ArgumentList "--setup-diagnose" -PassThru
+          Start-Sleep -Seconds 5
+          if ($d.HasExited) {
+            if ($d.ExitCode -ne 0) { Write-Host "::error::--setup-diagnose が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
+            else { Write-Host "--setup-diagnose は正常終了" }
+          } else {
+            Write-Host "--setup-diagnose は動作中 (成功扱い)"
+            Stop-Process -Id $d.Id -Force
+          }
+          Show-Logs
+          if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
+
+          if ($failed) { throw "起動テストに失敗しました" }
 
       - name: Upload exe
         uses: actions/upload-artifact@v4
@@ -116,14 +236,15 @@ jobs:
           if-no-files-found: error
 
   # ---- Qt UI (PySide6) のスクリーンショット。移植中の確認用で、失敗してもリリースを止めない ----
+  # リリース (release.yml) からの呼び出しでは撮らない (リリースの待ち時間を増やさないため)。
+  # concurrency は付けない: 同じ group の待機中のジョブは新しい方に取り消され、呼び出し元の
+  # Release が cancelled になりうる。ブランチへの保存は force push で、重なっても最後のものが残るだけ。
   qt-screenshots:
+    if: ${{ !inputs.skip_screens }}
     runs-on: windows-latest
     continue-on-error: true
     permissions:
       contents: write
-    concurrency:
-      group: qt-screens
-      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,12 +253,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: windows/requirements.txt
 
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r windows/requirements.txt -r windows/requirements-qt.txt
+          python -m pip install -r windows/requirements.txt
 
       # 倍率 1.0 / 2.0 (QT_SCALE_FACTOR を変えた子プロセス) x ライト/ダーク x 全ページ を撮る
       - name: Qt screenshots (windows platform)

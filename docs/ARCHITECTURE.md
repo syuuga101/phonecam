@@ -42,7 +42,7 @@ iPhone (PhoneCam アプリ)                         Windows PC
 1. **接続**（`phonecam_iphone.py`）: usbmux で iPhone を探して Connect する、または Wi-Fi で直接接続。切断されても、接続中の間は 2 秒ごとに自動で再接続します。
 2. **受信・デコード**: メッセージを取り出し、PyAV（`av`）でデコード。ハードウェアデコード（Direct3D 11、`d3d11va`）が既定で、使えない／途中で失敗したときは自動でソフトウェアに切り替えます。
 3. **出力**: サイズ変換・反転・「出力の形」「合わせ方」への収め込みをして、仮想カメラへ渡します。
-4. **GUI**（`phonecam_receiver.py`）: 接続・映像 / 画質調整 / エフェクト / 録画 / 音声 / 状態 / セットアップのタブ。設定は `%APPDATA%\PhoneCam\phonecam_settings.json`。
+4. **GUI**（`phonecam/qt/`、入口は `phonecam_qt.py`。旧 Tk 版は `phonecam/ui/`）: 接続・映像 / 画質調整 / エフェクト / 録画 / 音声 / 状態 / セットアップのタブ。設定は `%APPDATA%\PhoneCam\phonecam_settings.json`。
 5. **セットアップ**（`phonecam_setup.py`）: 初回ウィザードとセットアップタブ。必要なソフトの確認・インストール、iPhone のセットアップ案内。
 
 ### スレッド構成
@@ -64,7 +64,7 @@ iPhone (PhoneCam アプリ)                         Windows PC
 
 ### 専用カメラのしくみ
 
-[softcam](https://github.com/tshino/softcam)（MIT）v1.8.1 を、GitHub Actions で表示名「PhoneCam」・独自の CLSID・独自の共有メモリ名に書き換えてビルドしています（他の softcam 利用アプリと衝突しません）。受信アプリは（exe 版では内蔵し `%ProgramData%\PhoneCam\softcam\<ハッシュ>\` に登録した）`softcam.dll` を ctypes で読み込み、BGR24 のフレームを渡します。CLSID は `windows/phonecam_receiver.py` の `PHONECAM_CLSID` と `.github/workflows/windows.yml` で一致させてください。
+[softcam](https://github.com/tshino/softcam)（MIT）v1.8.1 を、GitHub Actions で表示名「PhoneCam」・独自の CLSID・独自の共有メモリ名に書き換えてビルドしています（他の softcam 利用アプリと衝突しません）。受信アプリは（exe 版では内蔵し `%ProgramData%\PhoneCam\softcam\<ハッシュ>\` に登録した）`softcam.dll` を ctypes で読み込み、BGR24 のフレームを渡します。CLSID は `windows/phonecam/core/softcam_reg.py` の `PHONECAM_CLSID` と `windows/softcam_ext/build-slots.ps1` で一致させてください。
 
 exe 版では DLL を exe に内蔵し、登録時に `C:\ProgramData\PhoneCam\softcam` にコピーします。登録は「接続・映像」タブの「PhoneCamカメラ」欄（**登録する（更新）** / **登録を解除**）で行います。
 

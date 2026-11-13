@@ -13,19 +13,22 @@ phonecam/
 ├─ ios/                         iPhone アプリ（Swift / XcodeGen）
 │   ├─ project.yml
 │   └─ PhoneCam/*.swift         CameraController, H264Encoder, StreamServer, Recorder, Effects, LowLatencyMic, ...
-├─ windows/                     Windows 受信アプリ（Python）
-│   ├─ phonecam_receiver.py     本体（GUI・受信・デコード・仮想カメラ出力）
+├─ windows/                     Windows 受信アプリ（Python / PySide6）
+│   ├─ phonecam_qt.py           入口（配布 exe の入口。Qt の画面）
+│   ├─ phonecam/                本体（core/ = 受信・デコード・仮想カメラなど、qt/ = 画面、controller.py = 画面と core をつなぐ層、ui/ = 旧 Tk 版の画面）
+│   ├─ phonecam_receiver.py     旧 Tk 版の入口（start.bat と --register/--setup のヘルパ起動で使用）
 │   ├─ phonecam_iphone.py       iPhone との接続まわり（usbmux など）
 │   ├─ phonecam_audio.py        音声の再生
 │   ├─ phonecam_setup.py        セットアップウィザード
 │   ├─ phonecam_qr.py           QR コード生成
+│   ├─ softcam_ext/             専用カメラ（softcam）の改造パッチとビルドスクリプト
 │   ├─ install.bat / start.bat  ソース実行用
 │   └─ register.bat / unregister.bat  専用カメラの登録／解除（ソース実行用）
 ├─ .github/
 │   ├─ workflows/ios.yml        iOS ビルド（署名なし IPA）
 │   ├─ workflows/windows.yml    softcam のビルド + exe のビルド
 │   ├─ workflows/release.yml    リリース作成
-│   └─ scripts/make_altstore_source.py   AltStore ソース JSON の生成
+│   └─ scripts/                 make_altstore_source.py（AltStore ソース JSON の生成）、list_bundle.py（exe の同梱物の一覧）
 └─ docs/                        ドキュメント
 ```
 
@@ -50,9 +53,9 @@ phonecam/
 1. Python をセットアップして依存ライブラリ（`windows/requirements.txt`）をインストール
 2. [softcam](https://github.com/tshino/softcam) をクローンし、表示名・CLSID・共有メモリ名を PhoneCam 用に書き換え（他の softcam 利用アプリと衝突しないようにするため）
 3. MSBuild で `softcam.dll` をビルド（x64。Win32 は任意）
-4. PyInstaller（`--onefile --windowed`）で、受信アプリと `softcam.dll`（x64 / あれば Win32）を `PhoneCamReceiver.exe` 1 つにまとめる（バージョンとリポジトリ名は `phonecam_version.py` として生成して埋め込む）
+4. PyInstaller（`--onefile --windowed`、入口は `phonecam_qt.py`）で、受信アプリと `softcam.dll`（x64 / あれば Win32）を `PhoneCamReceiver.exe` 1 つにまとめる（バージョンとリポジトリ名は `phonecam_version.py` として生成して埋め込む）
 
-> 専用カメラの CLSID は `windows/phonecam_receiver.py` の `PHONECAM_CLSID` と `.github/workflows/windows.yml` で必ず一致させてください。
+> 専用カメラの CLSID は `windows/phonecam/core/softcam_reg.py` の `PHONECAM_CLSID` と `windows/softcam_ext/build-slots.ps1` で必ず一致させてください。
 
 ### ソースから実行（Windows）
 
@@ -60,7 +63,7 @@ Python 3.12 が必要です（「Add python.exe to PATH」と「py launcher」�
 
 1. `windows` フォルダの **install.bat** を実行（初回のみ。av / numpy / pyvirtualcam と、音声用の sounddevice が入ります）
 2. iPhone で PhoneCam を起動して画面を表示したままにします
-3. **start.bat** で受信アプリが開きます
+3. **start.bat** で受信アプリが開きます（旧 Tk 版の入口です。Qt 版を試すときは `py -3 phonecam_qt.py`）
 4. 「USB」または「Wi-Fi」を選んで接続します
 
 専用カメラを使いたいときは、自分でビルドした `softcam.dll` を `windows` フォルダに置いて `register.bat` を実行します（手順は `windows.yml` を参照）。無ければ OBS Virtual Camera を使います。`sounddevice` が入っていないと音声タブは使えません（映像は使えます）。
