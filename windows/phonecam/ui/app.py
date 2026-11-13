@@ -31,6 +31,7 @@ from phonecam.i18n import set_language, t
 from phonecam.ui import icons, theme
 from phonecam.ui.labels import METER_MIN_DB, MODE3_LABELS, PHONE_NOTE_SECONDS, THROTTLE_MS
 from phonecam.ui.tkdeps import messagebox, tk, ttk
+from phonecam.ui.util import webbrowser_open
 from phonecam.ui import dshow_ui, phone_sync, update_ui
 from phonecam.ui.pages import audio, connection_video, effects, quality, recording, setup, shortcuts, status
 
@@ -726,7 +727,9 @@ _bind_setup()
 
 
 def main():
-    helper = helper_main(sys.argv[1:])
+    args = sys.argv[1:]
+    setup_window = args in (["--setup-wizard"], ["--setup-diagnose"])
+    helper = None if setup_window else helper_main(args)
     if helper is not None:
         return helper
     if tk is None:
@@ -736,6 +739,32 @@ def main():
     enable_dpi_awareness()  # Tk を作る前に (作ったあとでは効かない)
     root = tk.Tk()
     apply_ui_scale(root)
+    if setup_window:
+        root.withdraw()
+        settings = load_settings()
+        set_language(settings.get("language", "system"))
+        theme.apply(root, settings.get("theme", "system"))
+        if phonecam_setup is None:
+            messagebox.showerror("PhoneCam", t("setup.unavailable"), parent=root)
+            root.destroy()
+            return 1
+        if "--setup-diagnose" in args:
+            dialog = phonecam_setup.open_diagnostics(root, open_url=webbrowser_open)
+        else:
+            controller = phonecam_setup.SetupController(root)
+
+            def finish_setup():
+                current = load_settings()
+                current["setup_done"] = True
+                save_settings(current)
+
+            dialog = phonecam_setup.SetupWizard(root, controller, on_finish=finish_setup, open_url=webbrowser_open)
+        if dialog is not None:
+            dialog.top.transient("")
+            dialog.top.deiconify()
+            root.wait_window(dialog.top)
+        root.destroy()
+        return 0 if dialog is not None else 1
     _APP_REF.append(App(root))
     root.mainloop()
     return 0

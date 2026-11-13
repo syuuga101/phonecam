@@ -124,6 +124,16 @@ def _own_text_palette(w, color):
 # ラベル
 # ---------------------------------------------------------------------------
 
+def _fit_wrapped_height(label):
+    """折り返しラベルの高さを今の幅に合わせる。入れ子のレイアウトでは heightForWidth が親行まで伝わらず、
+    2行目以降が行の下端で切れる/次の行に重なることがあるため、最小高さとして明示する。"""
+    if not label.wordWrap() or label.width() <= 0:
+        return
+    h = label.heightForWidth(label.width())
+    if h > 0 and h != label.minimumHeight():
+        label.setMinimumHeight(h)
+
+
 class Hint(QLabel):
     """二次色の小さめの説明文 (折り返しあり)。親のパレットから色を計算するので、テーマ切替に追従する。"""
 
@@ -150,6 +160,14 @@ class Hint(QLabel):
         super().changeEvent(e)
         if e.type() in _THEME_EVENTS or e.type() == QEvent.Type.ParentChange:
             self._apply()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        _fit_wrapped_height(self)
+
+    def setText(self, text):
+        super().setText(text)
+        _fit_wrapped_height(self)
 
 
 _ICON_REFRESH = _THEME_EVENTS + tuple(x for x in (getattr(QEvent.Type, "DevicePixelRatioChange", None),) if x is not None)
@@ -185,6 +203,10 @@ class ErrorLabel(QLabel):
         super().changeEvent(e)
         if e.type() in _THEME_EVENTS or e.type() == QEvent.Type.ParentChange:
             self._apply()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        _fit_wrapped_height(self)
 
 
 class IconLabel(QLabel):
@@ -297,6 +319,24 @@ class Row(QWidget):
         self.hint_label.setVisible(bool(text))   # Row に載った後なので子ウィジェットとして出し入れされる
 
 
+class _Padded(QWidget):
+    """add_padded の入れ物。中身が隠れたら入れ物ごと隠す (空の余白行を残さない)。"""
+
+    def __init__(self, widget, margins):
+        super().__init__()
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(*margins)
+        lay.addWidget(widget)
+        self._inner = widget
+        widget.installEventFilter(self)
+        self.setVisible(not widget.isHidden())
+
+    def eventFilter(self, obj, e):
+        if obj is self._inner and e.type() in (QEvent.Type.HideToParent, QEvent.Type.ShowToParent):
+            self.setVisible(e.type() == QEvent.Type.ShowToParent)
+        return False
+
+
 class Section(QWidget):
     """小見出し (Semibold) + その下のカード。add(widget) / add_row(...) でカードへ積む。"""
 
@@ -324,10 +364,7 @@ class Section(QWidget):
 
     def add_padded(self, widget, margins=(16, 8, 16, 8)):
         """Row ではない中身 (グラフやメーター等) をカードへ余白つきで入れる。"""
-        box = QWidget()
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(*margins)
-        lay.addWidget(widget)
+        box = _Padded(widget, margins)
         return self.add(box)
 
 
@@ -346,7 +383,10 @@ class Page(QScrollArea):
         self._col = QWidget()
         self._col.setMaximumWidth(MAX_CONTENT_W + 2 * PAGE_PAD_X)
         self._col.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        outer.addWidget(self._col, 1, Qt.AlignmentFlag.AlignHCenter)   # 幅は最大まで、縦は全体 (下は finish() の stretch で寄せる)
+        # 幅は常に (最大幅 or 使える幅いっぱい) にする。alignment を付けると sizeHint 幅に縮むのでスペーサで中央寄せ。
+        outer.addStretch(1)
+        outer.addWidget(self._col, 1000)
+        outer.addStretch(1)
         self.column = QVBoxLayout(self._col)
         self.column.setContentsMargins(PAGE_PAD_X, 16, PAGE_PAD_X, 28)
         self.column.setSpacing(20)
@@ -461,6 +501,7 @@ def button(text, primary=False, parent=None):
         b.setDefault(True)
         b.setAutoDefault(True)
     b.setMinimumWidth(88)
+    b.setMinimumHeight(30)
     return b
 
 
@@ -514,7 +555,7 @@ def bound_combo(ctrl, key, items, group=None, width=None, on_change=None, setter
     return cb
 
 
-def bound_switch(ctrl, key, group=None, on_change=None, invert=False):
+def bound_switch(ctrl, key, group=None, on_change=None, invert=False, setter=None):
     """設定 key (bool) に結び付いたスイッチ。"""
     sw = Switch()
 
@@ -530,7 +571,10 @@ def bound_switch(ctrl, key, group=None, on_change=None, invert=False):
 
     def toggled(on):
         v = bool(on) != bool(invert)
-        ctrl.changed(key, v, group)
+        if setter is None:
+            ctrl.changed(key, v, group)
+        else:
+            setter(v)
         if on_change:
             on_change(v)
 
@@ -598,16 +642,28 @@ class SliderValue(QWidget):
         lay.setSpacing(10)
         self.slider = Slider()
         self.slider.setRange(0, n)
-        self.slider.setMinimumWidth(int(width))
+        self.slider.setFixedWidth(int(width))
         self.value_label = QLabel()
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         wmax = max(self.value_label.fontMetrics().horizontalAdvance(fmt(v)) for v in (lo, hi)) + 6
-        self.value_label.setMinimumWidth(wmax)
+        self.value_label.setMinimumWidth(max(wmax, 64))
         lay.addWidget(self.slider)
         lay.addWidget(self.value_label)
         self._show(ctrl.get(key))
         self.slider.valueChanged.connect(self._moved)
         _listen(ctrl, key, self._show)
+
+    def set_bounds(self, lo, hi):
+        steps = max(0, int((hi - lo) / self._step + 1e-9))
+        if lo == self._lo and steps == self.slider.maximum():
+            return
+        self._lo = lo
+        previous = self.slider.blockSignals(True)
+        try:
+            self.slider.setRange(0, steps)
+            self._show(self._ctrl.get(self._key))
+        finally:
+            self.slider.blockSignals(previous)
 
     def _value_of(self, i):
         v = self._lo + i * self._step
@@ -621,9 +677,9 @@ class SliderValue(QWidget):
         i = int(round((v - self._lo) / self._step))
         i = max(self.slider.minimum(), min(self.slider.maximum(), i))
         if i != self.slider.value():
-            self.slider.blockSignals(True)
+            previous = self.slider.blockSignals(True)
             self.slider.setValue(i)
-            self.slider.blockSignals(False)
+            self.slider.blockSignals(previous)
         self.value_label.setText(self._fmt(self._value_of(i)))
 
     def _moved(self, i):

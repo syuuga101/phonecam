@@ -11,12 +11,21 @@
 docs: scratchpad/qt_contract.md
 """
 
+import os
+from pathlib import Path
+import subprocess
+import sys
 import threading
 import time
+import webbrowser
+from queue import Empty, SimpleQueue
 
-from phonecam.core.audio_engine import AudioEngine
+from phonecam.core.audio_engine import AudioEngine, find_vbcable_control_panel
 from phonecam.core.canvas import build_control, canvas_size
-from phonecam.core.deps import av, np, pyvirtualcam
+from phonecam.core.deps import av, np, phonecam_dshowctl, phonecam_hotkeys, phonecam_update, pyvirtualcam
+from phonecam.core.elevate import run_elevated
+from phonecam.core.softcam_reg import registration_status
+from phonecam.core.version import APP_REPO, APP_VERSION
 from phonecam.core.link import Link
 from phonecam.core.settings import (
     AUDIO_AVAILABLE,
@@ -45,6 +54,7 @@ from phonecam.ui.labels import (
     LENS_LABELS,
     METER_MIN_DB,
     PHONE_NOTE_SECONDS,
+    SHUTTER_VALUES,
     THERMAL_WARNING,
     THROTTLE_MS,
     is_thermal_warning,
@@ -136,6 +146,29 @@ class Controller:
         self.toast = CallbackList()             # emit(text, kind)    kind: "info" / "error"
         self.update_changed = CallbackList()    # emit(banner)        banner: None か dict(text, actions=[(label, fn)])
 
+        self.update_status_changed = CallbackList()
+        self.update_status_text = t("update.status.never")
+        self.update_check_busy = False
+        self._dismissed_update = None
+        self._next_update = time.monotonic() + 3
+        self._results = SimpleQueue()
+        self.frozen = bool(getattr(sys, "frozen", False))
+        self.camera_registration = registration_status() if self.frozen and not demo else "unavailable"
+        self.camera_registration_busy = False
+        self.camera_registration_changed = CallbackList()
+        self.hotkey_conflicts = set()
+        self._hotkeys = None
+        if not demo and phonecam_hotkeys is not None and phonecam_hotkeys.is_windows():
+            self._hotkeys = phonecam_hotkeys.HotkeyManager()
+            self._apply_hotkeys()
+
+        self._dshow = None
+        self._next_dshow_retry = 0
+        self._dshow_reason = "shell.dshow.nomodule"
+        if not demo and phonecam_dshowctl is not None:
+            self._dshow = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES)
+            self._dshow_reason = "shell.dshow.notready" if os.name == "nt" else "shell.dshow.winonly"
+
         self.wanted = False                     # 「接続」を押した状態
         self.closing = False
         self.update_banner = None
@@ -190,6 +223,8 @@ class Controller:
         self._save_due = now + SAVE_DELAY_SEC
         if group:
             self._send_due.setdefault(group, now + THROTTLE_MS / 1000.0)
+        if key in ("hotkeys", "hotkeys_enabled"):
+            self._apply_hotkeys()
         self.settings_changed.emit(alias, value)
 
     def _flush(self, now, force=False):
@@ -296,8 +331,226 @@ class Controller:
         self._screen_user_t = time.monotonic()
         self.changed(key, value, "screen")
 
+    def open_vbcable_panel(self):
+        path = find_vbcable_control_panel() if os.name == "nt" else None
+        if not path:
+            return
+        try:
+            try:
+                os.startfile(path, "runas")
+            except OSError:
+                os.startfile(path)
+        except OSError as error:
+            self.toast.emit(t("audio.vbcable.openfail", err=error), "error")
+
+    def open_setup(self, diagnose=False):
+        if self.demo:
+            return
+        self.save_now()
+        args = [sys.executable]
+        if not self.frozen:
+            args.append(str(Path(__file__).resolve().parents[1] / "phonecam_receiver.py"))
+        args.append("--setup-diagnose" if diagnose else "--setup-wizard")
+        try:
+            subprocess.Popen(args)
+        except OSError as error:
+            self.toast.emit(t("settings.setup.launch_error", error=error), "error")
+
+    def _background(self, work, done):
+        def run():
+            try:
+                result = work()
+            except Exception as error:
+                result = error
+            self._results.put((done, result))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def change_camera_registration(self, action):
+        if self.demo or not self.frozen or self.camera_registration_busy or action not in ("register", "unregister"):
+            return
+        self.camera_registration_busy = True
+        self.camera_registration_changed.emit()
+        self.toast.emit(t("video.vcam.elev_wait"), "info")
+
+        def finished(result):
+            self.camera_registration_busy = False
+            self.camera_registration = registration_status()
+            self.camera_registration_changed.emit()
+            self.link.vcam.request_reset()
+            kind = result[0] if isinstance(result, tuple) else "error"
+            expected = ("ok",) if action == "register" else ("missing", "unavailable")
+            word = t(f"video.vcam.word_{action}")
+            if kind == "ok" and self.camera_registration in expected:
+                self.toast.emit(t("video.vcam.registered" if action == "register" else "video.vcam.unregistered"), "info")
+            else:
+                key = {"ok": "unchanged", "cancelled": "cancelled", "timeout": "timeout"}.get(kind, "failed")
+                self.toast.emit(t(f"video.vcam.{key}", word=word), "error")
+
+        self._background(lambda: run_elevated("--" + action), finished)
+
+    def version_text(self):
+        return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION
+
+    def phone_version_note(self):
+        """iPhone アプリと PC の major.minor が違うときの注意文 (違わなければ "")。Tk の _update_note_phone_version と同じ判定。"""
+        ver = self.status.phone.get("appVersion") if self.status else None
+        if not isinstance(ver, str) or not ver or phonecam_update is None:
+            return ""
+        try:
+            if (phonecam_update.parse_version(ver) is not None and phonecam_update.parse_version(APP_VERSION) is not None
+                    and not phonecam_update.same_major_minor(ver, APP_VERSION)):
+                return t("update.note.version_mismatch", pc=phonecam_update.display_version(APP_VERSION),
+                         iphone=phonecam_update.display_version(ver))
+        except Exception:
+            pass
+        return ""
+
+    def screen_state_text(self):
+        """接続中の iPhone の画面状態 (「現在のiPhoneの画面: 黒（自動: 30秒）」)。未接続なら ""。Tk の phone_sync と同じ。"""
+        from phonecam.core.settings import SCREEN_AUTO_VALUES
+        phone = self.status.phone if self.status else {}
+        if not (self.status and self.status.connected and "screenBlack" in phone):
+            return ""
+        auto = phone.get("autoBlackSeconds")
+        extra = ""
+        if auto in SCREEN_AUTO_VALUES:
+            label = t("labels.screen_auto.0") if auto == 0 else t(f"labels.sec.{auto}")
+            extra = t("shell.sync.screen_auto", v=label)
+        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
+        return t("shell.sync.screen", state=state, extra=extra)
+
+    def _show_update_status(self, text, busy=False):
+        self.update_status_text = text
+        self.update_check_busy = busy
+        self.update_status_changed.emit(text, busy)
+
+    def check_updates(self, auto=False):
+        if self.update_check_busy or (auto and not self.get("update_check", True)):
+            return
+        if not phonecam_update or not APP_REPO or phonecam_update.parse_version(APP_VERSION) is None or self.demo:
+            if not auto:
+                self._show_update_status(t("update.status.dev"))
+            return
+        self._show_update_status(t("update.status.checking"), busy=True)
+        self._background(lambda: phonecam_update.fetch_latest(APP_REPO, APP_VERSION), lambda result: self._finish_update_check(result, auto))
+
+    def _finish_update_check(self, result, auto):
+        stamp = time.strftime("%m/%d %H:%M")
+        if isinstance(result, Exception):
+            self._show_update_status(t("update.status.error", time=stamp, error=result))
+            return
+        tag = result["tag"]
+        version = result["version"]
+        newer = phonecam_update.is_newer(tag, APP_VERSION)
+        key = "update.status.available" if newer else "update.status.latest"
+        self._show_update_status(t(key, time=stamp, version=version))
+        if not auto:
+            self._dismissed_update = None
+        if tag == self._dismissed_update or not phonecam_update.should_notify(tag, APP_VERSION, self.get("update_skip_version", "")):
+            return
+
+        def dismiss():
+            self._dismissed_update = tag
+            self.update_banner = None
+            self.update_changed.emit(None)
+
+        def skip():
+            self.changed("update_skip_version", version)
+            dismiss()
+
+        self.update_banner = {
+            "text": t("update.banner.title", version=version),
+            "actions": [(t("update.notes.open_release"), lambda: webbrowser.open(result["html_url"] or f"https://github.com/{APP_REPO}/releases/latest")),
+                        (t("update.banner.later"), dismiss), (t("update.banner.skip"), skip)],
+        }
+        self.update_changed.emit(self.update_banner)
+
+    def _apply_hotkeys(self):
+        if self._hotkeys is None:
+            return
+        bindings = (self.get("hotkeys") or {}) if self.get("hotkeys_enabled", True) else {}
+        try:
+            result = self._hotkeys.apply(bindings)
+        except (OSError, RuntimeError):
+            result = dict.fromkeys(bindings, False)
+        self.hotkey_conflicts = {action for action, ok in result.items() if ok is False}
+
+    def _poll_dshow(self, now):
+        bridge = self._dshow
+        if bridge is None:
+            return
+        try:
+            if not bridge.is_open:
+                if now < self._next_dshow_retry:
+                    return
+                self._next_dshow_retry = now + 2
+                if not bridge.open():
+                    return
+            for change in bridge.poll_changes():
+                self.changed(change["key"], change["value"], change.get("group"))
+            snapshot = self.state.snapshot()
+            bridge.publish(snapshot["phone_status"] if snapshot["connected"] else {}, self.settings)
+        except (OSError, ValueError):
+            bridge.close()
+
+    def dshow_status_text(self):
+        if self._dshow is not None and self._dshow.is_open:
+            return t("shell.dshow.on")
+        return t("shell.dshow.off", reason=t(self._dshow_reason))
+
+    def _poll_hotkeys(self):
+        if self._hotkeys is None:
+            return
+        while (action := self._hotkeys.poll()) is not None:
+            try:
+                message = self._run_hotkey(action)
+            except Exception as error:
+                self.toast.emit(t("shortcuts.toast.failed", err=error), "error")
+            else:
+                if message:
+                    self.toast.emit(message, "info")
+
+    def _run_hotkey(self, action):
+        if action == "camera":
+            available = [v for v in (self.status.phone.get("lenses") or ()) if v in LENSES] or LENSES
+            current = self.get("lens")
+            lens = available[(available.index(current) + 1) % len(available)] if current in available else available[0]
+            if lens == current:
+                return t("shortcuts.toast.no_lens")
+            self.set_lens(lens)
+            return t("shortcuts.toast.camera", name=dict(LENS_LABELS)[lens])
+        if action == "mic":
+            muted = not self.get("mic_muted")
+            self.changed("mic_muted", muted, "micMuted")
+            return t("shortcuts.toast.mic_muted" if muted else "shortcuts.toast.mic_unmuted")
+        if action == "blur":
+            enabled = self.get("bg_mode") == "off"
+            self.changed("bg_mode", "blur" if enabled else "off", "background")
+            return t("shortcuts.toast.blur_on" if enabled else "shortcuts.toast.blur_off")
+        if action == "pause":
+            if not self.status.connected:
+                return t("shortcuts.toast.not_connected")
+            running = self.stream.desired(True, time.monotonic())
+            self.start_pause()
+            return t("shortcuts.toast.paused" if running else "shortcuts.toast.started")
+        if action == "rec":
+            if not self.status.connected:
+                return t("shortcuts.toast.rec_not_connected")
+            if self.toggle_record():
+                return t("shortcuts.toast.rec_stop" if self.status.rec_active else "shortcuts.toast.rec_start")
+        if action in ("zoom_in", "zoom_out"):
+            delta = .25 if action == "zoom_in" else -.25
+            maximum = self.status.phone.get("zoomMax") or 10
+            zoom = min(maximum, max(1, round((self.get("zoom", 1) + delta) * 4) / 4))
+            self.changed("zoom", zoom, "zoom")
+            return t("shortcuts.toast.zoom", v=zoom)
+        return None
+
     def toggle_record(self):
         """録画の開始/停止を iPhone へ依頼する。送れたら True。"""
+        if self.demo or time.monotonic() < self._rec_lock_until:
+            return False
         rec = self.state.snapshot()["phone_status"].get("recording")
         active = bool(rec.get("active")) if isinstance(rec, dict) else False
         if self.link.send_control({"record": "stop" if active else "start"}):
@@ -385,8 +638,19 @@ class Controller:
             return
         now = time.monotonic() if now is None else now
         self._flush(now)
+        self._poll_hotkeys()
+        while True:
+            try:
+                done, result = self._results.get_nowait()
+            except Empty:
+                break
+            done(result)
+        if not self.demo and phonecam_update and now >= self._next_update:
+            self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC
+            self.check_updates(auto=True)
         if now >= self._next_poll:
             self._next_poll = now + POLL_SEC
+            self._poll_dshow(now)
             self.poll(now)
         if not self.demo and now >= self._next_stream:
             self._next_stream = now + WATCH_INTERVAL_MS / 1000.0
@@ -561,7 +825,14 @@ class Controller:
             idle_enabled=self.stream.mode() == "auto",
             rec_active=bool(rec.get("active")),
             rec_enabled=bool(connected and now >= self._rec_lock_until),
-            phone=st,                                  # iPhone の status JSON (接続中のみ。未接続は {})
+            phone=st,
+            dshow_text=self.dshow_status_text(),
+            thin_total=snap.get("thin_total", 0),
+            thin_last=snap.get("thin_last", 0),
+            audio_summary=(self.audio.running, self.audio.error, self.audio.notice, self.audio.device_name,
+                           self.audio.mode, self.audio.mode_detail, self.audio.underruns, snap.get("audio_path"),
+                           round(self.audio.buffered_ms()) if self.audio.running else None,
+                           round(self.audio.latency_ms() or 0) if self.audio.running else None),                                  # iPhone の status JSON (接続中のみ。未接続は {})
         )
         if s != self.status:
             self.status = s
@@ -583,6 +854,10 @@ class Controller:
     def close(self):
         """アプリ終了時に呼ぶ。受信・音声を止め、設定を保存する。"""
         self.closing = True
+        if self._hotkeys is not None:
+            self._hotkeys.stop()
+        if self._dshow is not None:
+            self._dshow.close()
         try:
             self.link.stop()
             self.link.vcam.close()
