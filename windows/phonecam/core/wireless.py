@@ -31,7 +31,7 @@ def ipv4(values):
             ip = ipaddress.IPv4Address(value)
         except ValueError:
             continue
-        if not (ip.is_loopback or ip.is_unspecified or ip.is_multicast or ip.is_reserved):
+        if not (ip.is_loopback or ip.is_unspecified or ip.is_multicast or ip.is_reserved or ip.is_global):
             addresses.append(str(ip))
     return tuple(dict.fromkeys(addresses))
 
@@ -72,6 +72,9 @@ class Pairing:
         if not addresses:
             raise ValueError("No IPv4 addresses")
         self._stop = Event()
+        self._lock = Lock()
+        self._used = False
+        self._active = 0
         self._expires = time.monotonic() + seconds
         self._token = secrets.token_urlsafe(24)
         self._listener = socket.socket()
@@ -99,19 +102,39 @@ class Pairing:
                     conn, peer = self._listener.accept()
                 except socket.timeout:
                     continue
-                with conn:
-                    device = self._read(conn, peer[0])
-                    if device and not self._stop.is_set() and time.monotonic() < self._expires:
-                        on_pair(device)
-                        try:
-                            conn.sendall(b'{"ok":true}\n')
-                        except OSError:
-                            pass
-                        return
+                with self._lock:
+                    busy = self._active >= 8
+                    if not busy:
+                        self._active += 1
+                if busy:
+                    conn.close()
+                    continue
+                Thread(target=self._handle, args=(conn, peer[0], on_pair), daemon=True).start()
         except OSError:
             pass
         finally:
             self.close()
+
+    def _handle(self, conn, peer, on_pair):
+        """One thread per connection so idle clients cannot hold up the real iPhone."""
+        try:
+            with conn:
+                device = self._read(conn, peer)
+                if not device:
+                    return
+                with self._lock:
+                    if self._used or self._stop.is_set() or time.monotonic() >= self._expires:
+                        return
+                    self._used = True
+                on_pair(device)
+                try:
+                    conn.sendall(b'{"ok":true}\n')
+                except OSError:
+                    pass
+                self.close()
+        finally:
+            with self._lock:
+                self._active -= 1
 
     def _read(self, conn, peer):
         deadline = min(self._expires, time.monotonic() + 2)

@@ -56,6 +56,13 @@ struct WirelessInvite: Identifiable {
     let token: String
     var id: String { token }
 
+    static func isLocal(_ address: IPv4Address) -> Bool {
+        let b = [UInt8](address.rawValue)
+        guard b.count == 4 else { return false }
+        return b[0] == 10 || (b[0] == 172 && (16...31).contains(b[1])) || (b[0] == 192 && b[1] == 168)
+            || (b[0] == 169 && b[1] == 254) || (b[0] == 100 && (64...127).contains(b[1]))
+    }
+
     init?(_ text: String) {
         guard text.utf8.count <= 4096, let url = URLComponents(string: text),
               url.scheme == "phonecam", url.host == "pair", url.path.isEmpty,
@@ -66,7 +73,9 @@ struct WirelessInvite: Identifiable {
                   || (97...122).contains($0) || $0 == 45 || $0 == 95 }),
               let rawPort = value("port").flatMap({ UInt16($0) }), rawPort > 0,
               let port = NWEndpoint.Port(rawValue: rawPort) else { return nil }
-        let addresses = (value("ips") ?? "").split(separator: ",").compactMap { IPv4Address(String($0)) }
+        // 悪意ある QR でペアリングコードを外部へ送らせないよう、LAN 内の IPv4 だけを許可する。
+        let addresses = Array((value("ips") ?? "").split(separator: ",")
+            .compactMap { IPv4Address(String($0)) }.filter(WirelessInvite.isLocal).prefix(16))
         guard !addresses.isEmpty else { return nil }
         self.name = String((value("name") ?? "").prefix(128))
         self.addresses = addresses
