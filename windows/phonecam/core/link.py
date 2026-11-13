@@ -188,6 +188,8 @@ class Link:
     # -- 内部 -------------------------------------------------------------
     def controls(self, group):
         control = build_control(self.settings, group, self.last_frame_size)
+        if group in ("all", "bitrate", "adaptive_bitrate"):
+            control["adaptiveBitrate"] = self._mode == "wifi" and self.settings.get("adaptive_bitrate", True)
         if not self.audio_enabled() and "mic" in control:
             control["mic"]["enabled"] = False
         return control

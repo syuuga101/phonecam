@@ -50,6 +50,11 @@ final class StreamServer {
     private var pendingVideoFrames = 0
     private var pendingAudioBytes = 0
     private var networkDropped = 0
+    private var measureVideo = false
+    private var limitVideoQueue = false
+    private var videoSendTimes: [UInt64: Double] = [:]
+    private var videoSendID: UInt64 = 0
+    private var videoSample = VideoSendSample()
     private var audioDropped = 0
 
     /// 1 本の接続 (queue 上でのみ触る)
@@ -260,6 +265,10 @@ final class StreamServer {
         pendingVideoFrames = 0
         pendingAudioBytes = 0
         networkDropped = 0
+        measureVideo = !s.loopback && role == .main
+        limitVideoQueue = false
+        videoSendTimes.removeAll()
+        videoSample = VideoSendSample()
         audioDropped = 0
         lock.unlock()
 
@@ -348,6 +357,10 @@ final class StreamServer {
         clientReady = false
         pendingVideoFrames = 0
         pendingAudioBytes = 0
+        measureVideo = false
+        limitVideoQueue = false
+        videoSendTimes.removeAll()
+        videoSample = VideoSendSample()
         lock.unlock()
 
         if let a = activeSession {
@@ -471,13 +484,23 @@ final class StreamServer {
             lock.unlock()
             return false
         }
-        if !isKey && pendingVideoFrames >= 1 {
+        if (!isKey && pendingVideoFrames >= 1) || (limitVideoQueue && pendingVideoFrames >= 2) {
             networkDropped += 1
+            if measureVideo { videoSample.droppedFrames += 1 }
             lock.unlock()
             return false
         }
         pendingVideoFrames += 1
         let gen = generation
+        let measure = measureVideo
+        let started = measure ? ProcessInfo.processInfo.systemUptime : 0
+        let bytes = data.count
+        if measure { videoSendID &+= 1 }
+        let sendID = videoSendID
+        if measure {
+            videoSendTimes[sendID] = started
+            videoSample.pendingBytes += bytes
+        }
 
         // タイミングと映像の順序を保つため、lock を持ったまま続けて送信キューへ積む
         if let ct = captureTime, ct.isFinite {
@@ -489,16 +512,39 @@ final class StreamServer {
                       completion: .contentProcessed({ _ in }))
         }
         let packet = Packet.encode(type: hevc ? PacketType.videoHevc : PacketType.video, payload: data)
-        conn.send(content: packet, completion: .contentProcessed({ [weak self] _ in
+        conn.send(content: packet, completion: .contentProcessed({ [weak self] error in
             guard let self = self else { return }
             self.lock.lock()
             if self.generation == gen {
                 self.pendingVideoFrames = max(0, self.pendingVideoFrames - 1)
+                if measure, self.videoSendTimes.removeValue(forKey: sendID) != nil {
+                    self.videoSample.pendingBytes -= bytes
+                    self.videoSample.slowestSend = max(self.videoSample.slowestSend,
+                                                      ProcessInfo.processInfo.systemUptime - started)
+                    if error == nil { self.videoSample.sentBytes += bytes }
+                }
             }
             self.lock.unlock()
         }))
         lock.unlock()
         return true
+    }
+
+    func setAdaptiveVideoQueue(_ enabled: Bool) {
+        lock.lock()
+        limitVideoQueue = enabled && measureVideo
+        lock.unlock()
+    }
+
+    func takeVideoSendSample(now: Double) -> VideoSendSample {
+        lock.lock()
+        defer { lock.unlock() }
+        var sample = videoSample
+        if let oldest = videoSendTimes.values.min() {
+            sample.pendingSeconds = max(0, now - oldest)
+        }
+        videoSample = VideoSendSample(pendingBytes: sample.pendingBytes)
+        return sample
     }
 
     /// 接続してから送信側で破棄した映像フレーム数

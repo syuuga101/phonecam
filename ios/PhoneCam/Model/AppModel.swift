@@ -64,6 +64,11 @@ final class AppModel: ObservableObject {
     let wirelessIdentity: WirelessIdentity
     private var usbIdentityListener: USBIdentityListener?
     private let encoder = H264Encoder()
+    private let bitrateLock = NSLock()
+    private var adaptiveRate = AdaptiveBitrate()
+    private var wifiBitrateSession = false
+    private var lastVideoSample = ProcessInfo.processInfo.systemUptime
+    private var sentVideoMbps: Double?
     private let security: SecurityManager
     private let server: StreamServer
     /// 低遅延の音声専用チャンネル (5556)。映像の滞留に巻き込まれない
@@ -249,16 +254,13 @@ final class AppModel: ObservableObject {
         }
         camera.onStreamSettings = { [weak self] width, height, fps, bitrate in
             guard let self = self else { return }
-            if fps > 0 {
-                self.encoder.configure(fps: fps, bitrateMbps: bitrate)
-            }
+            self.configureStreamRate(fps: fps, ceiling: bitrate)
             DispatchQueue.main.async {
                 if width > 0 && height > 0 {
                     self.formatText = "\(width)×\(height) \(fps)fps"
                     let size = CGSize(width: width, height: height)
                     if self.cameraSize != size { self.cameraSize = size }
                 }
-                self.bitrateText = "\(bitrate) Mbps"
             }
         }
         camera.onRotation = { [weak self] angle in
@@ -280,6 +282,7 @@ final class AppModel: ObservableObject {
         // サーバ
         server.onClientConnected = { [weak self] kind in
             guard let self = self else { return }
+            self.resetStreamRate(wifi: kind == "Wi-Fi")
             self.stateLock.lock()
             self.active = true
             self.streamActive = true   // 古い PC 受信側は "stream" を送らないので既定は true
@@ -315,6 +318,7 @@ final class AppModel: ObservableObject {
         server.onClientDisconnected = { [weak self] in
             guard let self = self else { return }
             self.audioServer.disconnectClient()   // メイン切断時は音声チャンネルも閉じる
+            self.resetStreamRate(wifi: false)
             self.stateLock.lock()
             self.active = false
             self.stateLock.unlock()
@@ -332,6 +336,9 @@ final class AppModel: ObservableObject {
         }
         server.onControl = { [weak self] json in
             guard let self = self else { return }
+            if let enabled = json["adaptiveBitrate"] as? Bool {
+                self.configureStreamRate(adaptive: enabled)
+            }
             if let key = json["keyframe"] as? NSNumber, key.boolValue {
                 self.encoder.requestKeyframe()
             }
@@ -408,14 +415,66 @@ final class AppModel: ObservableObject {
         if sent {
             if isKey { waitingForKeyframe = false }
             sentCount += 1
-        } else if !isKey {
+        } else {
             waitingForKeyframe = true
         }
         stateLock.unlock()
 
-        if !sent && !isKey {
+        if !sent {
             encoder.requestKeyframe()
         }
+    }
+
+    // The camera queue, network queue and timer all apply rates through this lock.
+    private func configureStreamRate(fps: Int? = nil, ceiling: Int? = nil, adaptive: Bool? = nil) {
+        bitrateLock.lock()
+        defer { bitrateLock.unlock() }
+        let old = adaptiveRate.target
+        adaptiveRate.configure(ceiling: ceiling ?? adaptiveRate.ceiling,
+                               enabled: wifiBitrateSession && (adaptive ?? adaptiveRate.enabled))
+        if adaptive != nil { server.setAdaptiveVideoQueue(adaptiveRate.enabled) }
+        let target = adaptiveRate.target
+        if let fps, fps > 0 {
+            encoder.configure(fps: fps, bitrateMbps: target)
+        } else if target != old {
+            encoder.setBitrate(mbps: target)
+        }
+        if target != old || ceiling != nil { updateBitrateText(target) }
+    }
+
+    private func resetStreamRate(wifi: Bool) {
+        bitrateLock.lock()
+        defer { bitrateLock.unlock() }
+        wifiBitrateSession = wifi
+        let old = adaptiveRate.target
+        adaptiveRate.resetConnection()
+        let now = ProcessInfo.processInfo.systemUptime
+        lastVideoSample = now
+        _ = server.takeVideoSendSample(now: now)
+        sentVideoMbps = nil
+        if adaptiveRate.target != old { encoder.setBitrate(mbps: adaptiveRate.target) }
+        updateBitrateText(adaptiveRate.target)
+    }
+
+    private func sampleStreamRate(streaming: Bool) {
+        bitrateLock.lock()
+        defer { bitrateLock.unlock() }
+        let now = ProcessInfo.processInfo.systemUptime
+        let sample = server.takeVideoSendSample(now: now)
+        let elapsed = now - lastVideoSample
+        lastVideoSample = now
+        sentVideoMbps = wifiBitrateSession && streaming && elapsed > 0
+            ? Double(sample.sentBytes) * 8 / elapsed / 1_000_000 : nil
+        let old = adaptiveRate.target
+        adaptiveRate.update(sample, streaming: streaming)
+        if adaptiveRate.target != old {
+            encoder.setBitrate(mbps: adaptiveRate.target)
+            updateBitrateText(adaptiveRate.target)
+        }
+    }
+
+    private func updateBitrateText(_ target: Int) {
+        DispatchQueue.main.async { [weak self] in self?.bitrateText = "\(target) Mbps" }
     }
 
     private func startTimer() {
@@ -426,11 +485,13 @@ final class AppModel: ObservableObject {
             self.stateLock.lock()
             let count = self.sentCount
             let isActive = self.active
+            let streaming = isActive && self.streamActive && !self.scannerActive
             let delta = count - self.lastSentCount
             self.lastSentCount = count
             self.sentFpsValue = Double(max(0, delta))
             self.stateLock.unlock()
 
+            self.sampleStreamRate(streaming: streaming)
             self.checkAutoBlack()
             self.refreshRecordingUI()
 
@@ -513,6 +574,12 @@ final class AppModel: ObservableObject {
         s["audioChannel"] = audioServer.hasClient
         s["sentFps"] = fpsOut
         s["networkDroppedFrames"] = server.networkDroppedFrames()
+        bitrateLock.lock()
+        s["bitrateTargetMbps"] = adaptiveRate.target
+        s["adaptiveBitrateEnabled"] = adaptiveRate.enabled
+        s["adaptiveBitrateReduced"] = adaptiveRate.reduced
+        if let sentVideoMbps { s["bitrateSentMbps"] = sentVideoMbps }
+        bitrateLock.unlock()
         s["encodeMs"] = encMs
         s["screenBlack"] = black
         s["autoBlackSeconds"] = autoSec

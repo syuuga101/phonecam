@@ -51,6 +51,14 @@ TCP 上のメッセージは `[種別 1byte][長さ 4byte ビッグエンディ�
 
 ## iPhone → PC のパケット
 
+
+### ビットレートの自動調整（Wi-Fi）
+
+- PC → iPhone の制御 JSON に `"adaptiveBitrate": true|false` を追加します。PC は接続ごとに現在の経路に合わせて送り、USB では常に `false` です。iPhone も USB ではこの指定を無視します。指定がない接続では固定ビットレートのままです。
+- 従来の `"bitrate"`（Mbps）は、自動調整中は上限になります。送信待ちバイト数・最も古い送信待ち・送信完了までの時間・破棄数を毎秒計測し、混雑時に下限（上限の約30%）まで段階的に下げます。映像の送信が8秒連続で安定したら少し戻します。解像度と fps は変更しません。
+- iPhone → PC の状態 JSON は `bitrateTargetMbps`（エンコーダーの目標値）、`bitrateSentMbps`（Wi-Fi で送信処理が完了した映像ペイロードの Mbps）、`adaptiveBitrateEnabled`（有効か）、`adaptiveBitrateReduced`（目標値が上限より低いか）を返します。計測値は Wi-Fi 配信中のみです。送信完了は iPhone の TCP 送信処理で計測し、PC の受信完了を表すものではありません。
+- 接続が切り替わると混雑の履歴をリセットします。旧版では未知のキーを無視できます。
+
 ### 種別 4: pong（JSON）
 
 `{"pong": <PCが送ったpingの値>, "t": <iPhoneのホスト時計[秒]>}`

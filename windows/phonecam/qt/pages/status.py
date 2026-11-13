@@ -138,7 +138,8 @@ def build(ctrl):
         ("iphone", (("thermal", "thermometer"), ("pressure", "gauge"), ("factors", "info"),
                     ("hot", "clock"), ("battery", "battery"), ("lowpower", "battery"))),
         ("video", (("sentfps", "video"), ("dropped", "gauge"), ("dropreasons", "info"),
-                   ("recdropped", "record"), ("encode", "clock"), ("processing", "sparkles"))),
+                   ("recdropped", "record"), ("encode", "clock"), ("processing", "sparkles"),
+                   ("bitrate_sent", "gauge"), ("bitrate_target", "gauge"), ("adaptive", "wifi"))),
         ("pc", (("codec", "video"), ("decoder", "gear"), ("out", "aspect"), ("watch", "camera"), ("dshow", "camera"))),
         ("latency", (("iphone", "camera"), ("comm", "wifi"), ("pc", "gear"), ("total", "clock"), ("rtt", "clock"))),
     )
@@ -228,6 +229,20 @@ def build(ctrl):
             decoder = t("status.pc.decoder_note", decoder=decoder, note=snap["decoder_note"])
         size = canvas_size(ctrl.settings)
         output = f"{size[0]}×{size[1]}" if size else t("status.pc.out_native")
+        def bitrate(field):
+            value = _number(phone.get(field), ".1f") if status.connected else "-"
+            return f"{value} Mbps" if value != "-" else "-"
+
+        adaptive = phone.get("adaptiveBitrateEnabled")
+        reduced = phone.get("adaptiveBitrateReduced") is True
+        if not status.connected:
+            adaptive_text = "-"
+        elif type(adaptive) is not bool:
+            adaptive_text = t("status.video.adaptive_unsupported")
+        elif adaptive:
+            adaptive_text = t("status.video.adaptive_reduced" if reduced else "status.video.adaptive_ready")
+        else:
+            adaptive_text = t("status.video.adaptive_off")
         data = {
             "iphone": (status.thermal_text, pressure_text, factor_text or "-",
                        format_mmss(ctrl.thermal_log.hot_seconds) if status.connected else "-", status.battery_text,
@@ -235,7 +250,8 @@ def build(ctrl):
             "video": (fps_text, dropped, drops,
                       _number(rec.get("droppedFrames"), "d") if isinstance(rec, dict) and isinstance(rec.get("droppedFrames"), int) else "-",
                       _number(phone.get("encodeMs"), ".1f") + " ms" if isinstance(phone.get("encodeMs"), (float, int)) else "-",
-                      _number(phone.get("processingMs"), ".1f") + " ms" if isinstance(phone.get("processingMs"), (float, int)) else "-"),
+                      _number(phone.get("processingMs"), ".1f") + " ms" if isinstance(phone.get("processingMs"), (float, int)) else "-",
+                      bitrate("bitrateSentMbps"), bitrate("bitrateTargetMbps"), adaptive_text),
             "pc": (dict(CODEC_LABELS).get(codec, "-") if status.connected else "-", decoder, output, status.watch_text,
                    status.dshow_text),
         }
