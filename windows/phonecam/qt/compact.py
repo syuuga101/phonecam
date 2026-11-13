@@ -25,6 +25,7 @@ GROUPS = {
     "connection": (
         ("connection.wifi.title", "wifi", ()),
         ("connection.run.title", "play", ("connection.run.mode", "connection.run.idle")),
+        ("multi.manage", "camera", ()),
     ),
     "video": (
         ("compact.video.input", "lens", ("video.lens.label", "video.outsize.label", "video.fps.label")),
@@ -120,7 +121,7 @@ def compact_page(page, ctrl, key):
         widget = item.widget()
         if widget is None:
             continue
-        if not isinstance(widget, Section) or widget.title_label and widget.title_label.text() == t("multi.output"):
+        if not isinstance(widget, Section):
             extra.append((widget, item.alignment(), widget.isHidden()))
             continue
         title = widget.title_label.text()

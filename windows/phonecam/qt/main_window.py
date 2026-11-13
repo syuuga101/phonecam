@@ -9,10 +9,9 @@ import threading
 import webbrowser
 
 from PySide6.QtCore import QByteArray, QEvent, QRect, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
-    QToolButton,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -36,12 +35,18 @@ from phonecam.core.paths import WINDOWS_DIR
 from phonecam.core.cameras import CameraGroup
 from phonecam.i18n import t
 from phonecam.qt import icons
-from phonecam.qt.widgets import _THEME_EVENTS, Combo, Hint, Page, blend, button, ref_palette, text_color
+from phonecam.qt.multicam import AddCameraWizard, ElidedLabel, Segmented
+from phonecam.qt.widgets import (
+    _THEME_EVENTS, MAX_CONTENT_W, PAGE_PAD_X, Hint, Page, blend, button, ref_palette, text_color,
+)
 
 # (キー, アイコン名)。順番がページ番号 (qt/pages/<キー>.py の build(ctrl) -> QWidget)
-NAV_ITEMS = [("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
+NAV_ITEMS = [("cameras", "camera"), ("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
              ("audio", "mic"), ("recording", "record"), ("status", "gauge"),
              ("shortcuts", "keyboard"), ("settings", "gear")]
+
+# カメラごとのページ (ページ見出しの右に「カメラ 1 | カメラ 2」を出す)。それ以外 (音声・ショートカット・設定・カメラ) はアプリ全体のページ
+PER_CAMERA = ("connection", "video", "quality", "effects", "recording", "status")
 
 NAV_WIDTH = 200
 TOAST_MS = 2000
@@ -145,7 +150,8 @@ class MainWindow(QMainWindow):
         self.ctrl = ctrl
         self.cameras = CameraGroup(ctrl)
         self.camera_index = 0
-        self.camera_pages = {}
+        self._cur = ctrl            # いま選んでいるカメラ (増減で番号がずれても追えるように持つ)
+        self.camera_pages = {}     # {(カメラ, ページのキー): ページ}。2 台目以降のカメラごとのページ (最初に開いたときに作る)
         self._observed_cameras = {ctrl}
         self.setWindowTitle(ctrl.app_title())
         self.setWindowIcon(window_icon())
@@ -176,7 +182,14 @@ class MainWindow(QMainWindow):
         head.setContentsMargins(0, 0, 12, 0)
         head.setSpacing(8)
         head.addWidget(self.app_icon, 0)
-        head.addWidget(self.app_name, 1)
+        names = QVBoxLayout()
+        names.setContentsMargins(0, 0, 0, 0)
+        names.setSpacing(1)
+        names.addWidget(self.app_name)
+        self.camera_sub = ElidedLabel()    # 「カメラ 2 · iPhone 13」(2 台以上のときだけ)
+        self.camera_sub.hide()
+        names.addWidget(self.camera_sub)
+        head.addLayout(names, 1)
         nl.addLayout(head)
         self.nav = QListWidget()
         self.nav.setFrameShape(QFrame.Shape.NoFrame)
@@ -205,23 +218,33 @@ class MainWindow(QMainWindow):
         warning_icon = QLabel()
         warning_icon.setPixmap(icons.pixmap("thermometer", 16, text_color(self.warn_bar)))
         self.warn_bar._lay.insertWidget(0, warning_icon)
-        camera_bar = QHBoxLayout()
-        camera_bar.setContentsMargins(12, 6, 12, 0)
-        self.camera_select = Combo()
-        self.camera_select.setAccessibleName(t("multi.camera"))
-        self.camera_select.activated.connect(self._select_camera)
-        self.camera_add = QToolButton()
-        self.camera_add.setText("+")
-        self.camera_add.setToolTip(t("multi.add"))
-        self.camera_add.setAccessibleName(t("multi.add"))
-        self.camera_add.clicked.connect(self._add_camera)
-        camera_bar.addWidget(self.camera_select)
-        camera_bar.addWidget(self.camera_add)
-        camera_bar.addStretch(1)
-        rl.addLayout(camera_bar)
-        self._refresh_camera_list()
         rl.addWidget(self.update_bar)
         rl.addWidget(self.warn_bar)
+        # ページ見出し (カメラが 2 台以上のときだけ): 左にページ名、右にカメラの切り替え。Page と同じ幅・余白でそろえる
+        self.page_header = QWidget()
+        header_outer = QHBoxLayout(self.page_header)
+        header_outer.setContentsMargins(0, 0, 0, 0)
+        header_col = QWidget()
+        header_col.setMaximumWidth(MAX_CONTENT_W + 2 * PAGE_PAD_X)
+        header_col.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        header_outer.addStretch(1)
+        header_outer.addWidget(header_col, 1000)
+        header_outer.addStretch(1)
+        header_lay = QHBoxLayout(header_col)
+        header_lay.setContentsMargins(PAGE_PAD_X, 16, PAGE_PAD_X, 0)
+        header_lay.setSpacing(12)
+        self.page_title = QLabel()
+        f = self.page_title.font()
+        f.setPointSizeF(16.0)
+        f.setWeight(QFont.Weight.DemiBold)
+        self.page_title.setFont(f)
+        self.segment = Segmented()
+        self.segment.activated.connect(self.select_camera)
+        header_lay.addWidget(self.page_title, 0)
+        header_lay.addStretch(1)
+        header_lay.addWidget(self.segment, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.page_header.hide()
+        rl.addWidget(self.page_header)
         self.stack = QStackedWidget()
         rl.addWidget(self.stack, 1)
         outer.addWidget(right, 1)
@@ -244,11 +267,20 @@ class MainWindow(QMainWindow):
         self._toast_timer.timeout.connect(self.toast_label.hide)
 
         self.nav.currentRowChanged.connect(self._page_selected)
-        self.nav.setCurrentRow(0)
+        self._cameras_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "cameras")
+        self._first_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "connection")
+        page = self.stack.widget(self._cameras_row)
+        if hasattr(page, "camera_chosen"):
+            page.camera_chosen.connect(self._camera_chosen)
+            page.add_requested.connect(self.add_camera)
+        self.cameras.changed.connect(self._cameras_changed)
+        self.cameras.audio_changed.connect(self._audio_changed)
+        self._sync_cameras()
+        self.nav.setCurrentRow(self._cameras_row if len(self.cameras.cameras) > 1 else self._first_row)
 
         ctrl.toast.connect(self.show_toast)
         ctrl.camera_prompt.connect(self._ask_camera_registration)
-        ctrl.status_changed.connect(lambda s: self._status(s) if self.camera_index == 0 else None)
+        ctrl.status_changed.connect(lambda s: self._camera_status(ctrl, s))
         ctrl.update_changed.connect(self._update_banner)
         ctrl.update_action.connect(self._update_action)
         self._status(ctrl.status)
@@ -262,26 +294,93 @@ class MainWindow(QMainWindow):
             self._tick_timer.start()
 
     # -- ページ --------------------------------------------------------------------
-    def _refresh_camera_list(self):
-        self.camera_select.clear()
-        for index, camera in enumerate(self.cameras.cameras):
-            self.camera_select.addItem(t("multi.camera_number", n=index + 1))
-        self.camera_select.setCurrentIndex(self.camera_index)
-        self.camera_select.setVisible(len(self.cameras.cameras) > 1)
-        self.camera_add.setEnabled(len(self.cameras.cameras) < 4)
+    def current_camera(self):
+        return self.cameras.cameras[self.camera_index]
+
+    def _sync_cameras(self):
+        """カメラの増減・割り当て・選択が変わったとき: ナビの「カメラ」、ページ見出しの切り替え、ナビ下の小さな表示を合わせる。"""
+        cams = self.cameras.cameras
+        multi = len(cams) > 1
+        self.camera_index = max(0, min(len(cams) - 1, self.camera_index))
+        # 取り除いたカメラのページを捨てる
+        for cache_key in [k for k in self.camera_pages if k[0] not in cams]:
+            page = self.camera_pages.pop(cache_key)
+            self.stack.removeWidget(page)
+            page.deleteLater()
+        self.nav.item(self._cameras_row).setHidden(not multi)
+        if not multi and self.nav.currentRow() == self._cameras_row:
+            self.nav.setCurrentRow(self._first_row)
+        self.segment.set_items([self.cameras.label(camera) for camera in cams], self.camera_index)
+        self.segment.setAccessibleName(t("multi.switch"))
+        self._sync_header()
+        self._sync_subtitle()
+
+    def _sync_subtitle(self):
+        multi = len(self.cameras.cameras) > 1
+        if multi:
+            camera = self.current_camera()
+            self.camera_sub.setText(t("multi.nav_sub", camera=self.cameras.label(camera),
+                                      phone=self.cameras.phone_name(camera)))
+        self.camera_sub.setVisible(multi)
+
+    def _sync_header(self):
+        row = self.nav.currentRow()
+        key = NAV_ITEMS[row][0] if row >= 0 else "connection"
+        multi = len(self.cameras.cameras) > 1
+        self.page_header.setVisible(multi)
+        self.page_title.setText(t("nav." + key))
+        self.segment.setVisible(multi and key in PER_CAMERA)
+
+    def _cameras_changed(self):
+        cams = self.cameras.cameras
+        if self._cur not in cams:      # 選んでいたカメラを削除した
+            self._sync_cameras()
+            self._select_camera(0)
+            return
+        self.camera_index = cams.index(self._cur)
+        self._sync_cameras()
+
+    def _audio_changed(self):
+        row = self.nav.currentRow()
+        if row >= 0 and NAV_ITEMS[row][0] == "audio":
+            self._page_selected(row)    # 音声ページは、音声を受け取るカメラのページに切り替える
+
+    def add_camera(self):
+        """「カメラを追加」ウィザード。終わったら、そのカメラを選んで「カメラ」ページに戻る。"""
+        if not self.cameras.can_add:
+            return
+        wizard = AddCameraWizard(self, self.cameras)
+        accepted = wizard.exec() == QDialog.DialogCode.Accepted
+        camera = wizard.camera
+        wizard.deleteLater()
+        if accepted and camera in self.cameras.cameras:
+            self.select_camera(self.cameras.cameras.index(camera))
+            self.nav.setCurrentRow(self._cameras_row)
 
     def _add_camera(self):
+        """ウィザードを通さずにカメラを足す (テスト用)。"""
         camera = self.cameras.add()
         if camera is None:
-            return
-        self._refresh_camera_list()
-        self._select_camera(len(self.cameras.cameras) - 1)
+            return None
+        self._sync_cameras()
+        self.select_camera(len(self.cameras.cameras) - 1)
+        return camera
+
+    def _camera_chosen(self, camera):
+        """「カメラ」ページのタイルをクリック: そのカメラを選んで接続ページへ。"""
+        if camera in self.cameras.cameras:
+            self.select_camera(self.cameras.cameras.index(camera))
+            self.nav.setCurrentRow(self._first_row)
+
+    def select_camera(self, index):
+        self._select_camera(index)
 
     def _select_camera(self, index):
         if not 0 <= index < len(self.cameras.cameras):
             return
         self.camera_index = index
-        self.camera_select.setCurrentIndex(index)
+        self._cur = self.cameras.cameras[index]
+        self._sync_cameras()
         row = self.nav.currentRow()
         self._page_selected(max(0, row))
         self._status(self.cameras.cameras[index].status)
@@ -291,8 +390,9 @@ class MainWindow(QMainWindow):
         try:
             mod = importlib.import_module("phonecam.qt.pages." + key)
             page = mod.build(ctrl)
-            from phonecam.qt.compact import compact_page
-            compact_page(page, ctrl, key)
+            if key != "cameras":
+                from phonecam.qt.compact import compact_page
+                compact_page(page, ctrl, key)
         except Exception as e:   # 1ページの不具合でアプリ本体を止めない
             import traceback
             traceback.print_exc()
@@ -314,32 +414,36 @@ class MainWindow(QMainWindow):
         if row < 0:
             return
         key = NAV_ITEMS[row][0]
-        page_index = self.camera_index
-        if key in ("settings", "shortcuts"):
-            page_index = 0
+        camera = self.current_camera()
+        if key in ("settings", "shortcuts", "cameras"):
+            camera = self.ctrl
         elif key == "audio":
-            page_index = self.cameras.audio_index
-        if page_index == 0:
+            camera = self.cameras.cameras[self.cameras.audio_index]
+        if camera is self.ctrl:
             self.stack.setCurrentIndex(row)
         else:
-            cache_key = (page_index, key)
+            cache_key = (camera, key)
             if cache_key not in self.camera_pages:
-                ctrl = self.cameras.cameras[page_index]
-                page = self._load_page(key, ctrl)
+                page = self._load_page(key, camera)
                 self.camera_pages[cache_key] = page
                 self.stack.addWidget(page)
-                if ctrl not in self._observed_cameras:
-                    self._observed_cameras.add(ctrl)
-                    ctrl.status_changed.connect(lambda status, i=page_index: self._status(status)
-                                                if self.camera_index == i else None)
-                    ctrl.toast.connect(self.show_toast)
+                if camera not in self._observed_cameras:
+                    self._observed_cameras.add(camera)
+                    camera.status_changed.connect(lambda status, c=camera: self._camera_status(c, status))
+                    camera.toast.connect(self.show_toast)
             self.stack.setCurrentWidget(self.camera_pages[cache_key])
+        self._sync_header()
         fn = getattr(self.stack.currentWidget(), "on_activated", None)
         if callable(fn):
             try:
                 fn()
             except Exception:
                 pass
+
+    def _camera_status(self, camera, status):
+        if camera in self.cameras.cameras and self.cameras.cameras[self.camera_index] is camera:
+            self._status(status)
+            self._sync_subtitle()
 
     # -- ナビのアイコン (パレットが変わったら作り直す) ------------------------------------
     def _refresh_nav_icons(self):

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QWidget
 from phonecam.core.audio_engine import SYSTEM_DEFAULT_KEY, find_vbcable_control_panel, list_output_devices
 from phonecam.core.settings import AUDIO_AVAILABLE
 from phonecam.i18n import t
-from phonecam.qt.widgets import Page, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
+from phonecam.qt.widgets import Card, Combo, Page, Row, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
 from phonecam.ui.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
 
 
@@ -46,8 +46,39 @@ class _Meter(QWidget):
         painter.drawText(width + 8, int((self.height() + self.fontMetrics().ascent()) / 2) - 1, f"{self.db:.0f} dBFS")
 
 
+def _build_source(page, ctrl):
+    """「音声を受け取るカメラ」(2 台以上のときだけ)。項目は「カメラ 1 · iPhone 16 Pro」。"""
+    group = getattr(ctrl, "camera_group", None)
+    if group is None:
+        return
+    card = Card()
+    row = Row("mic", t("multi.audio_source"), t("multi.audio_hint"))
+    combo = Combo()
+    combo.setMinimumWidth(230)
+    combo.setAccessibleName(t("multi.audio_source"))
+    row.addControl(combo)
+    card.layout().addWidget(row)
+    page.add(card)
+
+    def refresh(*_):
+        combo.blockSignals(True)
+        combo.clear()
+        for index, camera in enumerate(group.cameras):
+            combo.addItem(group.camera_choice(camera), index)
+        combo.setCurrentIndex(group.audio_index)
+        combo.blockSignals(False)
+        card.setVisible(len(group.cameras) > 1)
+
+    combo.activated.connect(lambda index: group.select_audio(combo.itemData(index)))
+    group.changed.connect(refresh)
+    group.audio_changed.connect(refresh)
+    page.on_activated = refresh      # iPhone 名は接続したあとに分かることがあるので、開くたびに作り直す
+    refresh()
+
+
 def build(ctrl):
     page = Page()
+    _build_source(page, ctrl)
 
     def apply(_):
         ctrl.apply_audio()
