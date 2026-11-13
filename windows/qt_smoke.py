@@ -135,6 +135,44 @@ def child(scale, out):
             _settle(app, 150)
             win.grab().save(os.path.join(out, base + "_scroll.png"))
             print("  %s: scroll max=%d" % (base, bar.maximum()))
+    # 空の状態: 見つかった端末が 2 台 -> 0 台 (登録も消す) に変えてから、Wi-Fi 折りたたみを開いて撮る
+    conn = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "connection")
+    win.resize(W, H)
+    win.select(conn)
+    _settle(app)
+    wireless = win.current_page().wireless
+    for expander in win.current_page().findChildren(Expander):
+        expander.set_expanded(True, animate=False, save=False)
+    _settle(app, 200)
+    ctrl.settings["known_devices"] = []
+    ctrl.demo_discovered = []
+    wireless.discovered = []
+    wireless._render()
+    ctrl.state.update(transport="usb", peer="")   # 接続中の表示は外す
+    ctrl.poll()
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app, 500)
+        win.current_page().verticalScrollBar().setValue(0)
+        _settle(app, 150)
+        win.grab()   # 1 回目は保留中のレイアウトを確定させるだけ (撮り直す)
+        _settle(app, 150)
+        inner = win.current_page().widget()
+        win.grab().save(os.path.join(out, "empty_state_%s_x%s.png" % (theme, scale)))
+        for expander in win.current_page().findChildren(Expander):
+            if expander.expanded:
+                shot = wireless.devices_box.mapTo(win.current_page().widget(), wireless.devices_box.rect().topLeft()).y()
+                win.current_page().verticalScrollBar().setValue(max(0, shot - 80))
+                _settle(app, 150)
+                win.grab()
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, "empty_state_%s_x%s_scroll.png" % (theme, scale)))
+                break
+    box = wireless.devices_box
+    need = box.layout().totalHeightForWidth(box.width())
+    print("empty box height=%d need=%d" % (box.height(), need))
+    if box.height() < need:
+        failed.append(("connection", "empty state squeezed (%d < %d)" % (box.height(), need)))
     # カメラが 2 台以上のとき (カメラ切り替え・出力先の欄が出る状態): 接続・映像ページをカメラ 1 / 2 で撮る
     win.resize(W, H)
     win._add_camera()
