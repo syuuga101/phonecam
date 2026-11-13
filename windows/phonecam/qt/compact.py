@@ -23,7 +23,7 @@ PRIMARY = {
 # Section title, icon, and (where useful) the rows to summarize, in display order.
 GROUPS = {
     "connection": (
-        ("connection.wifi.title", "wifi", ()),
+        ("connection.wifi.title", "wifi", ("wireless.method", "connection.wifi.ip")),
         ("connection.run.title", "play", ("connection.run.mode", "connection.run.idle")),
     ),
     "video": (
@@ -120,7 +120,7 @@ def compact_page(page, ctrl, key):
         if widget is None:
             continue
         if not isinstance(widget, Section):
-            extra.append((widget, item.alignment()))
+            extra.append((widget, item.alignment(), widget.isHidden()))
             continue
         title = widget.title_label.text()
         children = groups.setdefault(title, [])
@@ -137,8 +137,9 @@ def compact_page(page, ctrl, key):
         widget.hide()
         widget.deleteLater()
 
-    for widget, alignment in extra:
+    for widget, alignment, hidden in extra:
         page.column.addWidget(widget, 0, alignment)
+        widget.setVisible(not hidden)
 
     primary = Section(t("compact.primary"))
     for label in wanted:
@@ -167,7 +168,9 @@ def compact_page(page, ctrl, key):
         refresh = partial(_set_summary, expander, summary_rows[:3])
         for row in summary_rows[:3]:
             for control in row.controls():
-                if isinstance(control, QLineEdit):
+                if isinstance(control, QComboBox):
+                    control.currentTextChanged.connect(lambda *_args, fn=refresh: fn())
+                elif isinstance(control, QLineEdit):
                     control.textChanged.connect(lambda *_args, fn=refresh: fn())
                 elif isinstance(control, QKeySequenceEdit):
                     control.keySequenceChanged.connect(lambda *_args, fn=refresh: fn())
