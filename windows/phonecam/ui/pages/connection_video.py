@@ -35,7 +35,7 @@ from phonecam.ui.labels import (
 )
 from phonecam.ui.pages.preview import build_preview
 from phonecam.ui.tkdeps import messagebox, tk, ttk
-from phonecam.ui.widgets import row, section
+from phonecam.ui.widgets import page, row, section
 
 
 def _dim(label):
@@ -557,6 +557,7 @@ def toggle_connect(app):
 def build_connection(app, parent):
     """接続ページ: 状態 + 開始/接続ボタン → プレビュー → 数値 → 接続方法 → Wi-Fi → カメラの動作。"""
     _init_vars(app)
+    parent = page(parent)   # 他のページと同じ「最大幅・中央寄せ・スクロール」の内容列に積む
     _build_header(app, parent)
     build_preview(app, parent)
     _build_numbers(app, parent)

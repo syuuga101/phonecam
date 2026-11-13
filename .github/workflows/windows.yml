@@ -134,7 +134,7 @@ jobs:
           $bins = @("--add-binary", "$dll64;softcam")
           $dll32 = Join-Path $out "softcam32.dll"
           if (Test-Path $dll32) { $bins += @("--add-binary", "$dll32;softcam") } else { Write-Host "softcam32.dll は無いため 64bit のみ埋め込みます" }
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name PhoneCamReceiver --collect-all av --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @bins phonecam_receiver.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @bins phonecam_receiver.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller に失敗しました" }
           if (-not (Test-Path dist/PhoneCamReceiver.exe)) { throw "PhoneCamReceiver.exe が作成されませんでした" }
 

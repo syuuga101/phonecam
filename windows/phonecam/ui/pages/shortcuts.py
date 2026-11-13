@@ -156,7 +156,7 @@ def _build_hotkeys(app, parent):
         app.hk_buttons[action] = b
         kv = tk.StringVar(value="")
         app.hk_key_vars[action] = kv
-        ttk.Label(r, textvariable=kv, font=("Segoe UI Semibold", 10), width=22, anchor="e").pack(side="right")
+        ttk.Label(r, textvariable=kv, font=theme.font("strong", "bold"), width=22, anchor="e").pack(side="right")
         nv = tk.StringVar(value="")
         app.hk_note_vars[action] = nv
         ttk.Label(keys, textvariable=nv, foreground=theme.colors()["live"]).pack(anchor="e")

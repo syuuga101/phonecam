@@ -62,7 +62,7 @@ def _style_ok(style):
         return False
 
 
-MAX_CONTENT_W = 880   # 内容列の最大幅 (論理px。Windows 11 設定アプリ相当)。実際は px() で DPI 倍する
+MAX_CONTENT_W = 760   # 内容列の最大幅 (論理px。Windows 11 設定アプリ相当)。実際は px() で DPI 倍する
 PAGE_PAD_X = 24
 
 
@@ -81,14 +81,14 @@ def page(parent):
     canvas.pack(side="left", fill="both", expand=True)
     padx = px(PAGE_PAD_X)
     body = ttk.Frame(canvas, padding=(padx, px(8), padx, px(24)))
-    win = canvas.create_window((0, 0), window=body, anchor="n")
+    win = canvas.create_window((0, 0), window=body, anchor="nw")
     state = {"w": 0}
     body.bind("<Configure>", lambda e: canvas.configure(scrollregion=(0, 0, canvas.winfo_width(), canvas.bbox("all")[3] if canvas.bbox("all") else 0)))
 
     def on_canvas(e):
         col = min(e.width, px(MAX_CONTENT_W) + 2 * padx)
-        canvas.coords(win, e.width // 2, 0)
-        canvas.itemconfigure(win, width=col)
+        canvas.coords(win, max(0, (e.width - col) // 2), 0)
+        canvas.itemconfigure(win, width=col, anchor="nw")
         inner = max(0, col - 2 * padx)
         canvas.configure(scrollregion=(0, 0, e.width, canvas.bbox("all")[3] if canvas.bbox("all") else 0))
         if inner != state["w"]:

@@ -236,6 +236,8 @@ class App:
         root.after(600, self._first_run_check)
         root.after(2500, self._audio_startup_check)
         self._update_init()
+        root.after(0, theme.reapply_fonts)   # UI 構築後にもう一度 (sv-ttk のフォント直書きに負けないように)
+        root.after(300, theme.reapply_fonts)
 
     # -- 補助 -------------------------------------------------------------
     def _get_mode_ip(self):

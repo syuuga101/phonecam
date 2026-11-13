@@ -12,7 +12,7 @@ from phonecam.ui.util import webbrowser_open
 
 AUTHOR = "syuuga101"
 REPO_URL = "https://github.com/syuuga101/phonecam"
-GUIDE_URL = "https://github.com/syuuga101/phonecam/tree/main/docs/guide"
+GUIDE_URL = "https://github.com/syuuga101/phonecam/wiki"
 TRANSLATE_URL = "https://crowdin.com/project/phonecam"  # 仮 (Crowdin プロジェクト作成後に差し替える)
 ISSUES_URL = REPO_URL + "/issues"
 LICENSE_TEXT = "GPL-2.0-or-later"

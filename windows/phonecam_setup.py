@@ -2591,6 +2591,13 @@ class SetupController:
 _FALLBACK_COLORS = {"bg": "#fafafa", "card": "#ffffff", "text": "#1c1c1c", "text2": "#616161",
                     "separator": "#e5e5e5", "accent": "#005fb8", "live": "#c42b1c", "ok": "#0f7b0f"}
 
+def _checkbutton(parent, **kw):
+    """ttk.Checkbutton (theme.py の DPI 対応インジケータが効く)。ttk が無い環境だけ tk.Checkbutton。"""
+    if ttk is not None:
+        return ttk.Checkbutton(parent, **kw)
+    return tk.Checkbutton(parent, **kw)
+
+
 BG = PANEL = FG = SUB = LINE = ACCENT = GOOD = WARN = BAD = ""
 ACCENT_FG = ACCENT_HOVER = PANEL_HOVER = DISABLED_FG = ""
 _COLOR_NAMES = ("BG", "PANEL", "FG", "SUB", "LINE", "ACCENT", "GOOD", "WARN", "BAD",
@@ -2976,8 +2983,8 @@ class SetupPanel:
         locked = comp["required"] and state == STATE_MISSING
         if locked:
             var.set(True)
-        cb = tk.Checkbutton(action, variable=var, bg=BG, activebackground=BG, bd=0, highlightthickness=0,
-                            command=lambda cid=cid, v=var: c.set_selected(cid, v.get()))
+        cb = _checkbutton(action, variable=var,
+                             command=lambda cid=cid, v=var: c.set_selected(cid, v.get()))
         if locked:
             cb.config(state="disabled")
         cb.pack()
@@ -3342,9 +3349,8 @@ class SetupWizard:
         self.mic_var = tk.BooleanVar(value=self.controller.mic)
         # VB-CABLE が導入済みなら選ぶ必要がないので表示しない (_sync_mic_option で出し入れする)
         self.mic_box = tk.Frame(self.body, bg=BG)
-        tk.Checkbutton(self.mic_box, text=t("setup.wizard.setupwizard__page_check_1"), variable=self.mic_var, bg=BG,
-                       activebackground=BG, fg=FG, font=(FONT, 10), bd=0, highlightthickness=0,
-                       command=self._mic_changed).pack(anchor="w")
+        _checkbutton(self.mic_box, text=t("setup.wizard.setupwizard__page_check_1"), variable=self.mic_var,
+                     command=self._mic_changed).pack(anchor="w")
         tk.Label(self.mic_box, text=t("setup.wizard.setupwizard__page_check_2"),
                  bg=BG, fg=SUB, font=(FONT, 9), justify="left", anchor="w",
                  wraplength=px(480)).pack(anchor="w", fill="x", padx=(px(22), 0))

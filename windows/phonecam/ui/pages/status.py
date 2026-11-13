@@ -138,7 +138,7 @@ def _build_latency(app, parent):
         r = row(f, icon, t(name))
         var = tk.StringVar(value="-")
         if key == "total":
-            _value_label(r, var, font=("Segoe UI Semibold", 10))
+            _value_label(r, var, font=theme.font("strong", "bold"))
         else:
             _value_label(r, var)
         app.lat_vars[key] = var

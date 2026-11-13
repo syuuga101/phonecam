@@ -123,20 +123,13 @@ def _hex_rgb(h):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def _render(name, size, color):
-    """設計グリッド 24 を size px に描いた RGBA 画像。"""
-    big = size * _SS
-    k = big / _G
-    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    rgb = _hex_rgb(color) + (255,)
-    w = max(1, int(round(_STROKE * k * (size / 16.0) ** 0 * 1.0)))
-
+def _draw_prims(d, name, k, ox, oy, rgb, w):
+    """設計グリッド 24 の線画 name を、倍率 k・原点 (ox, oy)・線幅 w(px) で d に描く。"""
     def S(pts):
-        return [(x * k, y * k) for x, y in pts]
+        return [(ox + x * k, oy + y * k) for x, y in pts]
 
     def bb(b):
-        return [b[0] * k, b[1] * k, b[2] * k, b[3] * k]
+        return [ox + b[0] * k, oy + b[1] * k, ox + b[2] * k, oy + b[3] * k]
 
     def cap(x, y):
         r = w / 2.0
@@ -166,7 +159,57 @@ def _render(name, size, color):
                 cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
                 rx, ry = (b[2] - b[0]) / 2, (b[3] - b[1]) / 2
                 cap(cx + rx * math.cos(math.radians(ang)), cy + ry * math.sin(math.radians(ang)))
+
+
+def _render(name, size, color):
+    """設計グリッド 24 を size px に描いた RGBA 画像。"""
+    big = size * _SS
+    k = big / _G
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    w = max(1, int(round(_STROKE * k)))
+    _draw_prims(d, name, k, 0, 0, _hex_rgb(color) + (255,), w)
     return img.resize((size, size), Image.LANCZOS)
+
+
+# カメラ線画 (camera) の外形: x 2.5..21.5, y 4.5..20 (設計グリッド)
+_CAM_W, _CAM_CX, _CAM_CY = 19.0, 12.0, 12.25
+_PLATE = "#F2F2F2"
+_GLYPH_DARK = "#1C1C1E"
+ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+
+def camera_glyph(size, color, span=0.62, plate=None, stroke=None):
+    """カメラ線画を size px で描く。span = 画像幅に対するグリフ幅、plate = 角丸の下地色 (None なら透明)。
+    線幅はサイズごとに決める (小さいサイズでも潰れない最小値あり)。"""
+    ss = 8 if size <= 64 else 4
+    big = size * ss
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    if plate:
+        d.rounded_rectangle([0, 0, big - 1, big - 1], radius=big * 0.22, fill=_hex_rgb(plate) + (255,))
+    k = span * big / _CAM_W
+    ox = big / 2.0 - _CAM_CX * k
+    oy = big / 2.0 - _CAM_CY * k
+    if stroke is None:
+        stroke = max(1.3, size * 0.062)   # px (16->1.3, 32->2.0, 256->15.9)
+    w = max(1, int(round(stroke * ss)))
+    _draw_prims(d, "camera", k, ox, oy, _hex_rgb(color) + (255,), w)
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def app_icon_image(size):
+    """タスクバー/ウィンドウ/exe 用: 明るい角丸プレート + 黒の線画カメラ (サイズごとに描く)。"""
+    return camera_glyph(size, _GLYPH_DARK, span=0.62, plate=_PLATE)
+
+
+def write_icon_assets(out_dir):
+    """assets/icon_app.png (256) と assets/icon.ico (16..256 の複数サイズ) を書き出す。"""
+    os.makedirs(out_dir, exist_ok=True)
+    imgs = {s: app_icon_image(s) for s in ICON_SIZES}
+    imgs[256].save(os.path.join(out_dir, "icon_app.png"))
+    imgs[256].save(os.path.join(out_dir, "icon.ico"), format="ICO", sizes=[(s, s) for s in ICON_SIZES],
+                   append_images=[imgs[s] for s in ICON_SIZES if s != 256])
 
 
 def _to_photo(img):
@@ -191,36 +234,37 @@ def get(name, size=16, color=None):
     return ph
 
 
-def _find_app_icon():
+def _asset_dirs():
     from phonecam.core.paths import WINDOWS_DIR
     import sys
-    bases = [getattr(sys, "_MEIPASS", None), WINDOWS_DIR, os.path.dirname(WINDOWS_DIR)]
-    for b in bases:
-        if not b:
-            continue
-        for rel in ("assets/icon.png", "docs/icon.png"):
-            p = os.path.join(b, rel)
-            if os.path.isfile(p):
-                return p
+    return [d for d in (os.path.join(getattr(sys, "_MEIPASS", "") or "", "assets") if getattr(sys, "_MEIPASS", None) else None,
+                        os.path.join(WINDOWS_DIR, "assets"),
+                        os.path.join(os.path.dirname(WINDOWS_DIR), "assets")) if d]
+
+
+def _find_asset(name):
+    for d in _asset_dirs():
+        p = os.path.join(d, name)
+        if os.path.isfile(p):
+            return p
     return None
 
 
 def app_icon(size=20):
-    """アプリアイコン (assets/icon.png → 無ければ camera の線画)。"""
-    key = ("__app__", size)
+    """ナビ左上のアイコン: 下地なし・テーマの文字色のカメラ線画 (テーマごとにキャッシュ)。"""
+    col = theme.colors()["text"]
+    key = ("__app__", size, theme.current(), col)
     ph = _cache.get(key)
     if ph is not None:
         return ph
     if Image is not None:
         try:
-            p = _find_app_icon()
-            if p:
-                img = Image.open(p).convert("RGBA").resize((px(size), px(size)), Image.LANCZOS)
-                ph = _to_photo(img)
-        except Exception:
+            ph = _to_photo(camera_glyph(px(size), col, span=0.92, stroke=max(1.4, px(size) * 0.085)))
+        except Exception as e:
+            theme._log("app_icon: %r" % (e,))
             ph = None
     if ph is None:
-        ph = get("camera", size, theme.colors()["accent"])
+        ph = get("camera", size, col)
     if ph is not None:
         _cache[key] = ph
     return ph
@@ -230,30 +274,49 @@ _window_icons = []   # PhotoImage を GC させない
 
 
 def set_window_icon(root):
-    """ウィンドウ/タスバーのアイコンを PhoneCam にする (iconphoto + 可能なら iconbitmap)。"""
-    p = _find_app_icon()
-    if not p or Image is None:
-        return False
+    """ウィンドウ/タスクバーのアイコンを PhoneCam にする。
+    (1) iconphoto: サイズごとに PIL で描いた PNG を tk.PhotoImage(data=) で渡す (PIL.ImageTk は使わない)
+    (2) iconbitmap: 同梱の assets/icon.ico (凍結 exe では sys._MEIPASS/assets)、無ければ PIL で一時 .ico を作る
+    どちらかが失敗しても残りを実行し、失敗は phonecam_ui.log に残す。"""
     ok = False
-    try:
-        base = Image.open(p).convert("RGBA")
-        photos = []
-        for sz in (16, 32, 48, 64, 128, 256):
-            photos.append(_to_photo(base.resize((sz, sz), Image.LANCZOS)))
-        _window_icons.extend(photos)
-        root.iconphoto(True, *photos)
-        ok = True
-    except Exception:
-        pass
-    try:
-        ico = os.path.join(os.path.dirname(p), "icon.ico")
-        if not os.path.isfile(ico) and os.name == "nt":
-            import tempfile
-            ico = os.path.join(tempfile.gettempdir(), "phonecam_icon.ico")
-            Image.open(p).convert("RGBA").save(ico, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (256, 256)])
-        if os.name == "nt" and os.path.isfile(ico):
-            root.iconbitmap(default=ico)
+    if Image is not None:
+        try:
+            photos = [_to_photo(app_icon_image(s)) for s in ICON_SIZES]
+            _window_icons.extend(photos)
+            root.iconphoto(True, *photos)
             ok = True
-    except Exception:
-        pass
+        except Exception as e:
+            theme._log("iconphoto(data): %r" % (e,))
+    if not ok:
+        p = _find_asset("icon_app.png")
+        if p:
+            try:
+                ph = tk.PhotoImage(file=p)
+                _window_icons.append(ph)
+                root.iconphoto(True, ph)
+                ok = True
+            except Exception as e:
+                theme._log("iconphoto(file): %r" % (e,))
+    if os.name == "nt":
+        ico = _find_asset("icon.ico")
+        try:
+            if not ico and Image is not None:
+                import tempfile
+                ico = os.path.join(tempfile.gettempdir(), "phonecam_icon.ico")
+                write_icon_assets(os.path.dirname(ico) + os.sep + "phonecam_icon_tmp")
+                import shutil
+                shutil.copyfile(os.path.join(os.path.dirname(ico), "phonecam_icon_tmp", "icon.ico"), ico)
+            if ico and os.path.isfile(ico):
+                try:
+                    root.iconbitmap(default=ico)
+                    ok = True
+                except Exception as e:
+                    theme._log("iconbitmap(default): %r" % (e,))
+                try:
+                    root.wm_iconbitmap(ico)
+                    ok = True
+                except Exception as e:
+                    theme._log("wm_iconbitmap: %r" % (e,))
+        except Exception as e:
+            theme._log("ico: %r" % (e,))
     return ok
