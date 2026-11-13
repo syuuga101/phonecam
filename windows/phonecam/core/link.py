@@ -6,6 +6,7 @@ import json
 import socket
 import threading
 import time
+from phonecam.core.crashlog import log_error
 from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, pad_color_for
 from phonecam.core.decoder import (
     BacklogGuard,
@@ -63,6 +64,9 @@ class Link:
         self._stop = threading.Event()
         self._sock = None
         self._send_lock = threading.Lock()
+        self._tx_cond = threading.Condition()
+        self._tx_pending = {}      # GUI スレッドから渡された、まだ送っていない制御 (キーごとに最新値)
+        self._tx_thread = None
         self.last_frame_size = None  # 最後にデコードしたフレームの (幅, 高さ)
         self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
         self._decoder_key = None
@@ -114,6 +118,36 @@ class Link:
         self.latency.reset()
 
     def send_control(self, control):
+        """iPhone へ制御メッセージを送る。GUI (メイン) スレッドから呼ばれたときは、送信が詰まっても画面を止めないよう
+        バックグラウンドの送信スレッドに渡す (スライダーを速く動かすと 1 秒に何度も呼ばれる)。"""
+        if self._sock is None:
+            return False
+        if threading.current_thread() is threading.main_thread():
+            return self._queue_control(control)
+        return self._send_control_now(control)
+
+    def _queue_control(self, control):
+        with self._tx_cond:
+            pending = self._tx_pending
+            for k, v in control.items():
+                pending[k] = v  # 同じキーは最新値で上書き (bitrate などは最後の値だけ送れば足りる)
+            if self._tx_thread is None or not self._tx_thread.is_alive():
+                self._tx_thread = threading.Thread(target=self._tx_loop, name="phonecam-tx", daemon=True)
+                self._tx_thread.start()
+            self._tx_cond.notify()
+        return True
+
+    def _tx_loop(self):
+        while True:
+            with self._tx_cond:
+                while not self._tx_pending:
+                    if not self._tx_cond.wait(30.0) and not self._tx_pending:
+                        self._tx_thread = None
+                        return  # 使われなくなったら終わる (次回また作る)
+                pending, self._tx_pending = self._tx_pending, {}
+            self._send_control_now(pending)
+
+    def _send_control_now(self, control):
         sock = self._sock
         if sock is None:
             return False
@@ -123,6 +157,11 @@ class Link:
                 sock.sendall(data)
             return True
         except Exception:
+            # 途中まで送ってしまった可能性がある (タイムアウト等)。メッセージの区切りが壊れるので接続ごと閉じて作り直す
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
             return False
 
     def retry_auth(self):
@@ -189,6 +228,8 @@ class Link:
             except Exception as e:
                 if not stop.is_set():
                     self.state.update(error_text="切断: %s" % e)
+                    if not isinstance(e, (OSError, ConnectionError, PhoneCamError)):
+                        log_error("link session")  # 想定外の例外だけ記録する (通常の切断は記録しない)
             finally:
                 self._sock = None
                 try:
@@ -426,6 +467,7 @@ class Link:
                     self._fps_count = 0
                     self._fps_t0 = now
         except Exception as e:
+            log_error("output loop")
             self._out_error = e  # 受信スレッドが次のパケットで取り出して再接続する
 
     def _receive_loop(self, sock, stop, decoders, fitter, last_kf, frame_count, fps_t0, decode_avg, pending_timing):
