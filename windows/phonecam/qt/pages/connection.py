@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from phonecam.core.deps import np
 from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import t
+from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
     ErrorLabel,
     Hint,
@@ -265,6 +266,8 @@ class ConnectionPage(Page):
         self.preview = self.add(PreviewView(ctrl))
         self.connection_status = StatusValue()
         self.column.addWidget(self.connection_status, 0, Qt.AlignmentFlag.AlignLeft)
+        self.wifi_warning = self.add(Hint(t("wireless.timeout")))
+        self.wifi_warning.hide()
         self._build_numbers()
         self._build_method()
         self._build_wifi()
@@ -354,6 +357,7 @@ class ConnectionPage(Page):
     # -- Wi-Fi ----------------------------------------------------------------------
     def _build_wifi(self):
         sec = self.add_section(t("connection.wifi.title"))
+        self.wireless = WirelessOptions(self, sec, self.ctrl, self.wifi_warning)
         row = sec.add_row("wifi", t("connection.wifi.ip"))
         row.addControl(bound_line(self.ctrl, "ip", width=180))
 
@@ -369,6 +373,9 @@ class ConnectionPage(Page):
         self.code_edit.textEdited.connect(self._code_edited)
         row.addControl(self.code_edit)
         self.ctrl.settings_changed.connect(self._code_setting)
+
+    def on_activated(self):
+        self.wireless.start()
 
     def _code_edited(self, text):
         code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
@@ -396,6 +403,7 @@ class ConnectionPage(Page):
     def update_status(self, s):
         if not s:
             return
+        self.wireless.status(s)
         level = "error" if s.error_text else "ok" if s.connected else "warning" if s.wanted else None
         self.connection_status.set_status(t("compact.connected") if s.connected else s.state_text, level)
         self.dot.set_key(s.key)

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @State private var showScanner = false
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("showLevel") private var showLevel = true
 
@@ -85,6 +86,13 @@ struct SettingsView: View {
                 SettingsLabel("Wi-Fiからの接続を許可", symbol: "wifi")
             }
             if model.wifiAllowed {
+                Button {
+                    showScanner = true
+                } label: {
+                    Label("wireless.scan.title", systemImage: "qrcode.viewfinder")
+                }
+                .disabled(model.recActive)
+                .sheet(isPresented: $showScanner) { WirelessScanner(model: model) }
                 VStack(spacing: 8) {
                     Text(model.pairingCode)
                         .font(.title.monospaced())
