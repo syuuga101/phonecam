@@ -3,6 +3,7 @@
 """
 
 import os
+import re
 import sys
 import time
 from phonecam.core.audio_engine import AudioEngine
@@ -225,6 +226,7 @@ class App:
         root.minsize(px(560), px(560))
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry("%dx%d" % (min(px(640), int(sw * 0.92)), min(px(720), int(sh * 0.9))))
+        self._restore_window_state()
         self._build_ui()
         self._update_enabled()
         self._apply_audio()
@@ -238,6 +240,27 @@ class App:
         self._update_init()
         root.after(0, theme.reapply_fonts)   # UI 構築後にもう一度 (sv-ttk のフォント直書きに負けないように)
         root.after(300, theme.reapply_fonts)
+
+    def _restore_window_state(self):
+        root = self.root
+        try:
+            if self.settings.get("window_maximized", True):
+                root.state("zoomed")
+                return
+            g = self.settings.get("tk_window_geometry", "")
+            m = re.match(r"^(\d+)x(\d+)([+-]\d+)([+-]\d+)$", g or "")
+            if not m:
+                return
+            w, h, x, y = int(m[1]), int(m[2]), int(m[3]), int(m[4])
+            root.update_idletasks()
+            vx, vy = root.winfo_vrootx(), root.winfo_vrooty()
+            vw, vh = root.winfo_vrootwidth(), root.winfo_vrootheight()
+            if vw <= 1 or vh <= 1:
+                vx, vy, vw, vh = 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+            if x < vx + vw and x + w > vx and y < vy + vh and y + h > vy:
+                root.geometry(g)
+        except Exception:
+            pass
 
     # -- 補助 -------------------------------------------------------------
     def _get_mode_ip(self):
@@ -648,6 +671,13 @@ class App:
             pass
         try:
             self.audio.stop()
+        except Exception:
+            pass
+        try:
+            zoomed = self.root.state() == "zoomed"
+            self.settings["window_maximized"] = zoomed
+            if not zoomed:
+                self.settings["tk_window_geometry"] = self.root.geometry()
         except Exception:
             pass
         save_settings(self.settings)

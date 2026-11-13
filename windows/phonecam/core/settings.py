@@ -4,6 +4,7 @@
 
 import json
 import os
+import re
 import shutil
 import threading
 from phonecam.core.audio_engine import AUDIO_PRIORITIES
@@ -113,6 +114,7 @@ DEFAULT_SETTINGS = {
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
     "idle_stop_sec": 10,
     "window_maximized": True,    # Qt UI: 最大化で起動する
+    "tk_window_geometry": "",    # Tk UI: 最大化していないときの位置と大きさ ("WxH+X+Y")
     "window_geometry": "",       # Qt UI: 最大化を解除して閉じたときの位置と大きさ (saveGeometry() の base64)
     # 初回セットアップ (ウィザード) を終えたか
     "setup_done": False,
@@ -357,6 +359,9 @@ def sanitize_settings(s):
     s["window_maximized"] = bool(s.get("window_maximized", True))
     if not isinstance(s.get("window_geometry"), str) or len(s["window_geometry"]) > 4096:
         s["window_geometry"] = ""
+    tg = s.get("tk_window_geometry")
+    if not isinstance(tg, str) or not re.match(r"^\d+x\d+[+-]\d+[+-]\d+$", tg):
+        s["tk_window_geometry"] = ""
     # カメラの動かし方
     if s.get("run_mode") not in RUN_MODES:
         s["run_mode"] = DEFAULT_SETTINGS["run_mode"]
