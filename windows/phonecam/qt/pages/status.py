@@ -106,13 +106,38 @@ def _open_timer(page):
     return dialog
 
 
+DROP_WARN_TOTAL = 100    # 取りこぼしの合計がこの数を超えたら注意
+DROP_WARN_RECENT = 10    # 直近 DROP_WARN_WINDOW_SEC 秒でこれ以上増えたら注意
+DROP_WARN_WINDOW_SEC = 30.0
+
+
+class DropTrend:
+    """取りこぼしたフレーム数 (接続してからの累計) を見て、注意を出すか決める。
+    数コマ程度では出さず、合計が多い・直近で増え続けているときだけ True。"""
+
+    def __init__(self):
+        self.samples = []
+
+    def update(self, total, now):
+        if total is None:
+            self.samples = []
+            return False
+        if self.samples and total < self.samples[-1][1]:
+            self.samples = []     # 再接続でカウントが戻った
+        self.samples.append((now, total))
+        self.samples = [s for s in self.samples if now - s[0] <= DROP_WARN_WINDOW_SEC]
+        recent = total - self.samples[0][1]
+        return total >= DROP_WARN_TOTAL or recent >= DROP_WARN_RECENT
+
+
 def build(ctrl):
     page = Page()
     values = {}
+    _drop_trend = DropTrend()
     sections = (
         ("iphone", (("thermal", "thermometer"), ("pressure", "gauge"), ("factors", "info"),
                     ("hot", "clock"), ("battery", "battery"), ("lowpower", "battery"))),
-        ("video", (("sentfps", "video"), ("dropped", "video"), ("dropreasons", "info"),
+        ("video", (("sentfps", "video"), ("dropped", "gauge"), ("dropreasons", "info"),
                    ("recdropped", "record"), ("encode", "clock"), ("processing", "sparkles"))),
         ("pc", (("codec", "video"), ("decoder", "gear"), ("out", "aspect"), ("watch", "camera"), ("dshow", "camera"))),
         ("latency", (("iphone", "camera"), ("comm", "wifi"), ("pc", "gear"), ("total", "clock"), ("rtt", "clock"))),
@@ -121,7 +146,7 @@ def build(ctrl):
         card = page.add_section(t(f"status.{name}.title"))
         for key, icon in specs:
             row = card.add_row(icon, t(f"status.{name}.{key}"))
-            values[name, key] = row.addControl(StatusValue())
+            values[name, key] = row.addControl(StatusValue(wrap=(name, key) != ("video", "dropped")))
         if name == "iphone":
             version_note = Hint("")
             card.add_padded(version_note)
@@ -178,6 +203,8 @@ def build(ctrl):
         cam, net = phone.get("cameraDroppedFrames"), phone.get("networkDroppedFrames")
         dropped = (t("status.video.dropped_fmt", cam=cam, net=net)
                    if isinstance(cam, int) and isinstance(net, int) else "-")
+        dropped_total = cam + net if isinstance(cam, int) and isinstance(net, int) and status.connected else None
+        dropped_warn = _drop_trend.update(dropped_total, time.monotonic())
         reasons = phone.get("cameraDropReasons")
         reasons = reasons if isinstance(reasons, dict) else {}
         drops = " / ".join(t(f"status.video.drop.{key}", count=reasons.get(key, "-"))
@@ -216,16 +243,18 @@ def build(ctrl):
             battery = phone.get("batteryLevel")
             if isinstance(battery, (int, float)) and 0 <= battery <= 1:
                 levels["iphone", "battery"] = "warning" if battery <= .2 else "ok"
-            for key, count in (("dropped", cam + net if isinstance(cam, int) and isinstance(net, int) else None),
-                               ("recdropped", rec.get("droppedFrames") if isinstance(rec, dict) else None)):
-                if isinstance(count, int):
-                    levels["video", key] = "warning" if count else "ok"
+            if dropped_total is not None:
+                levels["video", "dropped"] = "warning" if dropped_warn else "ok"
+            count = rec.get("droppedFrames") if isinstance(rec, dict) else None
+            if isinstance(count, int):
+                levels["video", "recdropped"] = "warning" if count else "ok"
             if isinstance(phone.get("sentFps"), (int, float)):
                 levels["video", "sentfps"] = "ok" if phone["sentFps"] > 0 else "warning"
         for section, specs in sections[:-1]:
             for (key, _), value in zip(specs, data[section]):
                 values[section, key].set_status(value if value and value != "-" else t("compact.no_value"),
-                                                levels.get((section, key)))
+                                                levels.get((section, key)),
+                                                t("status.video.dropped_tip") if (section, key) == ("video", "dropped") else None)
         latency = ctrl.link.latency.averages() if status.connected else {}
         for key, _ in sections[-1][1]:
             value = latency.get(key)
