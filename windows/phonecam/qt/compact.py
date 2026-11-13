@@ -9,7 +9,7 @@ from phonecam.qt.widgets import Expander, Row, Section, SliderValue, StatusValue
 
 
 PRIMARY = {
-    "connection": ("connection.method.label", "connection.run.mode"),
+    "connection": ("connection.run.mode",),
     "video": ("video.resolution.label", "video.fps.label", "video.orient.label"),
     "quality": ("quality.zoom.label", "quality.exposure.bias.label", "quality.focus.mode.label", "quality.light.label"),
     "effects": ("effects.background.mode.label", "effects.background.strength.label", "effects.color.brightness.label"),
@@ -120,7 +120,7 @@ def compact_page(page, ctrl, key):
         if widget is None:
             continue
         if not isinstance(widget, Section):
-            extra.append((widget, item.alignment()))
+            extra.append((widget, item.alignment(), widget.isHidden()))
             continue
         title = widget.title_label.text()
         children = groups.setdefault(title, [])
@@ -137,8 +137,9 @@ def compact_page(page, ctrl, key):
         widget.hide()
         widget.deleteLater()
 
-    for widget, alignment in extra:
+    for widget, alignment, hidden in extra:
         page.column.addWidget(widget, 0, alignment)
+        widget.setVisible(not hidden)
 
     primary = Section(t("compact.primary"))
     for label in wanted:
@@ -162,12 +163,17 @@ def compact_page(page, ctrl, key):
             expander.add(child)
             child.setVisible(not hidden)
         page.column.addWidget(expander)
+        if title_key == "connection.wifi.title" and hasattr(page, "wireless"):
+            page.wireless.bind_expander(expander)   # 要約は Wi-Fi 側が「接続中 · 名前」などを出す
+            continue
         summary_rows = ([rows[t(name)] for name in summary_keys if t(name) in rows]
                         if summary_keys else [child for child, _ in children if isinstance(child, Row)])
         refresh = partial(_set_summary, expander, summary_rows[:3])
         for row in summary_rows[:3]:
             for control in row.controls():
-                if isinstance(control, QLineEdit):
+                if isinstance(control, QComboBox):
+                    control.currentTextChanged.connect(lambda *_args, fn=refresh: fn())
+                elif isinstance(control, QLineEdit):
                     control.textChanged.connect(lambda *_args, fn=refresh: fn())
                 elif isinstance(control, QKeySequenceEdit):
                     control.keySequenceChanged.connect(lambda *_args, fn=refresh: fn())

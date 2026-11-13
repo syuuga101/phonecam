@@ -11,6 +11,7 @@ from phonecam.core.audio_engine import AUDIO_PRIORITIES
 from phonecam.core.deps import np, phonecam_audio, phonecam_hotkeys, sd
 from phonecam.core.paths import _app_dir, _appdata_dir
 from phonecam.core.softcam_reg import softcam_path
+from phonecam.core.wireless import read_device
 
 
 CAMERA_DROP_LABELS = [("late", "遅延"), ("outOfBuffers", "バッファ不足"), ("discontinuity", "不連続")]
@@ -48,7 +49,9 @@ def migrate_legacy_settings(new_path=None, old_path=None):
 # ---------------------------------------------------------------------------
 
 DEFAULT_SETTINGS = {
-    "mode": "usb",
+    "known_devices": [],
+    "mode": "auto",        # "auto" (USB があれば USB、なければ登録済みの iPhone へ Wi-Fi) / "usb" / "wifi"
+    "mode_auto": False,    # 旧設定の mode を auto へ移行済みか
     "ip": "",
     "lens": "wide",
     "resolution": "1080p",       # iPhoneから送る解像度 (仮想カメラのサイズとは無関係)
@@ -305,8 +308,15 @@ def mirror_key(settings):
 
 def sanitize_settings(s):
     """読み込んだ設定の新規項目を検証し、不正値は既定値へ戻す (古い設定ファイルとの互換用)。"""
+    known = s.get("known_devices")
+    s["known_devices"] = [device.stored() for entry in known[:64] if (device := read_device(entry))] if isinstance(known, list) else []
     expanded = s.get("ui_expanded")
     s["ui_expanded"] = {k: v for k, v in expanded.items() if isinstance(k, str) and isinstance(v, bool)} if isinstance(expanded, dict) else {}
+    if s.get("mode") not in ("auto", "usb", "wifi"):
+        s["mode"] = "auto"
+    if s.get("mode_auto") is not True:   # 自動切り替え導入前の設定は一度だけ auto へ移す (手動選択は「詳細」に残る)
+        s["mode"] = "auto"
+        s["mode_auto"] = True
     if s.get("lens") not in LENSES:
         s["lens"] = DEFAULT_SETTINGS["lens"]
     for key in ("mirror", "mirror_front"):

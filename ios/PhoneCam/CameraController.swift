@@ -150,7 +150,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     // MARK: - 起動 / 停止
 
     /// カメラセッションを動かす / 止める。start()/stopRunning は必ず sessionQueue 上で行う。
-    func setRunning(_ want: Bool) {
+    func setRunning(_ want: Bool, completion: (() -> Void)? = nil) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             self.runWanted = want
@@ -158,6 +158,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             if self.started {
                 self.publishState()
             }
+            if let completion { DispatchQueue.main.async { completion() } }
         }
     }
 

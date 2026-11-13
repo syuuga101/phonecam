@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(0)
 
         ctrl.toast.connect(self.show_toast)
+        ctrl.camera_prompt.connect(self._ask_camera_registration)
         ctrl.status_changed.connect(self._status)
         ctrl.update_changed.connect(self._update_banner)
         ctrl.update_action.connect(self._update_action)
@@ -438,6 +439,13 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "toast_label") and self.toast_label.isVisible():
             self._place_toast()
+
+    def _ask_camera_registration(self, state):
+        key = "setup.first_run.update_cam" if state == "outdated" else "setup.first_run.register_cam"
+        if QMessageBox.question(self, "PhoneCam", t(key)) == QMessageBox.StandardButton.Yes:
+            self.ctrl.change_camera_registration("register")
+        else:
+            self.show_toast(t("setup.first_run.declined_note"))
 
     def restore_state(self):
         """起動時: 最大化 (既定) か、前回の位置と大きさ。画面外なら無視。show の代わりに呼ぶ。"""

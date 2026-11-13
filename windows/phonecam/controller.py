@@ -161,6 +161,8 @@ class Controller:
         self.camera_registration = registration_status() if self.frozen and not demo else "unavailable"
         self.camera_registration_busy = False
         self.camera_registration_changed = CallbackList()
+        self.camera_prompt = CallbackList()     # emit(state)   起動時に専用カメラの登録/更新を確認する ("missing" / "outdated")
+        self._camera_prompted = False
         self.hotkey_conflicts = set()
         self._hotkeys = None
         if not demo and phonecam_hotkeys is not None and phonecam_hotkeys.is_windows():
@@ -387,9 +389,23 @@ class Controller:
             if version:
                 self.changed("setup_shown_version", version)
             self.open_setup()
+            return
         elif version and self.get("setup_shown_version") != version:
             self.changed("setup_shown_version", version)
             self.open_setup(after_update=version)
+            return
+        self.prompt_camera_registration()
+
+    def prompt_camera_registration(self):
+        """セットアップ済みなのに専用カメラが「更新が必要 / 未登録」のとき、起動時に1回だけ確認を出す
+        (設定ページの表示に気づかなくても、登録の更新ができるようにする)。"""
+        if self.demo or not self.frozen or self._camera_prompted or self.get("backend") != "phonecam":
+            return
+        state = registration_status()
+        self.camera_registration = state
+        if state in ("missing", "outdated"):
+            self._camera_prompted = True
+            self.camera_prompt.emit(state)
 
     def run_background(self, work, done):
         def run():
@@ -814,7 +830,7 @@ class Controller:
             key = "paused"
         else:
             key = "idle"
-        way = "Wi-Fi" if self.settings.get("mode") == "wifi" else "USB"
+        way = "Wi-Fi" if (snap.get("transport") or self.settings.get("mode")) == "wifi" else "USB"
         device = ""
         sub = ""
         if connected:
@@ -858,6 +874,8 @@ class Controller:
             sub=sub,
             error_text=snap["error_text"],
             auth_state=snap["auth_state"],
+            peer=snap.get("peer", ""),
+            transport=snap.get("transport") or ("wifi" if self.settings.get("mode") == "wifi" else "usb"),
             res_fps=res_fps,
             resolution=snap["resolution"],
             recv_fps=fps,

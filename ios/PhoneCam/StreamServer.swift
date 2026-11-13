@@ -20,14 +20,16 @@ final class StreamServer {
     private let audioCapMs: Int
     private let role: Role
     private let security: SecurityManager
+    private var bonjourService: NWListener.Service?
 
     init(port: UInt16 = StreamServer.port, ignoreIncoming: Bool = false, audioCapMs: Int = 200,
-         role: Role = .main, security: SecurityManager) {
+         role: Role = .main, security: SecurityManager, bonjourService: NWListener.Service? = nil) {
         self.port = port
         self.ignoreIncoming = ignoreIncoming
         self.audioCapMs = max(10, audioCapMs)
         self.role = role
         self.security = security
+        self.bonjourService = bonjourService
     }
 
     var onControl: (([String: Any]) -> Void)?
@@ -107,6 +109,22 @@ final class StreamServer {
         }
     }
 
+    /// 広告内容 (名前など) を差し替えて再公開する
+    func updateBonjourService(_ service: NWListener.Service?) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.bonjourService = service
+            self.listener?.service = self.security.wifiAllowed ? service : nil
+        }
+    }
+
+    func refreshAdvertisement() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.listener?.service = self.security.wifiAllowed ? self.bonjourService : nil
+        }
+    }
+
     private func startHealthTimer() {
         guard healthTimer == nil else { return }
         let t = DispatchSource.makeTimerSource(queue: queue)
@@ -167,6 +185,7 @@ final class StreamServer {
         newListener.newConnectionHandler = { [weak self] conn in
             self?.handleNewConnection(conn)
         }
+        newListener.service = security.wifiAllowed ? bonjourService : nil
         listener = newListener
         listenerStartedAt = Date()
         newListener.start(queue: queue)

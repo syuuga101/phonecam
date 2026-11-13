@@ -90,6 +90,10 @@ AltStore の「My Apps」で AltStore を一度 **Refresh** してから、も�
 - 脆弱性（セキュリティの問題）は [SECURITY.md](SECURITY.md) の方法で非公開で報告してください
 - 変更履歴は [CHANGELOG.md](CHANGELOG.md)
 
+## 翻訳に協力する
+
+画面の文言を他の言語にする作業を [Crowdin](https://crowdin.com/project/phonecam) で募集しています。Crowdin のアカウントがあれば、ブラウザー上で翻訳できます（元の言語は日本語です）。
+
 ## 開発者向け
 
 ソースからのビルド、しくみ、通信プロトコルなどは `docs/` にあります。

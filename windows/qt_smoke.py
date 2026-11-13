@@ -63,6 +63,19 @@ def child(scale, out):
     from phonecam.qt.widgets import Expander
 
     ctrl = Controller.demo_connected("ja")
+    # Wi-Fi の一覧用: 登録済み (接続中) 1台 + 未登録 1台 (テザリング経由)
+    from phonecam.core.wireless import Device
+    known = Device("5f1c0c1e-9a53-4a0e-8b8e-0b6f2f1d3a11", "iPhone 13", ("192.168.1.23",), "482913", "iPhone 13")
+    ctrl.settings["known_devices"] = [known.stored()]
+    ctrl.demo_discovered = [
+        Device(known.id, "iPhone 13", ("192.168.1.23",), "", "iPhone 13"),
+        Device("0d2e6a52-3c1b-4f0a-9d4e-7a1b2c3d4e5f", "リビングのiPhone", ("172.20.10.1",), "", "iPhone 15 Pro"),
+    ]
+    ctrl.settings["mode"] = "auto"
+    ctrl.settings["ip"] = "192.168.1.23"
+    ctrl.settings["pair_code"] = "482913"
+    ctrl.state.update(transport="wifi", peer="192.168.1.23")   # 自動で Wi-Fi につながっている状態
+    ctrl.poll()
     frame = _sample_frame()
     if frame is not None:
         ctrl.set_preview_frame(frame, "rgb24")
@@ -100,6 +113,18 @@ def child(scale, out):
                 expanded_bar.setValue(expanded_bar.maximum() // 2)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, base + "_expanded_scroll.png"))
+                # 小さな折りたたみ (Wi-Fi の「見つからないときは」「IP を手で入れる」) も開いて一番下を撮る
+                from phonecam.qt.wireless import Disclosure
+                discs = win.current_page().findChildren(Disclosure)
+                if discs:
+                    for d in discs:
+                        d.set_open(True)
+                    _settle(app, 200)
+                    expanded_bar.setValue(expanded_bar.maximum())
+                    _settle(app, 150)
+                    win.grab().save(os.path.join(out, base + "_expanded_bottom.png"))
+                    for d in discs:
+                        d.set_open(False)
                 for expander in expanders:
                     expander.set_expanded(False, animate=False, save=False)
             # スクロール: 低いウィンドウで中ほどまで送る

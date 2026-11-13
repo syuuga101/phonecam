@@ -4,6 +4,7 @@
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -50,6 +51,25 @@ def _file_hash12(path):
     return h.hexdigest()[:12]
 
 
+SOFTCAM_REV_FILE = "softcam.rev"
+
+
+def softcam_rev():
+    """インストール先フォルダ名になる softcam の版 (12文字)。
+    CI が softcam のソース (タグ・拡張パッチ・REVISION) から計算して exe に埋め込む。
+    DLL は MSVC のリンク時刻などでビルドごとに数バイト変わるため、DLL のハッシュでは比べない
+    (比べると、アプリを更新するたびに「更新が必要」になって管理者権限の再登録が要る)。
+    softcam.rev が無い (ソース実行・古いビルド) ときだけ DLL のハッシュで代用する。"""
+    try:
+        with open(os.path.join(_embedded_dir(), SOFTCAM_REV_FILE), "r", encoding="ascii") as f:
+            rev = f.read().strip().lower()
+        if re.fullmatch(r"[0-9a-f]{12}", rev):
+            return rev
+    except Exception:
+        pass
+    return _file_hash12(softcam_path())
+
+
 def softcam_install_root():
     base = os.environ.get("ProgramData") or r"C:\ProgramData"
     return os.path.join(base, "PhoneCam", "softcam")
@@ -62,7 +82,7 @@ def softcam_install_dir(hash12):
 def softcam_installed_path():
     """埋め込み DLL の現在のバージョン用のインストール先 DLL パス。埋め込みが無ければ None。"""
     try:
-        return os.path.join(softcam_install_dir(_file_hash12(softcam_path())), SOFTCAM_DLL)
+        return os.path.join(softcam_install_dir(softcam_rev()), SOFTCAM_DLL)
     except Exception:
         return None
 
@@ -143,7 +163,7 @@ def _cleanup_old_install_dirs(keep_hash=None):
 def helper_register():
     """管理者権限で実行される --register。成功なら True。"""
     src = softcam_path()
-    h = _file_hash12(src)
+    h = softcam_rev()
     dst_dir = softcam_install_dir(h)
     os.makedirs(dst_dir, exist_ok=True)
     pairs = [(src, os.path.join(dst_dir, SOFTCAM_DLL))]
@@ -152,7 +172,11 @@ def helper_register():
     for s, d in pairs:
         if os.path.isfile(d) and _file_hash12(d) == _file_hash12(s):
             continue  # 同じ内容なら上書きしない (使用中でも失敗しない)
-        shutil.copyfile(s, d)
+        try:
+            shutil.copyfile(s, d)
+        except OSError:
+            if not os.path.isfile(d):
+                raise  # 同じ版のフォルダに使用中の DLL がある場合は、それをそのまま使う
     x64, x86 = _regsvr32_paths()
     if not _run_regsvr32(x64, pairs[0][1]):
         return False

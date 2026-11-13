@@ -118,6 +118,26 @@ jobs:
           Copy-Item $dll ../softcam-out/softcam32.dll
           Write-Host "Win32: $dll"
 
+      # ---- softcam の版 (softcam.rev) ----
+      # DLL は MSVC のリンク時刻・PDB の GUID でビルドごとに数バイト変わる (v2.2.1 と v2.3.0 は 24 バイトだけ違った)。
+      # DLL のハッシュで「登録済みか」を判定すると、アプリを更新するたびに管理者権限の再登録が要ってしまう。
+      # そこで softcam のソースを決めるもの (タグ・拡張パッチ・REVISION) だけから版を計算し、アプリはこの値で比べる。
+      # CLSID/名前のパッチ (上の Patch softcam) やビルド設定を変えたら windows/softcam_ext/REVISION の数字を上げること。
+      - name: Compute softcam revision
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ext = Join-Path $env:GITHUB_WORKSPACE "windows/softcam_ext"
+          $sha = [System.Security.Cryptography.SHA256]::Create()
+          $text = "tag=$env:SOFTCAM_TAG`n"
+          foreach ($f in @("apply.ps1", "PhoneCamControls.h", "REVISION")) {
+            $text += "$f=" + ([System.IO.File]::ReadAllText((Join-Path $ext $f)) -replace "`r`n", "`n") + "`n"
+          }
+          $hash = ($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text)) | ForEach-Object { $_.ToString("x2") }) -join ""
+          $rev = $hash.Substring(0, 12)
+          [System.IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE "softcam-out/softcam.rev"), $rev)
+          Write-Host "softcam revision: $rev"
+
       # ---- softcam の DLL を exe に埋め込んでビルド (配布物は PhoneCamReceiver.exe 1つだけ) ----
       - name: Build exe
         shell: pwsh
@@ -132,6 +152,7 @@ jobs:
           $dll64 = Join-Path $out "softcam.dll"
           if (-not (Test-Path $dll64)) { throw "softcam.dll (x64) がありません" }
           $bins = @("--add-binary", "$dll64;softcam")
+          $bins += @("--add-data", "$(Join-Path $out 'softcam.rev');softcam")
           $dll32 = Join-Path $out "softcam32.dll"
           if (Test-Path $dll32) { $bins += @("--add-binary", "$dll32;softcam") } else { Write-Host "softcam32.dll は無いため 64bit のみ埋め込みます" }
           $qtPlugins = (& python -c "import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).parent / 'plugins')").Trim()
@@ -142,7 +163,7 @@ jobs:
             "--add-binary", "$(Join-Path $qtPlugins 'iconengines/qsvgicon.dll');PySide6/plugins/iconengines",
             "--add-binary", "$(Join-Path $qtPlugins 'styles/qmodernwindowsstyle.dll');PySide6/plugins/styles"
           )
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller に失敗しました" }
           if (-not (Test-Path dist/PhoneCamReceiver.exe)) { throw "PhoneCamReceiver.exe が作成されませんでした" }
 

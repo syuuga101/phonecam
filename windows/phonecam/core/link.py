@@ -47,7 +47,8 @@ from phonecam.core.settings import (
     valid_pair_code,
 )
 from phonecam.core.stats import LatencyTracker
-from phonecam.core.usbmux import usbmux_connect, wifi_connect
+from phonecam.core.usbmux import usbmux_available, usbmux_connect, wifi_connect
+from phonecam.core.wireless import discover, local_ipv4, merge_devices, read_device
 from phonecam.core.vcam import VirtualCamOutput
 
 
@@ -70,6 +71,8 @@ class Link:
         self.last_frame_size = None  # 最後にデコードしたフレームの (幅, 高さ)
         self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
         self._decoder_key = None
+        self._mode, self._ip, self._code = "usb", "", None   # 今回の接続で実際に使う方式 / IP / 登録済み端末のコード
+        self._last_wifi = None     # auto で最後に Wi-Fi でつながれた (ip, code)。つながらなくなったら捨てる
         self._device_id = None     # USB 接続した iPhone の usbmux デバイスID (音声チャンネルも同じ iPhone へ)
         self._audio_sock = None
         # 認証 (v1.5): Wi-Fi ではペアリングコードが通るまで音声チャンネルを開かない
@@ -90,6 +93,7 @@ class Link:
     # -- 公開 API --------------------------------------------------------
     def start(self):
         self.stop()
+        self._last_wifi = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="phonecam-link", daemon=True)
         self._thread.start()
@@ -113,7 +117,7 @@ class Link:
         self._thread = None
         self.vcam.park()
         self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-",
-                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="")
+                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="", transport="", peer="")
         self._decoder_key = None
         self.latency.reset()
 
@@ -169,8 +173,52 @@ class Link:
         self._auth_wake.set()
 
     # -- 内部 -------------------------------------------------------------
-    def _connect(self, port=PHONE_PORT, info=None):
+    def _resolve(self):
+        """今回つなぐ方式と相手を決める -> (方式, ip, コード)。設定が auto なら USB 優先、なければ Wi-Fi。"""
         mode, ip = self.get_mode_ip()
+        if mode != "auto":
+            return mode, ip, None
+        if usbmux_available():
+            return "usb", "", None
+        if self._last_wifi:
+            return "wifi", self._last_wifi[0], self._last_wifi[1]
+        code = self.settings.get("pair_code", "")
+        if ip and valid_pair_code(code) and self._probe(ip):   # 一覧で選んだ / 手で入れた相手
+            return "wifi", ip, None
+        known = [d for entry in self.settings.get("known_devices", []) if (d := read_device(entry))]
+        if known:
+            found = discover(local_ipv4())
+            live = {a for d in found for a in d.addresses}
+            for d in merge_devices(known, found):
+                for a in d.addresses:
+                    if d.code and a in live:
+                        self._last_wifi = (a, d.code)
+                        return "wifi", a, d.code
+            raise PhoneCamError("登録済みの iPhone が見つかりません。USB でつなぐか、PhoneCam を開いて同じ Wi-Fi につないでください")
+        raise PhoneCamError("iPhone が見つかりません。USB でつなぐか、「iPhoneを追加」で登録してください")
+
+    @staticmethod
+    def _probe(ip):
+        try:
+            socket.create_connection((ip, PHONE_PORT), timeout=0.8).close()
+            return True
+        except OSError:
+            return False
+
+    def _watch_usb(self, sock, stop, ping_stop):
+        """auto で Wi-Fi につないでいる間、USB が挿されたら Wi-Fi を切って USB につなぎ直す。"""
+        while not stop.is_set() and not ping_stop.wait(2.0):
+            if usbmux_available():
+                self.state.update(status_text="USBがつながりました。切り替えます…")
+                self._last_wifi = None
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass
+                return
+
+    def _connect(self, port=PHONE_PORT, info=None):
+        mode, ip = self._mode, self._ip
         if mode == "usb":
             if port == PHONE_PORT and info is None:
                 return usbmux_connect()
@@ -204,14 +252,18 @@ class Link:
         while not stop.is_set():
             self.state.update(status_text="接続中…", connected=False)
             try:
+                self._mode, self._ip, self._code = self._resolve()
+                self.state.update(transport=self._mode, peer=self._ip if self._mode == "wifi" else "")
                 info = {}
                 sock = self._connect(info=info)
                 self._device_id = info.get("device_id")
             except PhoneCamError as e:
+                self._last_wifi = None
                 self.state.update(status_text="待機中（再接続を試行します）", error_text=str(e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
             except Exception as e:
+                self._last_wifi = None
                 self.state.update(status_text="待機中（再接続を試行します）", error_text="接続エラー: %s" % e, connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
@@ -239,7 +291,7 @@ class Link:
             self.state.update(connected=False, recv_fps=0.0)
             if stop.is_set():
                 break
-            kind = auth_failure_kind(self.get_mode_ip()[0], self._authed, self._saw_required)
+            kind = auth_failure_kind(self._mode, self._authed, self._saw_required)
             if kind == "code":
                 # コード違い: 何度も再接続すると iPhone に締め出されるので、コードを直す/接続を押すまで待つ
                 self.state.update(status_text="認証できません（ペアリングコードを確認してください）",
@@ -271,10 +323,11 @@ class Link:
                           thin_total=0, thin_last=0.0, phone_status={})  # 前の接続のステータス (phoneEdit の seq など) を持ち越さない
 
         # 最初にペアリングコードを送る (Wi-Fi で必須。USB では iPhone が無視する)。USB は認証不要なので音声チャンネルもすぐ開く
-        mode = self.get_mode_ip()[0]
+        mode = self._mode
         if mode == "wifi" or valid_pair_code(self.settings.get("pair_code", "")):
+            auth = {"auth": {"code": self._code}} if self._code else build_auth_control(self.settings)
             with self._send_lock:
-                sock.sendall(encode_msg(MSG_CONTROL, json.dumps(build_auth_control(self.settings)).encode("utf-8")))
+                sock.sendall(encode_msg(MSG_CONTROL, json.dumps(auth).encode("utf-8")))
         if mode == "usb":
             self._authed = True
             self._auth_ok.set()
@@ -292,6 +345,9 @@ class Link:
         pending_timing = None  # 次の映像パケットに対応する (captureTime, sendTime)
         ping_stop = threading.Event()
         threading.Thread(target=self._ping_loop, args=(ping_stop,), name="phonecam-ping", daemon=True).start()
+        if mode == "wifi" and self.get_mode_ip()[0] == "auto":
+            threading.Thread(target=self._watch_usb, args=(sock, stop, ping_stop), name="phonecam-usb-watch",
+                             daemon=True).start()
         if self.audio is not None:
             threading.Thread(target=self._audio_channel_loop, args=(ping_stop, stop), name="phonecam-audio-ch",
                              daemon=True).start()
