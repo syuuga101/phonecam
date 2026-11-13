@@ -20,7 +20,6 @@ from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
-    Combo,
     EmptyState, FitBox, FixedHint, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
@@ -344,18 +343,12 @@ class DeviceRow(FitBox):
             lay.addWidget(status, 0, Qt.AlignmentFlag.AlignVCenter)
         elif state == "connecting":
             lay.addWidget(Hint(t("wireless.connecting"), wrap=False), 0, Qt.AlignmentFlag.AlignVCenter)
+        # どの iPhone がどのカメラかは、接続ページの「変更…」だけで決める。ここは使用中のカメラを文字で出すだけ
         camera = owner._camera(entry)
         group = getattr(owner.ctrl, "camera_group", None)
-        active = camera or owner.ctrl
-        if group and (len(group.cameras) > 1 or active.get("camera_slot") != 1) and (camera or entry.registered):
-            outputs = Combo()
-            outputs.setAccessibleName(t("multi.output"))
-            outputs.setToolTip(t("multi.output"))
-            for slot in range(1, 5):
-                outputs.addItem(t("multi.camera_number", n=slot), slot)
-            outputs.setCurrentIndex(outputs.findData(active.get("camera_slot")))
-            outputs.activated.connect(lambda index: owner._output(entry, outputs, index))
-            lay.addWidget(outputs)
+        if group and len(group.cameras) > 1 and camera is not None:
+            lay.addWidget(Hint(t("multi.in_use", camera=group.label(camera)), wrap=False), 0,
+                          Qt.AlignmentFlag.AlignVCenter)
         action = button(t("wireless.disconnect") if state else t("wireless.connect"))
         action.setMinimumWidth(84)
         if state:
@@ -396,6 +389,9 @@ class WirelessOptions:
         section.add(self._build_trouble())
         section.add(self._build_manual())
         section.add(self._build_method())
+        group = getattr(ctrl, "camera_group", None)
+        if group is not None:
+            group.changed.connect(self._render)   # 「変更…」などで割り当てが変わったら、行の「カメラ N で使用中」を更新する
         self._render()
 
     # -- 部品 -------------------------------------------------------------------
@@ -648,21 +644,6 @@ class WirelessOptions:
         elif status.get("peer") not in entry.device.addresses and camera.get("target_device") != entry.device.id:
             return ""
         return "connected" if status.get("connected") and status.get("auth_state") != "required" else "connecting"
-
-    def _output(self, entry, combo, index):
-        group = self.ctrl.camera_group
-        camera = self._camera(entry)
-        if camera is None:
-            if self.ctrl.get("target_device") or self.ctrl.wanted:
-                combo.setCurrentIndex(combo.findData(self.ctrl.get("camera_slot")))
-                self.ctrl.toast.emit(t("multi.select_profile"), "error")
-                return
-            camera = group.bind_device(self.ctrl, entry.device, entry.address)
-        if camera is None:
-            return
-        if not group.move_output(camera, combo.itemData(index)):
-            self.ctrl.toast.emit(t("multi.output_busy"), "error")
-        combo.setCurrentIndex(combo.findData(camera.get("camera_slot")))
 
     def _summary(self, entries):
         # 今選んでいるカメラ (このページの ctrl) 自身の接続の方式。上のカードと同じ status を見る

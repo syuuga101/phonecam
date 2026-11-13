@@ -7,6 +7,26 @@ from phonecam.core.settings import DEFAULT_SETTINGS, sanitize_settings
 from phonecam.core.softcam_reg import CAMERA_SLOTS
 from phonecam.core.usbmux import usbmux_connect, usbmux_devices
 from phonecam.core.wireless import device_id, read_device
+from phonecam.i18n import t
+
+
+class CallbackList:
+    """Qt を使わない簡易シグナル (controller.CallbackList と同じ振る舞い)。"""
+
+    def __init__(self):
+        self._cbs = []
+
+    def connect(self, fn):
+        if fn not in self._cbs:
+            self._cbs.append(fn)
+        return fn
+
+    def emit(self, *args):
+        for fn in list(self._cbs):
+            try:
+                fn(*args)
+            except Exception:
+                pass
 
 
 class DeviceRoutes:
@@ -112,6 +132,9 @@ class CameraGroup:
     def __init__(self, primary):
         self.primary = primary
         self.cameras = [primary]
+        self.retired = []          # 取り除いたあと、仮想カメラの登録解除が終わるまで tick だけ続けるカメラ
+        self.changed = CallbackList()        # emit()  カメラの増減・割り当ての変更
+        self.audio_changed = CallbackList()  # emit()  音声を受け取るカメラの変更
         self.routes = DeviceRoutes(self.cameras)
         primary.link.routes = self.routes
         primary.camera_group = self
@@ -156,8 +179,10 @@ class CameraGroup:
         settings.update(camera_slot=slot, backend="phonecam", camera_profiles=[])
         for key in ("known_devices", "theme", "language", "preview_fps"):
             settings[key] = self.primary.get(key)
-        camera = type(self.primary)(settings=settings, persist=False, demo=self.primary.demo,
-                                    secondary=True, audio_enabled=lambda: self.audio_index == index)
+        holder = []   # 作る前は camera が無いので、箱を介して「音声を受け取るカメラは自分か」を見る
+        camera = type(self.primary)(settings=settings, persist=False, demo=self.primary.demo, secondary=True,
+                                    audio_enabled=lambda: bool(holder) and self.cameras[self.audio_index:][:1] == holder)
+        holder.append(camera)
         camera.link.routes = self.routes
         camera.camera_group = self
         self.cameras.append(camera)
@@ -166,7 +191,121 @@ class CameraGroup:
         if save:
             # Preserve the existing first camera settings and backend.
             self._save()
+            self.changed.emit()
         return camera
+
+    # -- 「カメラ = OBS に出る仮想カメラ (スロット)」に iPhone を 1 台割り当てる (割り当ての唯一の窓口) ----------
+    @property
+    def can_add(self):
+        return len(self.cameras) < len(CAMERA_SLOTS)
+
+    def next_slot(self):
+        used = {camera.get("camera_slot", 1) for camera in self.cameras}
+        return next((number for number in CAMERA_SLOTS if number not in used), None)
+
+    @staticmethod
+    def slot_of(camera):
+        return camera.get("camera_slot", 1)
+
+    def label(self, camera):
+        return t("multi.camera_number", n=self.slot_of(camera))
+
+    def obs_name(self, camera):
+        return t("multi.obs_name_value", n=self.slot_of(camera))
+
+    def users(self):
+        """{iPhone の id: カメラ}。割り当て済みの iPhone だけ。"""
+        return {camera.get("target_device"): camera for camera in self.cameras if camera.get("target_device")}
+
+    def usb_users(self):
+        return {camera.get("usb_serial"): camera for camera in self.cameras if camera.get("usb_serial")}
+
+    def known_devices(self):
+        return [device for entry in self.primary.get("known_devices", []) if (device := read_device(entry))]
+
+    def phone_name(self, camera):
+        """そのカメラに割り当てた iPhone の名前。接続中は iPhone が名乗る名前、未接続は登録名、無ければ「未割り当て」。"""
+        identity = camera.get("target_device")
+        for device in self.known_devices():
+            if identity and device.id == identity:
+                return device.title or t("wireless.unknown_device")
+        phone = camera.status.get("phone") or {}
+        live = phone.get("deviceName") or phone.get("name")
+        if camera.status.get("connected") and live:
+            return live
+        if camera.get("usb_serial"):
+            return t("multi.usb_phone")
+        if camera.get("ip") or identity:
+            return t("connection.device.default")
+        return t("multi.unassigned")
+
+    def camera_choice(self, camera):
+        """音声の選択欄用「カメラ 1 · iPhone 16 Pro」。"""
+        return t("multi.camera_choice", camera=self.label(camera), phone=self.phone_name(camera))
+
+    def assign(self, camera, device=None, address="", usb_serial=""):
+        """camera に iPhone を割り当てる。device は登録済み端末 (Device)、USB だけの端末は usb_serial で渡す。
+        接続中なら一度切る。別のカメラで使用中の端末は割り当てない (False を返す)。"""
+        if device is not None and device.id:
+            owner = self.users().get(device.id)
+            if owner is not None and owner is not camera:
+                return False
+        if usb_serial:
+            owner = self.usb_users().get(usb_serial)
+            if owner is not None and owner is not camera:
+                return False
+        if camera.wanted:
+            camera.toggle_connect()
+        if device is not None:
+            camera.changed("usb_serial", usb_serial or "")
+            camera.changed("target_device", device.id if device.code else "")
+            camera.set_ip(address or (device.addresses[0] if device.addresses else ""))
+            camera.set_pair_code(device.code)
+            if camera.get("mode") == "usb":
+                camera.set_mode("auto")
+        else:
+            camera.changed("target_device", "")
+            camera.changed("usb_serial", usb_serial)
+            camera.set_ip("")
+            camera.set_pair_code("")
+            if camera.get("mode") == "wifi":
+                camera.set_mode("auto")
+        self.changed.emit()
+        return True
+
+    def unassign(self, camera):
+        if camera.wanted:
+            camera.toggle_connect()
+        for key in ("target_device", "usb_serial"):
+            camera.changed(key, "")
+        camera.set_ip("")
+        camera.set_pair_code("")
+        self.changed.emit()
+
+    def remove(self, camera, unregister=False):
+        """2 台目以降のカメラを取り除く。unregister なら OBS 用の仮想カメラの登録も解除する (管理者権限・非同期)。"""
+        if camera is self.primary or camera not in self.cameras:
+            return False
+        was_audio = self.cameras[self.audio_index] is camera
+        before = self.cameras[self.audio_index]
+        if camera.wanted:
+            camera.toggle_connect()
+        if unregister:
+            camera.change_camera_registration("unregister")
+        self.cameras.remove(camera)
+        camera.camera_group = None
+        self.audio_index = self.cameras.index(before) if not was_audio else 0
+        if was_audio or self.audio_index != self.primary.get("audio_camera", 0):
+            self.primary.changed("audio_camera", self.audio_index)
+        self._save()
+        if camera.camera_registration_busy:
+            self.retired.append(camera)     # 登録解除の結果を受け取るため、終わるまで tick する
+        else:
+            camera.close()
+        self._apply_audio()
+        self.changed.emit()
+        self.audio_changed.emit()
+        return True
 
     def for_device(self, identity, addresses=()):
         for camera in self.cameras:
@@ -197,36 +336,19 @@ class CameraGroup:
         camera.set_pair_code(device.code)
         if camera.get("mode") == "usb":
             camera.set_mode("auto")
+        self.changed.emit()
         return camera
 
     def _save(self):
         profiles = [{key: camera.get(key) for key in PROFILE_KEYS} for camera in self.cameras[1:]]
         self.primary.changed("camera_profiles", profiles)
 
-    def move_output(self, camera, slot):
-        if slot not in CAMERA_SLOTS or camera.camera_registration_busy:
-            return False
-        other = next((item for item in self.cameras
-                      if item is not camera and item.get("camera_slot") == slot), None)
-        if other is None:
-            camera.set_camera_slot(slot)
-            return True
-        if other.camera_registration_busy:
-            return False
-        # Both senders must be closed before either can claim the other's memory.
-        previous_slot = camera.get("camera_slot")
-        with camera.link.vcam._lock, other.link.vcam._lock:
-            camera.link.vcam.close()
-            other.link.vcam.close()
-            camera.set_camera_slot(slot)
-            other.set_camera_slot(previous_slot)
-        return True
-
     def select_audio(self, index):
         if 0 <= index < len(self.cameras) and index != self.audio_index:
             self.audio_index = index
             self.primary.changed("audio_camera", index)
             self._apply_audio()
+            self.audio_changed.emit()
 
     def _apply_audio(self):
         # Close the old audio endpoint before opening the new one.
@@ -241,9 +363,14 @@ class CameraGroup:
     def tick(self):
         for camera in self.cameras:
             camera.tick()
+        for camera in list(self.retired):
+            camera.tick()
+            if not camera.camera_registration_busy:
+                self.retired.remove(camera)
+                camera.close()
 
     def close(self):
-        for camera in reversed(self.cameras):
+        for camera in reversed(self.cameras + self.retired):
             camera.close()
 
 

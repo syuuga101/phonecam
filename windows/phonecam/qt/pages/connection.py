@@ -23,10 +23,11 @@ from phonecam.qt import icons
 from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
     Card,
-    Combo,
     ErrorLabel,
     Hint,
     Page,
+    Row,
+    StatusValue,
     bound_combo,
     border_color,
     button,
@@ -273,11 +274,12 @@ class ConnectionPage(Page):
         super().__init__()
         self.ctrl = ctrl
         self._build_header()
+        self._build_camera_card()
         self._build_preview()
         self._build_numbers()
         self._build_wifi()
-        self._build_output()
         self._build_run()
+        self._build_this_camera()
         self.finish()
         ctrl.status_changed.connect(self.update_status)
         self.update_status(ctrl.status)
@@ -382,54 +384,100 @@ class ConnectionPage(Page):
         self.add(box)
 
     # -- Wi-Fi ----------------------------------------------------------------------
-    def _build_output(self):
+    def _build_camera_card(self):
+        """上のカードの下の 1 枚: 「OBS での名前: PhoneCam カメラ 2 ✓ 準備済み」(未登録なら「準備する」) と、
+        このカメラの iPhone (2 台以上のとき)。割り当てを変えるのは「変更…」だけ。"""
         group = getattr(self.ctrl, "camera_group", None)
+        self.camera_group = group
         if group is None:
             return
-        slot = self.ctrl.get("camera_slot")
-        section = self.add_section(t("multi.output"))
-        row = section.add_row("camera", t("multi.output"))
-        outputs = Combo()
-        for number in range(1, 5):
-            outputs.addItem(t("multi.camera_number", n=number), number)
-        outputs.setCurrentIndex(outputs.findData(slot))
+        card = Card()
+        obs = Row("camera", t("multi.obs_name"))
+        self.obs_label = QLabel()
+        f = self.obs_label.font()
+        f.setWeight(QFont.Weight.DemiBold)
+        self.obs_label.setFont(f)
+        obs.addControl(self.obs_label)
+        self.vcam_status = StatusValue(wrap=False)
+        obs.addControl(self.vcam_status)
+        self.vcam_button = obs.addControl(button(t("multi.vcam.prepare")))
+        self.vcam_button.clicked.connect(lambda: self.ctrl.change_camera_registration("register"))
+        card.layout().addWidget(obs)
+        self.phone_row = Row("phone", t("multi.this_phone"))
+        self.phone_label = QLabel()
+        self.phone_row.addControl(self.phone_label)
+        change = self.phone_row.addControl(button(t("multi.change")))
+        change.clicked.connect(self._change_phone)
+        card.layout().addWidget(self.phone_row)
+        self.camera_card = card
+        self.add(card)
+        self.ctrl.camera_registration_changed.connect(self._refresh_camera_card)
+        self.ctrl.settings_changed.connect(lambda key, value: self._refresh_camera_card()
+                                           if key in ("camera_slot", "target_device", "usb_serial", "known_devices") else None)
+        group.changed.connect(self._refresh_camera_card)
+        self._refresh_camera_card()
 
-        def change_output(index):
-            if not group.move_output(self.ctrl, outputs.itemData(index)):
-                self.ctrl.toast.emit(t("multi.output_busy"), "error")
-                outputs.setCurrentIndex(outputs.findData(self.ctrl.get("camera_slot")))
+    def _refresh_camera_card(self):
+        group = self.camera_group
+        multi = len(group.cameras) > 1
+        # カメラが 1 台で、出力が「カメラ 1」のときは、これまでどおり何も出さない
+        self.camera_card.setVisible(multi or group.slot_of(self.ctrl) != 1)
+        self.phone_row.setVisible(multi)
+        self.obs_label.setText(group.obs_name(self.ctrl))
+        state = self.ctrl.camera_registration
+        busy = self.ctrl.camera_registration_busy
+        if state == "ok":
+            self.vcam_status.set_status(t("multi.vcam.ready"), "ok")
+        elif not self.ctrl.frozen:
+            self.vcam_status.set_status(t("video.vcam.src_only"))
+        elif busy:
+            self.vcam_status.set_status(t("multi.vcam.busy"))
+        else:
+            self.vcam_status.set_status(t("multi.vcam.outdated" if state == "outdated" else "multi.vcam.missing"), "warning")
+        self.vcam_button.setVisible(self.ctrl.frozen and state in ("missing", "outdated"))
+        self.vcam_button.setEnabled(not busy)
+        self.phone_label.setText(group.phone_name(self.ctrl))
 
-        outputs.activated.connect(change_output)
-        self.ctrl.settings_changed.connect(lambda key, value: outputs.setCurrentIndex(outputs.findData(value))
-                                           if key == "camera_slot" else None)
-        row.addControl(outputs)
-        register = row.addControl(button(t("video.vcam.register")))
-        register.clicked.connect(lambda: self.ctrl.change_camera_registration("register"))
+    def _change_phone(self):
+        from phonecam.qt.multicam import DevicePickDialog
+        dialog = DevicePickDialog(self.window(), self.camera_group, self.ctrl)
+        dialog.exec()
+        dialog.deleteLater()
+        self._refresh_camera_card()
 
-        def refresh_registration():
-            state = self.ctrl.camera_registration
-            row.setHint(t(f"video.vcam.status.{state}") if self.ctrl.frozen else t("video.vcam.src_only"))
-            register.setEnabled(self.ctrl.frozen and not self.ctrl.camera_registration_busy
-                                and state in ("missing", "outdated"))
+    def _build_this_camera(self):
+        """「このカメラ」の折りたたみ (一番下)。2 台目以降は「カメラを削除」、1 台だけのときは「カメラを追加」の入口。"""
+        group = self.camera_group
+        if group is None:
+            return
+        section = self.add_section(t("multi.manage"))
+        label = section.add_row("camera", t("multi.this_camera"))
+        self.manage_label = QLabel()
+        label.addControl(self.manage_label)
+        self.add_row_ = section.add_row("camera", t("multi.add"), t("multi.add_hint"))
+        add = self.add_row_.addControl(button(t("multi.add_button")))
+        add.clicked.connect(self._open_wizard)
+        self.remove_row = section.add_row("camera", t("multi.remove.row"), t("multi.remove.hint"))
+        remove = self.remove_row.addControl(button(t("multi.remove.button")))
+        remove.clicked.connect(self._remove_camera)
 
-        self.ctrl.camera_registration_changed.connect(refresh_registration)
-        refresh_registration()
-        audio = section.add_row("mic", t("multi.audio_source"))
-        audio_select = Combo()
+        def refresh():
+            multi = len(group.cameras) > 1
+            self.manage_label.setText(group.label(self.ctrl))
+            self.add_row_.setVisible(not multi and group.can_add)
+            self.remove_row.setVisible(self.ctrl is not group.primary)
 
-        def refresh_audio():
-            audio_select.clear()
-            for index, _ in enumerate(group.cameras):
-                audio_select.addItem(t("multi.camera_number", n=index + 1), index)
-            audio_select.setCurrentIndex(group.audio_index)
-            section.setVisible(len(group.cameras) > 1 or self.ctrl.get("camera_slot") != 1)
+        group.changed.connect(refresh)
+        refresh()
 
-        audio_select.activated.connect(group.select_audio)
-        audio.addControl(audio_select)
-        group.primary.settings_changed.connect(lambda key, value: refresh_audio()
-                                               if key in ("audio_camera", "camera_profiles") else None)
-        refresh_audio()
-        self.ctrl.settings_changed.connect(lambda key, value: refresh_audio() if key == "camera_slot" else None)
+    def _open_wizard(self):
+        fn = getattr(self.window(), "add_camera", None)
+        if callable(fn):
+            fn()
+
+    def _remove_camera(self):
+        from phonecam.qt.multicam import confirm_remove
+        confirm_remove(self.window(), self.camera_group, self.ctrl)
 
     def _build_wifi(self):
         sec = self.add_section(t("connection.wifi.title"))
