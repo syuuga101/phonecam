@@ -370,6 +370,7 @@ class Controller:
         if self._setup_process is not process:
             return
         self._setup_process = None
+        self.refresh_camera_registration()  # ウィザード (別プロセス) が登録した結果を、起動時に覚えた古い状態のままにしない
         current = load_settings()
         for key in ("setup_done", "setup_shown_version", "audio_defaults_backup", "vbcable_restore_pending"):
             self.changed(key, current[key])
@@ -395,6 +396,16 @@ class Controller:
             self.open_setup(after_update=version)
             return
         self.prompt_camera_registration()
+
+    def refresh_camera_registration(self):
+        if self.demo or not self.frozen:
+            return
+        try:
+            self.camera_registration = registration_status()
+            self.camera_registration_changed.emit()
+            self.link.vcam.request_reset()
+        except Exception:
+            pass
 
     def prompt_camera_registration(self):
         """セットアップ済みなのに専用カメラが「更新が必要 / 未登録」のとき、起動時に1回だけ確認を出す
