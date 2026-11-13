@@ -26,6 +26,7 @@ from phonecam.qt.widgets import (
     ErrorLabel,
     Hint,
     Page,
+    StatusValue,
     bound_combo,
     bound_line,
     border_color,
@@ -262,6 +263,8 @@ class ConnectionPage(Page):
         self.ctrl = ctrl
         self._build_header()
         self.preview = self.add(PreviewView(ctrl))
+        self.connection_status = StatusValue()
+        self.column.addWidget(self.connection_status, 0, Qt.AlignmentFlag.AlignLeft)
         self._build_numbers()
         self._build_method()
         self._build_wifi()
@@ -392,6 +395,8 @@ class ConnectionPage(Page):
     def update_status(self, s):
         if not s:
             return
+        level = "error" if s.error_text else "ok" if s.connected else "warning" if s.wanted else None
+        self.connection_status.set_status(t("compact.connected") if s.connected else s.state_text, level)
         self.dot.set_key(s.key)
         self.state_label.setText(s.state_text)
         self.device_label.setText(s.device)

@@ -149,7 +149,7 @@ class Controller:
 
         self.update_status_changed = CallbackList()
         self.update_action = CallbackList()
-        self.update_status_text = t("update.status.never")
+        self._update_status = ("update.status.never", {})
         self.update_check_busy = False
         self._dismissed_update = None
         self._setup_process = None
@@ -253,7 +253,6 @@ class Controller:
     def set_language(self, lang):
         """言語を保存する (文言は次回起動で切り替わる)。"""
         self.changed("language", lang, None)
-        set_language(lang)
 
     # ------------------------------------------------------------------
     # 接続・配信
@@ -463,31 +462,36 @@ class Controller:
         state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
         return t("shell.sync.screen", state=state, extra=extra)
 
-    def _show_update_status(self, text, busy=False):
-        self.update_status_text = text
+    @property
+    def update_status_text(self):
+        key, args = self._update_status
+        return t(key, **args)
+
+    def _show_update_status(self, key, *, busy=False, **args):
+        self._update_status = (key, args)
         self.update_check_busy = busy
-        self.update_status_changed.emit(text, busy)
+        self.update_status_changed.emit(self.update_status_text, busy)
 
     def check_updates(self, auto=False):
         if self.update_check_busy or (auto and not self.get("update_check", True)):
             return
         if not phonecam_update or not APP_REPO or phonecam_update.parse_version(APP_VERSION) is None or self.demo:
             if not auto:
-                self._show_update_status(t("update.status.dev"))
+                self._show_update_status("update.status.dev")
             return
-        self._show_update_status(t("update.status.checking"), busy=True)
+        self._show_update_status("update.status.checking", busy=True)
         self.run_background(lambda: phonecam_update.fetch_latest(APP_REPO, APP_VERSION), lambda result: self._finish_update_check(result, auto))
 
     def _finish_update_check(self, result, auto):
         stamp = time.strftime("%m/%d %H:%M")
         if isinstance(result, Exception):
-            self._show_update_status(t("update.status.error", time=stamp, error=result))
+            self._show_update_status("update.status.error", time=stamp, error=result)
             return
         tag = result["tag"]
         version = result["version"]
         newer = phonecam_update.is_newer(tag, APP_VERSION)
         key = "update.status.available" if newer else "update.status.latest"
-        self._show_update_status(t(key, time=stamp, version=version))
+        self._show_update_status(key, time=stamp, version=version)
         if not auto:
             self._dismissed_update = None
         if tag == self._dismissed_update or not phonecam_update.should_notify(

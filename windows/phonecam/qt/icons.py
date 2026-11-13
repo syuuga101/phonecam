@@ -13,6 +13,10 @@ from PySide6.QtSvg import QSvgRenderer
 
 # 各アイコンの中身 (<svg> の中身のみ)。viewBox 24x24, stroke=currentColor, fill=none
 _PATHS = {
+    "check": '<path d="m5 12 4 4L19 6"/>',
+    "warning": '<path d="M12 3 2 20h20L12 3zM12 9v4m0 3h.01"/>',
+    "chevron_down": '<path d="m6 9 6 6 6-6"/>',
+    "chevron_up": '<path d="m6 15 6-6 6 6"/>',
     "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
             '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     "usb": '<circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5.1"/>'

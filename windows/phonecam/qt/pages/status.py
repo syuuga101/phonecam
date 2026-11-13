@@ -10,7 +10,7 @@ from phonecam.core.canvas import canvas_size
 from phonecam.core.decoder import THIN_NOTICE_SEC
 from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph_window, range_label
 from phonecam.i18n import t
-from phonecam.qt.widgets import Combo, ErrorLabel, Hint, Page, button, error_color, secondary_color, separator_color
+from phonecam.qt.widgets import Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
 from phonecam.ui.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
 
 
@@ -108,7 +108,7 @@ def _open_timer(page):
 
 def build(ctrl):
     page = Page()
-    rows = {}
+    values = {}
     sections = (
         ("iphone", (("thermal", "thermometer"), ("pressure", "gauge"), ("factors", "info"),
                     ("hot", "clock"), ("battery", "battery"), ("lowpower", "battery"))),
@@ -120,7 +120,8 @@ def build(ctrl):
     for name, specs in sections:
         card = page.add_section(t(f"status.{name}.title"))
         for key, icon in specs:
-            rows[name, key] = card.add_row(icon, t(f"status.{name}.{key}"))
+            row = card.add_row(icon, t(f"status.{name}.{key}"))
+            values[name, key] = row.addControl(StatusValue())
         if name == "iphone":
             version_note = Hint("")
             card.add_padded(version_note)
@@ -206,13 +207,30 @@ def build(ctrl):
             "pc": (dict(CODEC_LABELS).get(codec, "-") if status.connected else "-", decoder, output, status.watch_text,
                    status.dshow_text),
         }
+        levels = {}
+        if status.connected:
+            severity = {"nominal": "ok", "fair": "warning", "serious": "warning",
+                        "critical": "error", "shutdown": "error"}
+            levels["iphone", "thermal"] = severity.get(phone.get("thermalState"))
+            levels["iphone", "pressure"] = severity.get(pressure)
+            battery = phone.get("batteryLevel")
+            if isinstance(battery, (int, float)) and 0 <= battery <= 1:
+                levels["iphone", "battery"] = "warning" if battery <= .2 else "ok"
+            for key, count in (("dropped", cam + net if isinstance(cam, int) and isinstance(net, int) else None),
+                               ("recdropped", rec.get("droppedFrames") if isinstance(rec, dict) else None)):
+                if isinstance(count, int):
+                    levels["video", key] = "warning" if count else "ok"
+            if isinstance(phone.get("sentFps"), (int, float)):
+                levels["video", "sentfps"] = "ok" if phone["sentFps"] > 0 else "warning"
         for section, specs in sections[:-1]:
             for (key, _), value in zip(specs, data[section]):
-                rows[section, key].setHint(value or "-")
+                values[section, key].set_status(value if value and value != "-" else t("compact.no_value"),
+                                                levels.get((section, key)))
         latency = ctrl.link.latency.averages() if status.connected else {}
         for key, _ in sections[-1][1]:
             value = latency.get(key)
-            rows["latency", key].setHint(status.latency_text if key == "total" else f"{value:.1f} ms" if value is not None else "-")
+            text = status.latency_text if key == "total" else f"{value:.1f} ms" if value is not None else "-"
+            values["latency", key].set_status(text if text != "-" else t("compact.no_value"))
         current.setHint(t("status.graph.current", level=status.thermal_text or "-",
                           hot=format_mmss(ctrl.thermal_log.hot_seconds)))
 

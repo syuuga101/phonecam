@@ -14,8 +14,8 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEvent, QPointF, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPen
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
@@ -240,6 +240,52 @@ class IconLabel(QLabel):
         self._render()
 
 
+class StatusValue(QWidget):
+    """A status value with a theme-aware icon when its severity is known."""
+
+    _icons = {"ok": "check", "warning": "warning", "error": "warning"}
+
+    def __init__(self, text="", parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.label = QLabel(text)
+        self.label.setWordWrap(True)
+        self.label.setMaximumWidth(300)
+        self.icon = QLabel()
+        self.icon.setFixedSize(16, 16)
+        self.icon.hide()
+        layout.addWidget(self.label, 0, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        self.level = None
+
+    def text(self):
+        return self.label.text()
+
+    def set_status(self, text, level=None):
+        if self.label.text() != text:
+            self.label.setText(text)
+        if self.level != level:
+            self.level = level
+            self._render()
+
+    def _render(self):
+        name = self._icons.get(self.level)
+        self.icon.setVisible(bool(name))
+        if name:
+            palette = ref_palette(self)
+            colors = {"ok": ok_color(palette), "error": error_color(palette),
+                      "warning": QColor("#ffb864" if is_dark(palette) else "#9d5000")}
+            self.icon.setPixmap(icons.pixmap(name, 16, colors[self.level], self.devicePixelRatioF()))
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in _ICON_REFRESH and hasattr(self, "icon"):
+            self._render()
+
+
 # ---------------------------------------------------------------------------
 # Page / Section / Row
 # ---------------------------------------------------------------------------
@@ -314,6 +360,9 @@ class Row(QWidget):
         self._controls.addWidget(widget, stretch, Qt.AlignmentFlag.AlignVCenter)
         return widget
 
+    def controls(self):
+        return (self._controls.itemAt(i).widget() for i in range(self._controls.count()))
+
     def setTitle(self, text):
         self.title_label.setText(text)
 
@@ -369,6 +418,153 @@ class Section(QWidget):
         """Row ではない中身 (グラフやメーター等) をカードへ余白つきで入れる。"""
         box = _Padded(widget, margins)
         return self.add(box)
+
+
+class _ExpanderHeader(QPushButton):
+    def paintEvent(self, event):
+        # The surrounding card paints the background and its shared border.
+        if self.hasFocus():
+            painter = QPainter(self)
+            painter.setPen(QPen(secondary_color(ref_palette(self)), 1, Qt.PenStyle.DotLine))
+            painter.drawRoundedRect(self.rect().adjusted(3, 3, -4, -4), 3, 3)
+
+
+class Expander(Card):
+    """折りたたみ状態を設定に保存するカード。"""
+
+    def __init__(self, ctrl, key, icon_name, title, summary, parent=None):
+        super().__init__(parent)
+        self.ctrl, self.key = ctrl, key
+        self.expanded = False
+        self.header = _ExpanderHeader()
+        self.header.installEventFilter(self)
+        self.header.setCheckable(True)
+        self.header.setMinimumHeight(64)
+        self.header.setAccessibleName(title)
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(16, 10, 16, 10)
+        header_layout.setSpacing(12)
+        header_layout.addWidget(IconLabel(icon_name))
+        labels = QVBoxLayout()
+        labels.setSpacing(2)
+        self.title_label = QLabel(title)
+        font = self.title_label.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        self.title_label.setFont(font)
+        self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.summary_label = Hint(summary, wrap=False)
+        self.summary_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.summary_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        labels.addWidget(self.title_label)
+        labels.addWidget(self.summary_label)
+        header_layout.addLayout(labels, 1)
+        self.controls = QHBoxLayout()
+        header_layout.addLayout(self.controls)
+        self.arrow = IconLabel("chevron_down")
+        self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        header_layout.addWidget(self.arrow)
+        self.layout().addWidget(self.header)
+        self.content = QWidget()
+        content_layout = QVBoxLayout(self.content)
+        content_layout.setContentsMargins(1, 0, 1, 1)
+        content_layout.setSpacing(0)
+        self.layout().addWidget(self.content)
+        self.animation = QPropertyAnimation(self.content, b"maximumHeight", self)
+        self.animation.setDuration(160)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.animation.finished.connect(self._animation_finished)
+        self.header.clicked.connect(lambda: self.set_expanded(not self.expanded))
+        ctrl.settings_changed.connect(self._settings_changed)
+        self.set_expanded(self._saved_state(ctrl.get("ui_expanded", {})), animate=False, save=False)
+
+    def add(self, widget):
+        self.content.layout().addWidget(widget)
+        return widget
+
+    def addControl(self, widget):
+        self.controls.addWidget(widget)
+        return widget
+
+    def set_summary(self, text):
+        if text != self.summary_label.text():
+            self.summary_label.setText(text)
+        self.header.setToolTip(text)
+        self.header.setAccessibleDescription(text)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        palette = ref_palette(self)
+        bounds = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        shape = QPainterPath()
+        shape.addRoundedRect(bounds, 5, 5)
+        painter.fillPath(shape, card_color(palette))
+        if self.header.underMouse():
+            painter.save()
+            painter.setClipPath(shape)
+            painter.fillRect(self.header.geometry(), blend(card_color(palette), text_color(self), 0.065))
+            painter.restore()
+
+        if self.content.isVisible() and self.content.height() > 0:
+            painter.save()
+            painter.setClipPath(shape)
+            painter.fillRect(self.content.geometry(), blend(card_color(palette), QColor("black"),
+                                                           0.22 if is_dark(palette) else 0.045))
+            painter.setPen(QPen(separator_color(palette), 1))
+            top = self.content.y()
+            painter.drawLine(1, top, self.width() - 2, top)
+            layout = self.content.layout()
+            for i in range(layout.count()):
+                child = layout.itemAt(i).widget()
+                y = top + child.y()
+                if child.isVisible() and top < y < top + self.content.height():
+                    painter.drawLine(1, y, self.width() - 2, y)
+            painter.restore()
+        painter.setPen(QPen(border_color(palette), 1))
+        painter.drawPath(shape)
+
+    def eventFilter(self, obj, event):
+        if obj is self.header and event.type() in (QEvent.Type.Enter, QEvent.Type.Leave):
+            self.update()
+        return super().eventFilter(obj, event)
+
+    def _saved_state(self, states):
+        page = self.key.partition(".")[0]
+        return bool(states.get(self.key, states.get(page, False))) if isinstance(states, dict) else False
+
+    def _settings_changed(self, key, value):
+        if key == "ui_expanded" and isinstance(value, dict):
+            self.set_expanded(self._saved_state(value), save=False)
+
+    def set_expanded(self, expanded, animate=True, save=True):
+        expanded = bool(expanded)
+        if expanded == self.expanded and animate:
+            return
+        self.expanded = expanded
+        self.header.setChecked(expanded)
+        self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
+        self.animation.stop()
+        if animate and self.isVisible():
+            start = self.content.height() if self.content.isVisible() else 0
+            self.content.show()
+            self.content.layout().activate()
+            target = self.content.sizeHint().height() if expanded else 0
+            self.animation.setStartValue(start)
+            self.animation.setEndValue(target)
+            self.animation.start()
+        else:
+            self.content.setVisible(expanded)
+            self.content.setMaximumHeight(16777215 if expanded else 0)
+        if save:
+            saved = self.ctrl.get("ui_expanded", {})
+            states = dict(saved) if isinstance(saved, dict) else {}
+            states[self.key] = expanded
+            self.ctrl.changed("ui_expanded", states)
+
+    def _animation_finished(self):
+        self.content.setVisible(self.expanded)
+        if self.expanded:
+            self.content.setMaximumHeight(16777215)
 
 
 class Page(QScrollArea):
