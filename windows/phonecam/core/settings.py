@@ -50,7 +50,8 @@ def migrate_legacy_settings(new_path=None, old_path=None):
 
 DEFAULT_SETTINGS = {
     "known_devices": [],
-    "mode": "usb",
+    "mode": "auto",        # "auto" (USB があれば USB、なければ登録済みの iPhone へ Wi-Fi) / "usb" / "wifi"
+    "mode_auto": False,    # 旧設定の mode を auto へ移行済みか
     "ip": "",
     "lens": "wide",
     "resolution": "1080p",       # iPhoneから送る解像度 (仮想カメラのサイズとは無関係)
@@ -311,6 +312,11 @@ def sanitize_settings(s):
     s["known_devices"] = [device.stored() for entry in known[:64] if (device := read_device(entry))] if isinstance(known, list) else []
     expanded = s.get("ui_expanded")
     s["ui_expanded"] = {k: v for k, v in expanded.items() if isinstance(k, str) and isinstance(v, bool)} if isinstance(expanded, dict) else {}
+    if s.get("mode") not in ("auto", "usb", "wifi"):
+        s["mode"] = "auto"
+    if s.get("mode_auto") is not True:   # 自動切り替え導入前の設定は一度だけ auto へ移す (手動選択は「詳細」に残る)
+        s["mode"] = "auto"
+        s["mode_auto"] = True
     if s.get("lens") not in LENSES:
         s["lens"] = DEFAULT_SETTINGS["lens"]
     for key in ("mirror", "mirror_front"):

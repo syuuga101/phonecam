@@ -187,6 +187,22 @@ class Pairing:
         return read_device(data)
 
 
+def local_ipv4():
+    """この PC の IPv4 アドレス (Qt なしで求める。自動接続の Wi-Fi 検索用)。"""
+    found = []
+    try:
+        found.extend(socket.gethostbyname_ex(socket.gethostname())[2])
+    except OSError:
+        pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("10.255.255.255", 9))   # 送信はしない。経路の選択だけで自分のアドレスが分かる
+            found.append(probe.getsockname()[0])
+    except OSError:
+        pass
+    return ipv4(found)
+
+
 def route_of(address):
     """見つかった経路: "tether" (iPhone のテザリング) / "hotspot" (PC のホットスポット) / "lan" (同じ Wi-Fi)。"""
     if address == TETHER:

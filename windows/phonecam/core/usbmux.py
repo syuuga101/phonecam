@@ -79,6 +79,19 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
         raise PhoneCamError("USBでの通信中にエラーが発生しました。ケーブルを抜き差しして再試行してください")
 
 
+def usbmux_available(mux_addr=USBMUX_ADDR):
+    """iPhone が USB でつながっているか (usbmuxd に聞くだけ。つながない)。例外は出さず False。"""
+    try:
+        with socket.create_connection(mux_addr, timeout=1.0) as sock:
+            sock.settimeout(1.0)
+            sock.sendall(usbmux_pack({"MessageType": "ListDevices", "ClientVersionString": "phonecam",
+                                      "ProgName": "phonecam"}, 1))
+            resp = usbmux_recv(sock)
+        return any(d.get("Properties", {}).get("ConnectionType") == "USB" for d in resp.get("DeviceList", []))
+    except Exception:
+        return False
+
+
 def wifi_connect(ip, port=PHONE_PORT, timeout=3.0):
     try:
         sock = socket.create_connection((ip, port), timeout=timeout)

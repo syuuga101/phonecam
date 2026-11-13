@@ -830,7 +830,7 @@ class Controller:
             key = "paused"
         else:
             key = "idle"
-        way = "Wi-Fi" if self.settings.get("mode") == "wifi" else "USB"
+        way = "Wi-Fi" if (snap.get("transport") or self.settings.get("mode")) == "wifi" else "USB"
         device = ""
         sub = ""
         if connected:
@@ -874,6 +874,8 @@ class Controller:
             sub=sub,
             error_text=snap["error_text"],
             auth_state=snap["auth_state"],
+            peer=snap.get("peer", ""),
+            transport=snap.get("transport") or ("wifi" if self.settings.get("mode") == "wifi" else "usb"),
             res_fps=res_fps,
             resolution=snap["resolution"],
             recv_fps=fps,

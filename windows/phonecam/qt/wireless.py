@@ -10,7 +10,7 @@ from PySide6.QtCore import QEvent, QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QPainter, QPen, QPixmap
 from PySide6.QtNetwork import QNetworkInterface
 from PySide6.QtWidgets import (
-    QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QButtonGroup, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QVBoxLayout, QWidget,
 )
 
 from phonecam.core.wireless import (
@@ -36,7 +36,7 @@ def local_addresses():
 class PairDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle(t("wireless.qr"))
+        self.setWindowTitle(t("wireless.add"))
         self.device = None
         self.inbox = SimpleQueue()
         layout = QVBoxLayout(self)
@@ -45,7 +45,7 @@ class PairDialog(QDialog):
         layout.addWidget(self.note)
         qr_view = QLabel()
         qr_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        qr_view.setAccessibleName(t("wireless.qr"))
+        qr_view.setAccessibleName(t("wireless.add"))
         layout.addWidget(qr_view)
         self.clock = Hint()
         layout.addWidget(self.clock)
@@ -376,6 +376,7 @@ class WirelessOptions:
         section.add(self._build_qr())
         section.add(self._build_trouble())
         section.add(self._build_manual())
+        section.add(self._build_method())
         self._render()
 
     # -- 部品 -------------------------------------------------------------------
@@ -410,7 +411,7 @@ class WirelessOptions:
 
     def _build_qr(self):
         row = Row("qr", t("wireless.qr_title"), t("wireless.qr_hint"))
-        self.qr = row.addControl(button(t("wireless.qr"), primary=True))
+        self.qr = row.addControl(button(t("wireless.add"), primary=True))
         self.qr.setMinimumWidth(150)
         self.qr.clicked.connect(self._show_qr)
         row.setMinimumHeight(64)
@@ -479,6 +480,35 @@ class WirelessOptions:
         self.manual.add(go_row)
         return self.manual
 
+    def _build_method(self):
+        """つなぎ方の手動選択 (ふつうは自動)。"""
+        self.method = Disclosure(t("wireless.method"))
+        row = Row("link", t("wireless.method_label"), t("wireless.method_hint"))
+        self.mode_group = QButtonGroup(self.page)
+        self.mode_buttons = {}
+        for value in ("auto", "usb", "wifi"):
+            radio = QRadioButton(t("wireless.mode_" + value))
+            self.mode_group.addButton(radio)
+            self.mode_buttons[value] = radio
+            row.addControl(radio)
+            radio.clicked.connect(lambda _checked=False, v=value: self.ctrl.set_mode(v))
+        self.method.add(row)
+        self._show_mode(self.ctrl.get("mode"))
+        self.ctrl.settings_changed.connect(lambda k, v: self._show_mode(v) if k == "mode" else None)
+        return self.method
+
+    def display_name(self, address, fallback):
+        """つないでいる相手の表示名 (PC 側で付けた名前を優先)。分からなければ fallback。"""
+        for entry in self.entries():
+            if address and address in entry.device.addresses:
+                return entry.name
+        return fallback
+
+    def _show_mode(self, value):
+        radio = self.mode_buttons.get(value)
+        if radio is not None and not radio.isChecked():
+            radio.setChecked(True)
+
     def _code_edited(self, text):
         code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
         if code != text:
@@ -508,7 +538,7 @@ class WirelessOptions:
             self.refresh()
 
     def status(self, status):
-        pending = status.wanted and not status.connected and self.ctrl.get("mode") == "wifi"
+        pending = status.wanted and not status.connected and self.ctrl.get("mode") != "usb"
         if not pending:
             self.hint_timer.stop()
             self.warning.hide()
@@ -519,7 +549,7 @@ class WirelessOptions:
 
     def _show_hint(self):
         status = self.ctrl.status
-        show = bool(status.get("wanted") and not status.get("connected") and self.ctrl.get("mode") == "wifi")
+        show = bool(status.get("wanted") and not status.get("connected") and self.ctrl.get("mode") != "usb")
         self.warning.setVisible(show)
         if show:
             self.trouble.set_open(True)
@@ -582,20 +612,22 @@ class WirelessOptions:
 
     def _state(self, entry):
         """"connected" / "connecting" / "" (この行が今つないでいる相手か)。"""
-        if self.ctrl.get("mode") != "wifi" or not self.ctrl.wanted:
+        status = self.ctrl.status
+        if not self.ctrl.wanted or status.get("transport") != "wifi":
             return ""
-        if self.ctrl.get("ip") not in entry.device.addresses:
+        if status.get("peer") not in entry.device.addresses:
             return ""
-        return "connected" if self.ctrl.status.get("connected") else "connecting"
+        return "connected" if status.get("connected") else "connecting"
 
     def _summary(self, entries):
         status = self.ctrl.status
-        if self.ctrl.get("mode") == "wifi" and status and status.get("connected"):
+        if status and status.get("connected"):
+            way = t("wireless.way." + ("wifi" if status.get("transport") == "wifi" else "usb"))
             for entry in entries:
                 if self._state(entry) == "connected":
-                    return t("wireless.summary.connected", name=entry.name)
+                    return t("wireless.summary.connected", name=entry.name, way=way)
             name = (status.get("phone") or {}).get("deviceName") or t("connection.device.default")
-            return t("wireless.summary.connected", name=name)
+            return t("wireless.summary.connected", name=name, way=way)
         count = sum(1 for entry in entries if entry.found)
         if count:
             return t("wireless.summary.found", n=count)
@@ -697,7 +729,8 @@ class WirelessOptions:
         self.ctrl.set_ip(address)
         if code or address != previous_ip:
             self.ctrl.set_pair_code(code)
-        self.ctrl.set_mode("wifi")
+        if self.ctrl.get("mode") == "usb":
+            self.ctrl.set_mode("auto")   # USB だけにしていた人が Wi-Fi の iPhone を選んだとき。「Wi-Fiだけ」は選び直さない限り変えない
 
     def _commit_pending(self, status):
         pending = self._pending
@@ -705,7 +738,7 @@ class WirelessOptions:
             return
         if not self.ctrl.wanted:
             self._pending = None
-        elif status.connected and self.ctrl.get("ip") == pending.addresses[0]:
+        elif status.connected and status.get("peer") == pending.addresses[0]:
             self._pending = None
             self._save_known([pending, *(item for item in self._known() if item.id != pending.id)])
 

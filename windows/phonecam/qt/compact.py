@@ -9,7 +9,7 @@ from phonecam.qt.widgets import Expander, Row, Section, SliderValue, StatusValue
 
 
 PRIMARY = {
-    "connection": ("connection.method.label", "connection.run.mode"),
+    "connection": ("connection.run.mode",),
     "video": ("video.resolution.label", "video.fps.label", "video.orient.label"),
     "quality": ("quality.zoom.label", "quality.exposure.bias.label", "quality.focus.mode.label", "quality.light.label"),
     "effects": ("effects.background.mode.label", "effects.background.strength.label", "effects.color.brightness.label"),

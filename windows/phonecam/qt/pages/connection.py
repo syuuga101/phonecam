@@ -8,11 +8,9 @@
 from PySide6.QtCore import QPointF, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QButtonGroup,
-    QGridLayout,
+        QGridLayout,
     QHBoxLayout,
     QLabel,
-    QRadioButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -21,17 +19,19 @@ from PySide6.QtWidgets import (
 from phonecam.core.deps import np
 from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import t
+from phonecam.qt import icons
 from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
+    Card,
     ErrorLabel,
     Hint,
     Page,
-    StatusValue,
     bound_combo,
     border_color,
     button,
     card_color,
     ok_color,
+    ref_palette,
     secondary_color,
 )
 
@@ -262,54 +262,73 @@ class ConnectionPage(Page):
         self.ctrl = ctrl
         self._build_header()
         self.preview = self.add(PreviewView(ctrl))
-        self.connection_status = StatusValue()
-        self.column.addWidget(self.connection_status, 0, Qt.AlignmentFlag.AlignLeft)
         self._build_numbers()
-        self._build_method()
         self._build_wifi()
         self._build_run()
         self.finish()
         ctrl.status_changed.connect(self.update_status)
         self.update_status(ctrl.status)
 
-    # -- 上部: 状態 + ボタン -----------------------------------------------------
+    # -- 上部: 状態のカード (1枚) -----------------------------------------------------
     def _build_header(self):
+        card = Card()
         box = QWidget()
         lay = QHBoxLayout(box)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(16, 14, 16, 14)
         lay.setSpacing(12)
         left = QVBoxLayout()
-        left.setSpacing(2)
+        left.setSpacing(3)
         top = QHBoxLayout()
         top.setSpacing(8)
         self.dot = Dot()
         top.addWidget(self.dot, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.state_label = QLabel(t("connection.state.off"))
+        self.state_label = QLabel(t("connection.card.off"))
         f = self.state_label.font()
         f.setPointSizeF(14.0)
         f.setWeight(QFont.Weight.DemiBold)
         self.state_label.setFont(f)
-        top.addWidget(self.state_label)
-        self.device_label = Hint("", wrap=False)
-        top.addWidget(self.device_label)
+        self.state_label.setWordWrap(True)
+        top.addWidget(self.state_label, 0)
+        self.check = QLabel()
+        self.check.setFixedSize(18, 18)
+        self.check.hide()
+        top.addWidget(self.check, 0, Qt.AlignmentFlag.AlignVCenter)
         top.addStretch(1)
         left.addLayout(top)
         self.sub_label = Hint("", wrap=True)
-        self.sub_label.setVisible(False)
         left.addWidget(self.sub_label)
         self.error_label = ErrorLabel("")
         left.addWidget(self.error_label)
         lay.addLayout(left, 1)
         btns = QHBoxLayout()
         btns.setSpacing(8)
-        self.start_btn = button(t("connection.button.start"), primary=True)
+        self.start_btn = button(t("connection.button.start"))
         self.start_btn.clicked.connect(self.ctrl.start_pause)
-        self.connect_btn = button(t("connection.button.connect"))
+        self.connect_btn = button(t("connection.button.connect"), primary=True)
+        self.connect_btn.setMinimumWidth(104)
         self.connect_btn.clicked.connect(lambda: self.ctrl.toggle_connect())
         btns.addWidget(self.start_btn)
         btns.addWidget(self.connect_btn)
         lay.addLayout(btns, 0)
-        self.add(box)
+        card.layout().addWidget(box)
+        self.add(card)
+
+    def _card_text(self, s):
+        """上のカードの (見出し, 補足, ✓ を出すか)。方式を選ばせない (auto) ときは 3 つの状態だけを出す。"""
+        auto = self.ctrl.get("mode") == "auto"
+        way = t("wireless.way.wifi" if s.get("transport") == "wifi" else "wireless.way.usb")
+        if s.connected:
+            name = (s.get("phone") or {}).get("deviceName") or (s.get("phone") or {}).get("name") \
+                or t("connection.device.default")
+            return t("connection.card.connected", name=self.wireless.display_name(s.get("peer"), name), way=way), \
+                s.sub, True
+        if not auto:
+            return s.state_text, s.sub, False
+        if not s.wanted:
+            return t("connection.card.off"), t("connection.card.off_hint"), False
+        if s.error_text and s.get("auth_state") not in ("failed", "refused"):
+            return t("connection.card.none"), t("connection.card.none_hint"), False
+        return t("connection.card.searching"), "", False
 
     # -- 数値の行 -------------------------------------------------------------------
     def _build_numbers(self):
@@ -329,26 +348,6 @@ class ConnectionPage(Page):
             grid.addWidget(val, 1, i)
             self.num[key] = val
         self.add(box)
-
-    # -- 接続方法 -------------------------------------------------------------------
-    def _build_method(self):
-        sec = self.add_section(t("connection.method.title"))
-        row = sec.add_row("link", t("connection.method.label"))
-        self.mode_group = QButtonGroup(self)
-        self.mode_buttons = {}
-        for value, text in (("usb", "USB"), ("wifi", "Wi-Fi")):
-            rb = QRadioButton(text)
-            self.mode_group.addButton(rb)
-            self.mode_buttons[value] = rb
-            row.addControl(rb)
-            rb.clicked.connect(lambda _checked=False, v=value: self.ctrl.set_mode(v))
-        self._show_mode(self.ctrl.get("mode"))
-        self.ctrl.settings_changed.connect(lambda k, v: self._show_mode(v) if k == "mode" else None)
-
-    def _show_mode(self, value):
-        rb = self.mode_buttons.get(value)
-        if rb is not None and not rb.isChecked():
-            rb.setChecked(True)
 
     # -- Wi-Fi ----------------------------------------------------------------------
     def _build_wifi(self):
@@ -377,16 +376,20 @@ class ConnectionPage(Page):
         if not s:
             return
         self.wireless.status(s)
-        level = "error" if s.error_text else "ok" if s.connected else "warning" if s.wanted else None
-        self.connection_status.set_status(t("compact.connected") if s.connected else s.state_text, level)
+        headline, sub, checked = self._card_text(s)
         self.dot.set_key(s.key)
-        self.state_label.setText(s.state_text)
-        self.device_label.setText(s.device)
-        self.sub_label.setText(s.sub)
-        self.sub_label.setVisible(bool(s.sub))
-        self.error_label.setText(s.error_text)
+        self.state_label.setText(headline)
+        self.check.setVisible(checked)
+        if checked:
+            self.check.setPixmap(icons.pixmap("check", 18, ok_color(ref_palette(self)), self.devicePixelRatioF()))
+        self.sub_label.setText(sub)
+        self.sub_label.setVisible(bool(sub))
+        # 自動のときの「見つかりません」は上の見出しが言うので、赤字は認証の失敗などだけ出す
+        hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in ("failed", "refused")
+        self.error_label.setText("" if hide_error else s.error_text)
         self.start_btn.setText(t("connection.button.pause") if s.start_is_pause else t("connection.button.start"))
         self.start_btn.setEnabled(bool(s.start_enabled))
+        self.start_btn.setVisible(bool(s.start_enabled))   # つないでいる間だけ (主ボタンは「つなぐ / 切断」の1つ)
         self.connect_btn.setText(t("connection.button.disconnect") if s.wanted else t("connection.button.connect"))
         self.num["res"].setText(s.res_fps)
         self.num["latency"].setText(s.latency_text)

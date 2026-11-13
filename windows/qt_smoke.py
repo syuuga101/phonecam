@@ -71,9 +71,11 @@ def child(scale, out):
         Device(known.id, "iPhone 13", ("192.168.1.23",), "", "iPhone 13"),
         Device("0d2e6a52-3c1b-4f0a-9d4e-7a1b2c3d4e5f", "リビングのiPhone", ("172.20.10.1",), "", "iPhone 15 Pro"),
     ]
-    ctrl.settings["mode"] = "wifi"
+    ctrl.settings["mode"] = "auto"
     ctrl.settings["ip"] = "192.168.1.23"
     ctrl.settings["pair_code"] = "482913"
+    ctrl.state.update(transport="wifi", peer="192.168.1.23")   # 自動で Wi-Fi につながっている状態
+    ctrl.poll()
     frame = _sample_frame()
     if frame is not None:
         ctrl.set_preview_frame(frame, "rgb24")
