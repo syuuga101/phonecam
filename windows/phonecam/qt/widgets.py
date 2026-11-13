@@ -514,7 +514,7 @@ def bound_combo(ctrl, key, items, group=None, width=None, on_change=None, setter
     return cb
 
 
-def bound_switch(ctrl, key, group=None, on_change=None, invert=False):
+def bound_switch(ctrl, key, group=None, on_change=None, invert=False, setter=None):
     """設定 key (bool) に結び付いたスイッチ。"""
     sw = Switch()
 
@@ -530,7 +530,10 @@ def bound_switch(ctrl, key, group=None, on_change=None, invert=False):
 
     def toggled(on):
         v = bool(on) != bool(invert)
-        ctrl.changed(key, v, group)
+        if setter is None:
+            ctrl.changed(key, v, group)
+        else:
+            setter(v)
         if on_change:
             on_change(v)
 
@@ -609,6 +612,18 @@ class SliderValue(QWidget):
         self.slider.valueChanged.connect(self._moved)
         _listen(ctrl, key, self._show)
 
+    def set_bounds(self, lo, hi):
+        steps = max(0, int((hi - lo) / self._step + 1e-9))
+        if lo == self._lo and steps == self.slider.maximum():
+            return
+        self._lo = lo
+        previous = self.slider.blockSignals(True)
+        try:
+            self.slider.setRange(0, steps)
+            self._show(self._ctrl.get(self._key))
+        finally:
+            self.slider.blockSignals(previous)
+
     def _value_of(self, i):
         v = self._lo + i * self._step
         return int(round(v)) if self._as_int else round(v, 4)
@@ -621,9 +636,9 @@ class SliderValue(QWidget):
         i = int(round((v - self._lo) / self._step))
         i = max(self.slider.minimum(), min(self.slider.maximum(), i))
         if i != self.slider.value():
-            self.slider.blockSignals(True)
+            previous = self.slider.blockSignals(True)
             self.slider.setValue(i)
-            self.slider.blockSignals(False)
+            self.slider.blockSignals(previous)
         self.value_label.setText(self._fmt(self._value_of(i)))
 
     def _moved(self, i):
