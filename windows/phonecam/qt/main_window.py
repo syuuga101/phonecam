@@ -200,8 +200,13 @@ class MainWindow(QMainWindow):
         self.nav.setIconSize(QSize(16, 16))
         self.nav.setItemDelegate(NavDelegate(self.nav))
         self.nav.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.nav.setTextElideMode(Qt.TextElideMode.ElideNone)   # 文字は delegate が描く。省略記号 (…) を足させない
+        self.nav.setWordWrap(False)
+        self.nav.setDragEnabled(False)
+        self.nav.setDropIndicatorShown(False)                   # 項目の間・右に出る挿入の線 / 点を出さない
         for key, icon_name in NAV_ITEMS:
             item = QListWidgetItem(t("nav." + key))
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             item.setData(Qt.ItemDataRole.UserRole, icon_name)
             self.nav.addItem(item)
         self._refresh_nav_icons()

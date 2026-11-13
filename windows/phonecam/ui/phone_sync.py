@@ -42,6 +42,18 @@ def _apply_phone_edit(app, st, now=None):
         app.mic_muted_var.set(muted)
         app._changed("mic_muted", muted, None)
         notes.append(t("shell.sync.muted") if muted else t("shell.sync.unmuted"))
+    zoom = pe.get("zoom")
+    if isinstance(zoom, (int, float)) and not isinstance(zoom, bool) and zoom == zoom and zoom >= 1.0:
+        zoom = round(float(zoom), 2)
+        if abs(zoom - float(app.settings.get("zoom", 1.0))) >= 0.005:
+            app.zoom_var.set(zoom)
+            app._changed("zoom", zoom, None)
+            notes.append(t("shell.sync.zoom", v="%.1f" % zoom))
+    torch = pe.get("torch")
+    if isinstance(torch, bool) and torch != bool(app.settings.get("torch", False)):
+        app.torch_var.set(torch)
+        app._changed("torch", torch, None)
+        notes.append(t("shell.sync.torch_on") if torch else t("shell.sync.torch_off"))
     return " / ".join(notes) if notes else None
 
 

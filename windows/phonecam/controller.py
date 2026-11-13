@@ -856,6 +856,17 @@ class Controller:
         if isinstance(muted, bool) and muted != bool(self.settings.get("mic_muted", False)):
             self.changed("mic_muted", muted, None)
             notes.append(t("shell.sync.muted") if muted else t("shell.sync.unmuted"))
+        # ズーム (ピンチ) とライト: 設定だけ更新して画質ページへ反映する。iPhone へは送り返さない (group=None)
+        zoom = pe.get("zoom")
+        if isinstance(zoom, (int, float)) and not isinstance(zoom, bool) and zoom == zoom and zoom >= 1.0:
+            zoom = round(float(zoom), 2)
+            if abs(zoom - float(self.settings.get("zoom", 1.0))) >= 0.005:
+                self.changed("zoom", zoom, None)
+                notes.append(t("shell.sync.zoom", v="%.1f" % zoom))
+        torch = pe.get("torch")
+        if isinstance(torch, bool) and torch != bool(self.settings.get("torch", False)):
+            self.changed("torch", torch, None)
+            notes.append(t("shell.sync.torch_on") if torch else t("shell.sync.torch_off"))
         return " / ".join(notes) if notes else None
 
     # ------------------------------------------------------------------
