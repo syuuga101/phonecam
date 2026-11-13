@@ -13,7 +13,7 @@ from phonecam.ui.util import webbrowser_open
 AUTHOR = "syuuga101"
 REPO_URL = "https://github.com/syuuga101/phonecam"
 GUIDE_URL = "https://github.com/syuuga101/phonecam/wiki"
-TRANSLATE_URL = ""  # Crowdin プロジェクト作成後に URL を入れる (空のあいだは翻訳協力の行を出さない)
+TRANSLATE_URL = "https://crowdin.com/project/phonecam"  # 翻訳協力 (Crowdin)。空にすると行を隠す
 ISSUES_URL = REPO_URL + "/issues"
 LICENSE_TEXT = "GPL-2.0-or-later"
 
