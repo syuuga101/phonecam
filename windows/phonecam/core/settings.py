@@ -196,6 +196,7 @@ IDLE_STOP_VALUES = (10, 30, 60)
 
 # 整数の設定 (キー: (最小, 最大))
 INT_RANGES = {
+    "bitrate": (2, 50),         # 配信のビットレート (Mbps)。設定ファイルの壊れた値・過大な値で iPhone/デコーダーを詰まらせない
     "rec_bitrate": (10, 100),
     "mic_volume": (0, 200),
     "mic_delay_ms": (0, 500),

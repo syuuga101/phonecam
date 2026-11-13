@@ -8,6 +8,8 @@ import sys
 import time
 from phonecam.core.audio_engine import AudioEngine
 from phonecam.core.canvas import build_control
+from phonecam.core import crashlog
+from phonecam.core.crashlog import log_error as _log_error
 from phonecam.core.deps import phonecam_setup
 from phonecam.core.elevate import ELEVATED_TIMEOUT_MS, run_elevated
 from phonecam.core.link import Link
@@ -295,7 +297,10 @@ class App:
 
         def fire():
             self._pending.pop(group, None)
-            self.link.send_control(build_control(self.settings, group, self.link.last_frame_size))
+            try:
+                self.link.send_control(build_control(self.settings, group, self.link.last_frame_size))
+            except Exception:
+                pass  # 送れなくても画面は止めない (次の変更でまた送る)
 
         self._pending[group] = self.root.after(THROTTLE_MS, fire)
 
@@ -598,6 +603,14 @@ class App:
 
     # -- 状態表示のポーリング (メインスレッド) -----------------------------------
     def _poll(self):
+        try:
+            self._poll_once()
+        except Exception:
+            _log_error("poll")  # 1回の失敗でポーリングを止めない
+        if not self._closing:
+            self.root.after(100, self._poll)
+
+    def _poll_once(self):
         snap = self.state.snapshot()
         st = snap["phone_status"]
         self.status_var.set(snap["status_text"])
@@ -634,7 +647,6 @@ class App:
             self._screen_user_t = now  # 接続直後は送った設定が反映される前なので、iPhone側の値で上書きしない
         self._was_connected = connected
         self._update_v13(st if connected else {}, connected, snap, now)
-        self.root.after(100, self._poll)
 
     def _housekeeping(self):
         """1秒ごと: 音声ストリームが止まっていたら、3秒以上あけて開き直す。"""
@@ -738,6 +750,7 @@ def main():
     set_app_user_model_id()  # タスクバーで python.exe ではなく PhoneCam として扱わせる
     enable_dpi_awareness()  # Tk を作る前に (作ったあとでは効かない)
     root = tk.Tk()
+    crashlog.install(root)
     apply_ui_scale(root)
     if setup_window:
         settings = load_settings()
@@ -778,6 +791,7 @@ def _show_fatal(exc):
     """windowed の exe ではコンソールが無いので、起動時エラーをダイアログで表示する。"""
     import traceback
     detail = traceback.format_exc()
+    _log_error("fatal", detail)
     try:
         r = tk.Tk() if tk is not None else None
         if r is not None:

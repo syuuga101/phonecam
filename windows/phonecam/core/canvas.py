@@ -15,6 +15,21 @@ def output_canvas_control(settings, frame_size=None):
     return {"width": int(size[0]), "height": int(size[1]), "fit": fit if fit in FIT_MODES else "pad"}
 
 
+BITRATE_MIN_MBPS = 2
+
+
+BITRATE_MAX_MBPS = 50   # UI のスライダー上限。これを超える値 (壊れた設定ファイルなど) は送らない
+
+
+def clamp_bitrate(value, default=20):
+    """配信ビットレート (Mbps) を安全な範囲 (2〜50) に収める。数値でない値は既定値。"""
+    try:
+        v = int(round(float(value)))
+    except Exception:
+        v = default
+    return min(BITRATE_MAX_MBPS, max(BITRATE_MIN_MBPS, v))
+
+
 def build_control(settings, group, frame_size=None):
     """設定から制御 JSON を作る。group='all' で全項目。frame_size: 最後にデコードしたフレームの (幅, 高さ)。"""
     c = {}
@@ -47,7 +62,7 @@ def build_control(settings, group, frame_size=None):
             "sharpness": float(settings["sharpness"]),
         }
     if group in ("all", "bitrate"):
-        c["bitrate"] = int(settings["bitrate"])
+        c["bitrate"] = clamp_bitrate(settings.get("bitrate"))
     if group in ("all", "exposure"):
         c["exposure"] = {
             "mode": settings["exp_mode"],
