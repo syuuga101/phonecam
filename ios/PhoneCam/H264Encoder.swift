@@ -51,7 +51,7 @@ final class H264Encoder {
         if bps != bitrateBps {
             bitrateBps = bps
             if let s = session {
-                applyBitrateLocked(s)
+                updateBitrateLocked(s)
             }
         }
     }
@@ -71,9 +71,11 @@ final class H264Encoder {
     func setBitrate(mbps: Int) {
         sessionLock.lock()
         defer { sessionLock.unlock() }
-        bitrateBps = max(1, mbps) * 1_000_000
+        let bps = max(1, mbps) * 1_000_000
+        guard bps != bitrateBps else { return }
+        bitrateBps = bps
         if let s = session {
-            applyBitrateLocked(s)
+            updateBitrateLocked(s)
         }
     }
 
@@ -260,12 +262,22 @@ final class H264Encoder {
         return true
     }
 
-    private func applyBitrateLocked(_ s: VTCompressionSession) {
-        VTSessionSetProperty(s, key: kVTCompressionPropertyKey_AverageBitRate, value: NSNumber(value: bitrateBps))
+    private func updateBitrateLocked(_ session: VTCompressionSession) {
+        if applyBitrateLocked(session) != noErr {
+            // Some encoders reject a live update. Open the next session with the new rate.
+            destroySessionLocked()
+            requestKeyframe()
+        }
+    }
+
+    @discardableResult
+    private func applyBitrateLocked(_ s: VTCompressionSession) -> OSStatus {
+        let result = VTSessionSetProperty(s, key: kVTCompressionPropertyKey_AverageBitRate, value: NSNumber(value: bitrateBps))
         // 低遅延レート制御では未対応の場合があるため、失敗しても無視する
         let bytesPerSecond = Int(Double(bitrateBps) * 1.5 / 8.0)
         let limits = [NSNumber(value: bytesPerSecond), NSNumber(value: 1)] as CFArray
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_DataRateLimits, value: limits)
+        return result
     }
 
     private func destroySessionLocked() {

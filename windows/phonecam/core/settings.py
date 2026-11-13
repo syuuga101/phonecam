@@ -64,6 +64,7 @@ DEFAULT_SETTINGS = {
     "hw_decode": True,           # ハードウェアデコード (d3d11va) を試す。使えなければ自動でソフトウェア
     "fps": 60,
     "bitrate": 20,
+    "adaptive_bitrate": True,  # only sent as enabled on Wi-Fi
     "mirror": False,
     "mirror_front": True,
     "rotate180": False,
@@ -215,7 +216,7 @@ INT_RANGES = {
 }
 
 
-BOOL_KEYS = ("screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "mic_muted", "setup_done", "hw_decode", "update_check", "hotkeys_enabled")
+BOOL_KEYS = ("adaptive_bitrate", "screen_black", "rec_audio", "rec_photos", "rec_custom_bitrate", "mic_enabled", "mic_mute", "mic_muted", "setup_done", "hw_decode", "update_check", "hotkeys_enabled")
 
 
 AUDIO_AVAILABLE = sd is not None and np is not None

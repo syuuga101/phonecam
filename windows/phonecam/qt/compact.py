@@ -34,6 +34,7 @@ GROUPS = {
         ("video.power.title", "light", ()),
     ),
     "quality": (
+        ("quality.adaptive.title", "wifi", ()),
         ("quality.exposure.title", "sun", ("quality.exposure.mode.label", "quality.exposure.bias.label")),
         ("quality.wb.title", "droplet", ()),
         ("quality.focus.title", "focus", ("quality.focus.mode.label", "quality.focus.position.label")),
@@ -56,7 +57,7 @@ GROUPS = {
     ),
     "status": (
         ("status.iphone.title", "battery", ("status.iphone.thermal", "status.iphone.battery")),
-        ("status.video.title", "video", ("status.video.sentfps", "status.video.encode")),
+        ("status.video.title", "video", ("status.video.sentfps", "status.video.bitrate_target", "status.video.adaptive")),
         ("status.pc.title", "camera", ("status.pc.out", "status.pc.decoder")),
         ("status.latency.title", "wifi", ("status.latency.total",)),
         ("status.diag.title", "wrench", ()),

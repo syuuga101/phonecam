@@ -7,6 +7,9 @@ from phonecam.ui.labels import MODE3_LABELS, SHUTTER_VALUES
 
 def build(ctrl):
     page = Page()
+    network = page.add_section(t("quality.adaptive.title"))
+    network.add_row("wifi", t("quality.adaptive.label"), t("quality.adaptive.hint")).addControl(
+        bound_switch(ctrl, "adaptive_bitrate", group="adaptive_bitrate"))
 
     def mode(name, key, group):
         card = page.add_section(t(f"quality.{name}.title"))

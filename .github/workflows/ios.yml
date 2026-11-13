@@ -18,6 +18,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test adaptive bitrate
+        working-directory: ios
+        run: |
+          swiftc PhoneCam/AdaptiveBitrate.swift Tests/AdaptiveBitrateChecks.swift -o "$RUNNER_TEMP/phonecam-adaptive-checks"
+          "$RUNNER_TEMP/phonecam-adaptive-checks"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
