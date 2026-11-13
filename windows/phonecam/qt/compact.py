@@ -42,6 +42,8 @@ def compact_page(page, ctrl, key):
                     layout.removeWidget(row)
                     selected[row.title_label.text()] = row
             if layout.count() == 0:
+                widget.hide()
+                widget.setParent(None)
                 widget.deleteLater()
                 continue
             if widget.title_label is not None:
