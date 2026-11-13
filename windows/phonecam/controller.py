@@ -65,6 +65,8 @@ from phonecam.ui.labels import (
 SAVE_DELAY_SEC = 0.5       # 設定の保存は最後の変更から 0.5 秒後
 POLL_SEC = 0.1             # status の更新間隔
 HOUSEKEEP_SEC = 1.0
+STATUS_JITTER_SEC = 0.5     # 下の STATUS_JITTER_KEYS だけが変わったときの反映間隔
+STATUS_JITTER_KEYS = frozenset(("latency_text", "audio_summary", "decode_ms"))
 PREVIEW_STALE_SEC = 1.5    # これより古い映像は「映像なし」
 
 
@@ -184,6 +186,7 @@ class Controller:
         self._save_due = None
         self._send_due = {}
         self._next_poll = 0.0
+        self._last_emit = 0.0
         self._next_stream = 0.0
         self._next_house = 0.0
         self._last_sample = 0.0
@@ -878,6 +881,7 @@ class Controller:
             res_fps=res_fps,
             resolution=snap["resolution"],
             recv_fps=fps,
+            rx_fps=snap.get("rx_fps", 0.0),
             decode_ms=snap["decode_ms"],
             latency_text="%d ms" % round(lat) if lat is not None else "-",
             thermal=thermal,
@@ -904,6 +908,12 @@ class Controller:
                            round(self.audio.latency_ms() or 0) if self.audio.running else None),                                  # iPhone の status JSON (接続中のみ。未接続は {})
         )
         if s != self.status:
+            # 遅延 (ms) や音声バッファのように毎回少しずつ変わる値だけの違いは、0.5秒に1回だけ反映する。
+            # status_changed には全ページの更新が繋がっていて、10回/秒で GUI スレッド (GIL) を使うため。
+            if (self.status and now - self._last_emit < STATUS_JITTER_SEC
+                    and all(s.get(k) == self.status.get(k) for k in s if k not in STATUS_JITTER_KEYS)):
+                return s
+            self._last_emit = now
             self.status = s
             self.status_changed.emit(s)
         return s
