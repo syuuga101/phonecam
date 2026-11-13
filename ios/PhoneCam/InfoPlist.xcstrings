@@ -27,8 +27,8 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
+            "state" : "translated",
+            "value" : "Used to discover and connect to your PC over Wi-Fi."
           }
         },
         "ja" : {
@@ -93,7 +93,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "PhoneCam"
           }
         },
