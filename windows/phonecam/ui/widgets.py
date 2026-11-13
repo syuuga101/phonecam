@@ -14,12 +14,6 @@ _wheel_installed = []
 _NO_WHEEL_CLASSES = ("Text", "Listbox", "Treeview", "TCombobox")
 
 
-def _safe(fn):
-    def run():
-        fn()
-    return run
-
-
 def _wheel(e):
     try:
         w = e.widget.winfo_containing(e.x_root, e.y_root)

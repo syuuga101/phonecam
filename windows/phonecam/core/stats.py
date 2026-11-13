@@ -71,9 +71,6 @@ class LatencyTracker:
 THERMAL_LEVELS = ("nominal", "fair", "serious", "critical")
 
 
-THERMAL_COLORS = {"nominal": "#1d1d1f", "fair": "#b7791f", "serious": "#d9730d", "critical": "#c0392b"}
-
-
 HISTORY_SECONDS = 30 * 60
 
 
@@ -115,9 +112,6 @@ GRAPH_FPS_MAX = 60.0
 
 
 THERMAL_BLOCK_COLORS = {"nominal": "#8fd6a1", "fair": "#f5c542", "serious": "#f2994a", "critical": "#e5484d"}
-
-
-THERMAL_NO_DATA_COLOR = "#e8e8ed"
 
 
 def graph_window(samples, seconds):

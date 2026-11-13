@@ -6,7 +6,7 @@ from queue import Empty, SimpleQueue
 from threading import Thread
 import time
 
-from PySide6.QtCore import QEvent, QRectF, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QPainter, QPen, QPixmap
 from PySide6.QtNetwork import QNetworkInterface
 from PySide6.QtWidgets import (

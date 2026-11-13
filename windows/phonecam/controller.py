@@ -17,7 +17,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from queue import Empty, SimpleQueue
 
 from phonecam.core.audio_engine import AudioEngine, find_vbcable_control_panel
@@ -103,20 +102,6 @@ class Status(dict):
             return self[name]
         except KeyError:
             raise AttributeError(name)
-
-
-def value_to_label(pairs, value):
-    for v, label in pairs:
-        if v == value:
-            return label
-    return pairs[0][1]
-
-
-def label_to_value(pairs, label):
-    for v, lab in pairs:
-        if lab == label:
-            return v
-    return pairs[0][0]
 
 
 class Controller:
@@ -330,9 +315,6 @@ class Controller:
         self.stream.mode_changed()
         self._stream_tick_once(time.monotonic())
 
-    def set_idle_stop(self, sec):
-        self.changed("idle_stop_sec", sec, None)
-
     def set_backend(self, value):
         self.changed("backend", value, None)
         self.link.vcam.request_reset()
@@ -468,28 +450,6 @@ class Controller:
 
         slot = self.link.vcam.slot
         self.run_background(lambda: run_elevated(f"--{action} --camera-slot {slot}"), finished)
-
-    def set_camera_slot(self, slot):
-        if slot == self.link.vcam.slot:
-            return
-        # Rebind the DLL and both per-filter shared-memory readers under the output lock.
-        output = self.link.vcam
-        with output._lock:
-            output.close()
-            self.watcher.reset()
-            output.slot = slot
-            output.fail_until = 0.0
-            output.last_frame_t = 0.0
-            namespace = camera_namespace(slot)
-            self.watcher = ConsumerWatcher(SoftcamMemoryReader(name=namespace + "/SharedMemory"))
-            self._vcam_gen = -1
-            if self._dshow is not None:
-                self._dshow.close()
-                self._dshow = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES, namespace=namespace)
-                self._next_dshow_retry = 0
-        self.changed("camera_slot", slot)
-        self.camera_registration = registration_status(slot) if self.frozen else "unavailable"
-        self.camera_registration_changed.emit()
 
     def version_text(self):
         return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION

@@ -132,11 +132,6 @@ class Segmented(QWidget):
         self.updateGeometry()
         self.update()
 
-    def set_current(self, index):
-        if index != self._current and 0 <= index < len(self._items):
-            self._current = index
-            self.update()
-
     def current(self):
         return self._current
 

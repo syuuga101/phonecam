@@ -98,31 +98,6 @@ AUTO_UNSUPPORTED_NOTE = t("labels.auto_unsupported")
 WATCH_STATE_LABELS = {k: t("labels.watch." + k) for k in _WATCH_STATE_LABELS}
 
 
-# 更新バナー・更新欄の配色 (Apple 風: 淡いグレーの帯、青のボタン)
-UPD_BG = "#f5f5f7"
-
-
-UPD_BG_WHITE = "#ffffff"
-
-
-UPD_FG = "#1d1d1f"
-
-
-UPD_SUB = "#6e6e73"
-
-
-UPD_LINE = "#d2d2d7"
-
-
-UPD_ACCENT = "#0071e3"
-
-
-UPD_WARN = "#b25000"
-
-
-UPD_FONT = "Yu Gothic UI"
-
-
 STATUS_TAB_INDEX = 6  # app.NAV_ITEMS の「状態」の番号
 
 
@@ -130,9 +105,6 @@ METER_MIN_DB = -60.0
 
 
 THERMAL_WARNING = t("labels.thermal_warning")
-
-
-HINT_FG = "#8a8a8a"  # 旧互換 (新しい画面は theme.colors()["text2"])
 
 
 THROTTLE_MS = 50  # 1コントロールあたり最大 20 msg/s

@@ -79,10 +79,6 @@ def _pick_font():
     _FONT = cands[-1]
 
 
-def font_family():
-    return _FONT
-
-
 def size(name):
     """名前 (caption/body/strong/large/subtitle/title/...) -> pt。"""
     return SIZES.get(name, SIZES["body"])
@@ -437,6 +433,3 @@ def set_mode(mode_setting):
         _apply(r)
         _fire()
 
-
-def is_sv():
-    return sv_ttk is not None

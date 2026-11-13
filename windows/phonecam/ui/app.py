@@ -72,9 +72,6 @@ class _ContentArea(_FrameWrapper):
         self._pages.append(host)
         return host
 
-    def tabs(self):
-        return [str(p) for p in self._pages]
-
     def index(self, what):
         if what == "current":
             return self._cur
@@ -325,12 +322,6 @@ class App:
         """セットアップ画面を内容欄に出す (ナビでは「設定」を選択状態のままにする)。"""
         self.nb.select(SETUP_INDEX)
 
-    def _section(self, parent, title):
-        frame = ttk.LabelFrame(parent, text=title, padding=(10, 6))
-        frame.pack(fill="x", padx=10, pady=5)
-        frame.columnconfigure(1, weight=1)
-        return frame
-
     def _build_ui(self):
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
@@ -430,10 +421,6 @@ class App:
             pass
         self._tab_changed()
 
-    def _on_wheel(self, e):
-        """旧互換 (スクロールは widgets の共通ハンドラが行う)。"""
-        return None
-
     def _hint(self, parent, row, text, **grid):
         lbl = ttk.Label(parent, text=text, foreground=theme.colors()["text2"], wraplength=px(480), justify="left")
         theme.on_change(lambda: lbl.configure(foreground=theme.colors()["text2"]))
@@ -483,10 +470,6 @@ class App:
         var.trace_add("write", on_write)
         self._slider_vars[key] = var
         return scale, val_label, var
-
-    @property
-    def CAM_STATUS_TEXT(self):
-        return {k: t("shell.cam." + k) for k in ("ok", "missing", "outdated", "unavailable")}
 
     def _tab_changed(self, _e=None):
         self._graph_dirty = True
