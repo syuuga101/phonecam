@@ -433,35 +433,6 @@ class _ExpanderHeader(QPushButton):
             painter.drawRoundedRect(self.rect().adjusted(3, 3, -4, -4), 3, 3)
 
 
-class _ExpanderContent(QWidget):
-    """Expander の中身。開いているあいだは、今の幅で必要な高さを minimumHeight にする。
-    (入れ子の折り返しラベルの heightForWidth だけだと、親が足りない高さを割り当てて重なることがある)"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._fitting = False
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.fit()
-
-    def fit(self):
-        layout = self.layout()
-        if self._fitting or layout is None or self.width() <= 0:
-            return
-        self._fitting = True
-        try:
-            if self.maximumHeight() < 16777215:   # 開閉アニメーション中・閉じている間は固定しない
-                need = 0
-            else:
-                need = layout.totalHeightForWidth(self.width())
-            if need != self.minimumHeight():
-                self.setMinimumHeight(need)
-                self.updateGeometry()
-        finally:
-            self._fitting = False
-
-
 class Expander(Card):
     """折りたたみ状態を設定に保存するカード。"""
 
@@ -623,7 +594,7 @@ def refit(widget):
     QTimer.singleShot(0, lambda: _refit_chain(widget))
 
 
-def _refit_chain(widget):
+def _refit_chain(widget, settle=True):
     try:
         node = widget
         while node is not None:
@@ -633,7 +604,7 @@ def _refit_chain(widget):
                 layout.activate()
             if isinstance(node, FitBox):
                 node._fit()
-            if isinstance(node, Expander):
+            if settle and isinstance(node, Expander):
                 node.fit_content()
             node.updateGeometry()
             node = node.parentWidget()
@@ -642,12 +613,13 @@ def _refit_chain(widget):
 
 
 class FitBox(QWidget):
-    """レイアウト付きの入れ物。今の幅で必要な高さを minimumHeight にして、押しつぶされても重ならないようにする。"""
+    """レイアウト付きの入れ物。今の幅で必要な高さを minimumHeight にして、押しつぶされても重ならないようにする。
+    minimumHeight の変更はレイアウトの組み立て中 (resizeEvent) に直接やると親へ伝わらないことがあるので、1 周遅らせる。"""
 
     def __init__(self, base_height=0, parent=None):
         super().__init__(parent)
         self._base_height = base_height
-        self._fitting = False
+        self._queued = False
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -657,18 +629,41 @@ class FitBox(QWidget):
         super().showEvent(event)
         self._fit()
 
-    def _fit(self):
+    def _need(self):
         layout = self.layout()
-        if self._fitting or layout is None or self.width() <= 0:
+        if layout is None or self.width() <= 0:
+            return None
+        return max(self._base_height, layout.totalHeightForWidth(self.width()))
+
+    def _fit(self):
+        need = self._need()
+        if need is None or need == self.minimumHeight() or self._queued:
             return
-        self._fitting = True
+        self._queued = True
+        QTimer.singleShot(0, self._apply_fit)
+
+    def _apply_fit(self):
+        self._queued = False
         try:
-            need = max(self._base_height, layout.totalHeightForWidth(self.width()))
-            if need != self.minimumHeight():
+            need = self._need()
+            if need is not None and need != self.minimumHeight():
                 self.setMinimumHeight(need)
                 self.updateGeometry()
-        finally:
-            self._fitting = False
+                _refit_chain(self.parentWidget(), settle=False)
+        except RuntimeError:
+            pass
+
+
+class _ExpanderContent(FitBox):
+    """Expander の中身。開いているあいだだけ必要な高さを minimumHeight にする (アニメーション中・閉じている間は固定しない)。"""
+
+    def _need(self):
+        if self.maximumHeight() < 16777215:
+            return 0
+        return super()._need()
+
+    def fit(self):
+        self._fit()
 
 
 class EmptyState(FitBox):
