@@ -127,6 +127,8 @@ def main():
     from phonecam.controller import Controller
     from phonecam.qt.main_window import MainWindow
     set_app_user_model_id()
+    from phonecam.core import crashlog
+    crashlog.install()  # Qt のスロット内の例外・ネイティブのクラッシュを %APPDATA%/PhoneCam に記録する
     ctrl = Controller(settings=settings)
     app = QApplication(sys.argv)
     app.setApplicationName("PhoneCam")

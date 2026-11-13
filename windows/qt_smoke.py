@@ -55,6 +55,8 @@ def _sample_frame():
 def child(scale, out):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
+    from phonecam.i18n import set_language
+    set_language("ja")   # ui/labels.py は import 時に t() を評価するので、Controller を読む前に言語を決める
     from phonecam.controller import Controller
     from phonecam.qt.app import configure
     from phonecam.qt.main_window import NAV_ITEMS, MainWindow
