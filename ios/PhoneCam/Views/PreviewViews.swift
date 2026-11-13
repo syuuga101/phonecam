@@ -39,27 +39,37 @@ final class PreviewUIView: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window != nil {
+        // 縦横のレイアウト切り替えで SwiftUI がホストを作り直すと、この View は一瞬ウィンドウから外れて戻ってくる。
+        // そのたびに RotationCoordinator を作り直さないよう、外れたときは何も捨てない (インスタンスは共有して使い回す)。
+        guard window != nil else { return }
+        if coordinator == nil || boundDevice !== desiredDevice {
             rebuildCoordinator()
-            if sessionObserver == nil {
-                // 入力の差し替えなどで接続が作り直されても角度を入れ直す
-                sessionObserver = NotificationCenter.default.addObserver(
-                    forName: .AVCaptureSessionDidStartRunning,
-                    object: nil,
-                    queue: .main
-                ) { [weak self] _ in
-                    self?.reapplyAngle()
-                }
-            }
-        } else {
-            observation?.invalidate()
-            observation = nil
-            coordinator = nil
-            if let o = sessionObserver {
-                NotificationCenter.default.removeObserver(o)
-                sessionObserver = nil
+        }
+        if sessionObserver == nil {
+            // 入力の差し替えなどで接続が作り直されても角度を入れ直す
+            sessionObserver = NotificationCenter.default.addObserver(
+                forName: .AVCaptureSessionDidStartRunning,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.reapplyAngle()
             }
         }
+    }
+
+    /// 縦横の切り替えで CameraPreview が作り直されても、同じ PreviewUIView (= 同じプレビューレイヤー / セッション接続 /
+    /// RotationCoordinator) を使い回す。レイヤーの session を回転のたびにメインスレッドで付け直すと、
+    /// sessionQueue 上の構成・起動処理とロックを取り合って UI が固まるため。
+    private static var cached: PreviewUIView?
+
+    static func shared(for session: AVCaptureSession) -> PreviewUIView {
+        if let v = cached, v.previewLayer.session === session { return v }
+        let v = PreviewUIView()
+        v.backgroundColor = .black
+        v.previewLayer.session = session
+        v.previewLayer.videoGravity = .resizeAspect
+        cached = v
+        return v
     }
 
     private func rebuildCoordinator() {
@@ -107,10 +117,7 @@ struct CameraPreview: UIViewRepresentable {
     let onAngle: (Int) -> Void
 
     func makeUIView(context: Context) -> PreviewUIView {
-        let view = PreviewUIView()
-        view.backgroundColor = .black
-        view.previewLayer.session = session
-        view.previewLayer.videoGravity = .resizeAspect
+        let view = PreviewUIView.shared(for: session)
         view.onAngle = onAngle
         view.bind(device: device)
         return view
