@@ -13,7 +13,7 @@ from phonecam.core.paths import _app_dir, _is_frozen
 from phonecam.core.deps import messagebox, tk
 
 
-# 専用仮想カメラ (softcam)。CLSID は .github/workflows/windows.yml でパッチして埋め込むものと同一
+# 専用仮想カメラ (softcam)。CLSID は build-slots.ps1 と同一
 SOFTCAM_DLL = "softcam.dll"
 
 
@@ -34,13 +34,31 @@ def _embedded_dir():
     return _app_dir()
 
 
-def softcam_path():
-    """埋め込み (ソース実行時はスクリプトの隣) の softcam.dll。"""
-    return os.path.join(_embedded_dir(), SOFTCAM_DLL)
+CAMERA_SLOTS = (1, 2, 3, 4)
 
 
-def softcam32_path():
-    return os.path.join(_embedded_dir(), SOFTCAM_DLL32)
+def camera_namespace(slot):
+    if slot not in CAMERA_SLOTS:
+        raise ValueError("Invalid camera slot")
+    return "PhoneCam" if slot == 1 else f"PhoneCam{slot}"
+
+
+def camera_clsid(slot):
+    camera_namespace(slot)
+    return PHONECAM_CLSID if slot == 1 else "{BD7AEDAC-501F-4685-9B20-BC10F70BD1%02X}" % (0x43 + slot)
+
+
+def _slot_dir(root, slot):
+    camera_namespace(slot)
+    return root if slot == 1 else os.path.join(root, str(slot))
+
+
+def softcam_path(slot=1):
+    return os.path.join(_slot_dir(_embedded_dir(), slot), SOFTCAM_DLL)
+
+
+def softcam32_path(slot=1):
+    return os.path.join(_slot_dir(_embedded_dir(), slot), SOFTCAM_DLL32)
 
 
 def _file_hash12(path):
@@ -54,7 +72,7 @@ def _file_hash12(path):
 SOFTCAM_REV_FILE = "softcam.rev"
 
 
-def softcam_rev():
+def softcam_rev(slot=1):
     """インストール先フォルダ名になる softcam の版 (12文字)。
     CI が softcam のソース (タグ・拡張パッチ・REVISION) から計算して exe に埋め込む。
     DLL は MSVC のリンク時刻などでビルドごとに数バイト変わるため、DLL のハッシュでは比べない
@@ -67,7 +85,7 @@ def softcam_rev():
             return rev
     except Exception:
         pass
-    return _file_hash12(softcam_path())
+    return _file_hash12(softcam_path(slot))
 
 
 def softcam_install_root():
@@ -79,10 +97,10 @@ def softcam_install_dir(hash12):
     return os.path.join(softcam_install_root(), hash12)
 
 
-def softcam_installed_path():
+def softcam_installed_path(slot=1):
     """埋め込み DLL の現在のバージョン用のインストール先 DLL パス。埋め込みが無ければ None。"""
     try:
-        return os.path.join(softcam_install_dir(softcam_rev()), SOFTCAM_DLL)
+        return os.path.join(_slot_dir(softcam_install_dir(softcam_rev(slot)), slot), SOFTCAM_DLL) if os.path.isfile(softcam_path(slot)) else None
     except Exception:
         return None
 
@@ -91,22 +109,23 @@ def _same_path(a, b):
     return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
-def softcam_registered_path():
+def softcam_registered_path(slot=1, view=0):
     """レジストリに登録されている PhoneCam カメラの DLL パス。未登録なら None。"""
     try:
         import winreg
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "CLSID\\%s\\InprocServer32" % PHONECAM_CLSID) as k:
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "CLSID\\%s\\InprocServer32" % camera_clsid(slot),
+                            0, winreg.KEY_READ | (winreg.KEY_WOW64_32KEY if view == 32 else 0)) as k:
             return winreg.QueryValueEx(k, "")[0]
     except Exception:
         return None
 
 
-def registration_status():
+def registration_status(slot=1):
     """exe 版での登録状態。"ok" / "missing"(未登録) / "outdated"(更新が必要) / "unavailable"(埋め込み DLL なし)。"""
-    expected = softcam_installed_path()
+    expected = softcam_installed_path(slot)
     if expected is None:
         return "unavailable"
-    reg = softcam_registered_path()
+    reg = softcam_registered_path(slot)
     if not reg:
         return "missing"
     if _same_path(reg, expected) and os.path.isfile(expected):
@@ -114,15 +133,15 @@ def registration_status():
     return "outdated"
 
 
-def softcam_load_path():
+def softcam_load_path(slot=1):
     """送る側が読み込む softcam.dll。登録済み(OK)ならその DLL、そうでなければ埋め込みの DLL。"""
     if _is_frozen():
         try:
-            if registration_status() == "ok":
-                return softcam_installed_path()
+            if registration_status(slot) == "ok":
+                return softcam_installed_path(slot)
         except Exception:
             pass
-    return softcam_path()
+    return softcam_path(slot)
 
 
 def register_hint():
@@ -148,27 +167,33 @@ def _run_regsvr32(exe, dll, unregister=False):
 
 
 def _cleanup_old_install_dirs(keep_hash=None):
-    """他のハッシュのフォルダを消す (OBS が使用中だと消せないので失敗は無視)。"""
+    """Preserve every revision still referenced by a registered filter."""
     root = softcam_install_root()
-    try:
-        names = os.listdir(root)
-    except Exception:
-        return
-    for n in names:
-        if keep_hash is not None and n == keep_hash:
-            continue
-        shutil.rmtree(os.path.join(root, n), ignore_errors=True)
+    retained = {keep_hash}
+    for slot in CAMERA_SLOTS:
+        for view in (0, 32):
+            path = softcam_registered_path(slot, view)
+            if path:
+                try:
+                    relative = os.path.relpath(path, root)
+                except ValueError:  # a manually registered DLL can be on a different drive
+                    continue
+                retained.add(relative.split(os.sep)[0])
+    if os.path.isdir(root):
+        for name in os.listdir(root):
+            if name not in retained and re.fullmatch(r"[0-9a-f]{12}", name):
+                shutil.rmtree(os.path.join(root, name), ignore_errors=True)
 
 
-def helper_register():
+def helper_register(slot=1):
     """管理者権限で実行される --register。成功なら True。"""
-    src = softcam_path()
-    h = softcam_rev()
-    dst_dir = softcam_install_dir(h)
+    src = softcam_path(slot)
+    h = softcam_rev(slot)
+    dst_dir = _slot_dir(softcam_install_dir(h), slot)
     os.makedirs(dst_dir, exist_ok=True)
     pairs = [(src, os.path.join(dst_dir, SOFTCAM_DLL))]
-    if os.path.isfile(softcam32_path()):
-        pairs.append((softcam32_path(), os.path.join(dst_dir, SOFTCAM_DLL32)))
+    if os.path.isfile(softcam32_path(slot)):
+        pairs.append((softcam32_path(slot), os.path.join(dst_dir, SOFTCAM_DLL32)))
     for s, d in pairs:
         if os.path.isfile(d) and _file_hash12(d) == _file_hash12(s):
             continue  # 同じ内容なら上書きしない (使用中でも失敗しない)
@@ -186,22 +211,19 @@ def helper_register():
     return True
 
 
-def helper_unregister():
-    """管理者権限で実行される --unregister。成功なら True。"""
+def helper_unregister(slot=1):
+    """Unregister the selected filter in both registry views."""
     ok = True
-    reg = softcam_registered_path()
-    x64, x86 = _regsvr32_paths()
-    if reg and os.path.isfile(reg):
-        ok = _run_regsvr32(x64, reg, unregister=True)
-        dll32 = os.path.join(os.path.dirname(reg), SOFTCAM_DLL32)
-        if os.path.isfile(dll32):
-            _run_regsvr32(x86, dll32, unregister=True)
-    elif reg:
-        # 登録先の DLL が消えている: 現行のインストール先にあればそれで解除を試みる
-        inst = softcam_installed_path()
-        if inst and os.path.isfile(inst):
-            ok = _run_regsvr32(x64, inst, unregister=True)
-        else:
+    for executable, view in zip(_regsvr32_paths(), (0, 32)):
+        registered = softcam_registered_path(slot, view)
+        if not registered:
+            continue
+        dll = registered
+        if not os.path.isfile(dll):
+            installed = softcam_installed_path(slot)
+            dll = (os.path.join(os.path.dirname(installed), SOFTCAM_DLL32)
+                   if installed and view == 32 else installed)
+        if not dll or not os.path.isfile(dll) or not _run_regsvr32(executable, dll, unregister=True):
             ok = False
     _cleanup_old_install_dirs()
     return ok
@@ -259,7 +281,10 @@ def helper_main(argv):
     else:
         return None
     try:
-        ok = fn()
+        slot = int(args[args.index("--camera-slot") + 1]) if "--camera-slot" in args else 1
+        if slot not in CAMERA_SLOTS:
+            return 1
+        ok = fn(slot)
     except Exception as e:
         _error_box("%s\n\n詳細: %s" % (msg, e))
         return 1

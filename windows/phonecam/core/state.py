@@ -25,6 +25,7 @@ class SharedState:
         self.audio_path = "-"        # "dedicated" (専用チャンネル) / "shared" (映像と共用) / "-"
         self.thin_total = 0          # PCの処理が追いつかず間引いたフレーム数 (デコード省略 + 出力で上書き)
         self.thin_last = 0.0         # 最後に間引いた時刻 (time.monotonic)
+        self.usb_serial = ""
         self.peer = ""               # Wi-Fi でつないでいる (つなごうとしている) iPhone の IP
         self.transport = ""          # 今つないでいる方式: "usb" / "wifi" / ""
         self.auth_state = ""         # "" / "required" (認証待ち) / "failed" (コード違い) / "refused" (拒否)
@@ -53,4 +54,5 @@ class SharedState:
                 "auth_state": self.auth_state,
                 "transport": self.transport,
                 "peer": self.peer,
+                "usb_serial": self.usb_serial,
             }

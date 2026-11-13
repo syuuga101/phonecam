@@ -21,10 +21,10 @@ import webbrowser
 from queue import Empty, SimpleQueue
 
 from phonecam.core.audio_engine import AudioEngine, find_vbcable_control_panel
-from phonecam.core.canvas import build_control, canvas_size
+from phonecam.core.canvas import canvas_size
 from phonecam.core.deps import av, np, phonecam_dshowctl, phonecam_hotkeys, phonecam_update, pyvirtualcam
 from phonecam.core.elevate import run_elevated
-from phonecam.core.softcam_reg import registration_status
+from phonecam.core.softcam_reg import camera_namespace, registration_status
 from phonecam.core.version import APP_REPO, APP_VERSION
 from phonecam.core.link import Link
 from phonecam.core.settings import (
@@ -118,9 +118,10 @@ def label_to_value(pairs, label):
 
 
 class Controller:
-    def __init__(self, settings=None, persist=True, demo=False):
+    def __init__(self, settings=None, persist=True, demo=False, secondary=False, audio_enabled=lambda: True):
         """settings=None なら設定ファイルから読む。persist=False は保存しない (CI のスクリーンショット用)。
         demo=True は受信・音声・使用中検出を動かさず、tick() で status を作り直すだけにする。"""
+        self.secondary = secondary
         self.persist = bool(persist)
         self.demo = bool(demo)
         self.demo_latency_ms = None   # demo: 遅延 (ms) の固定表示値
@@ -135,8 +136,10 @@ class Controller:
         self.audio = AudioEngine(lambda: (self.settings["mic_volume"], self.settings["mic_mute"],
                                           self.settings["mic_delay_ms"]))
         self.stream = StreamController(self.settings)
-        self.link = Link(self.settings, self.state, self._get_mode_ip, audio=self.audio, stream=self.stream)
-        self.watcher = ConsumerWatcher(SoftcamMemoryReader())
+        slot = settings.get("camera_slot", 1)
+        self.link = Link(self.settings, self.state, self._get_mode_ip, audio=self.audio, stream=self.stream, slot=slot)
+        self.link.audio_enabled = audio_enabled
+        self.watcher = ConsumerWatcher(SoftcamMemoryReader(name=camera_namespace(slot) + "/SharedMemory"))
         # カメラを作り直す直前に共有メモリの監視を手放す (掴んだままだと同じ名前で作り直せない)
         self.link.vcam.release_hooks.append(lambda: self.watcher.reader.close(hold=CAM_RELEASE_HOLD_SEC))
         self.thermal_log = ThermalLog()
@@ -156,16 +159,16 @@ class Controller:
         self._next_update = time.monotonic() + 3
         self._results = SimpleQueue()
         self.frozen = bool(getattr(sys, "frozen", False))
-        if self.frozen and not demo and phonecam_update is not None:
+        if self.frozen and not secondary and not demo and phonecam_update is not None:
             phonecam_update.cleanup_old(os.path.dirname(sys.executable), prefix=Path(sys.executable).stem)
-        self.camera_registration = registration_status() if self.frozen and not demo else "unavailable"
+        self.camera_registration = registration_status(self.link.vcam.slot) if self.frozen and not demo else "unavailable"
         self.camera_registration_busy = False
         self.camera_registration_changed = CallbackList()
         self.camera_prompt = CallbackList()     # emit(state)   起動時に専用カメラの登録/更新を確認する ("missing" / "outdated")
         self._camera_prompted = False
         self.hotkey_conflicts = set()
         self._hotkeys = None
-        if not demo and phonecam_hotkeys is not None and phonecam_hotkeys.is_windows():
+        if not secondary and not demo and phonecam_hotkeys is not None and phonecam_hotkeys.is_windows():
             self._hotkeys = phonecam_hotkeys.HotkeyManager()
             self._apply_hotkeys()
 
@@ -173,7 +176,7 @@ class Controller:
         self._next_dshow_retry = 0
         self._dshow_reason = "shell.dshow.nomodule"
         if not demo and phonecam_dshowctl is not None:
-            self._dshow = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES)
+            self._dshow = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES, namespace=camera_namespace(slot))
             self._dshow_reason = "shell.dshow.notready" if os.name == "nt" else "shell.dshow.winonly"
 
         self.wanted = False                     # 「接続」を押した状態
@@ -243,7 +246,7 @@ class Controller:
             if force or now >= due:
                 self._send_due.pop(group, None)
                 if not self.demo:
-                    self.link.send_control(build_control(self.settings, group, self.link.last_frame_size))
+                    self.link.send_control(self.link.controls(group))
 
     def save_now(self):
         self._flush(time.monotonic(), force=True)
@@ -274,7 +277,11 @@ class Controller:
                 self.toast.emit(err, "error")
                 return err
             self.wanted = True
-            self.link.start()   # 認証失敗で止まっていた場合も、新しく始めるので再試行になる
+            if not self.link.start():
+                self.wanted = False
+                err = t("multi.stopping")
+                self.toast.emit(err, "error")
+                return err
         else:
             self.wanted = False
             self.link.stop()
@@ -401,7 +408,7 @@ class Controller:
         (設定ページの表示に気づかなくても、登録の更新ができるようにする)。"""
         if self.demo or not self.frozen or self._camera_prompted or self.get("backend") != "phonecam":
             return
-        state = registration_status()
+        state = registration_status(self.link.vcam.slot)
         self.camera_registration = state
         if state in ("missing", "outdated"):
             self._camera_prompted = True
@@ -426,7 +433,7 @@ class Controller:
 
         def finished(result):
             self.camera_registration_busy = False
-            self.camera_registration = registration_status()
+            self.camera_registration = registration_status(self.link.vcam.slot)
             self.camera_registration_changed.emit()
             self.link.vcam.request_reset()
             kind = result[0] if isinstance(result, tuple) else "error"
@@ -438,7 +445,30 @@ class Controller:
                 key = {"ok": "unchanged", "cancelled": "cancelled", "timeout": "timeout"}.get(kind, "failed")
                 self.toast.emit(t(f"video.vcam.{key}", word=word), "error")
 
-        self.run_background(lambda: run_elevated("--" + action), finished)
+        slot = self.link.vcam.slot
+        self.run_background(lambda: run_elevated(f"--{action} --camera-slot {slot}"), finished)
+
+    def set_camera_slot(self, slot):
+        if slot == self.link.vcam.slot:
+            return
+        # Rebind the DLL and both per-filter shared-memory readers under the output lock.
+        output = self.link.vcam
+        with output._lock:
+            output.close()
+            self.watcher.reset()
+            output.slot = slot
+            output.fail_until = 0.0
+            output.last_frame_t = 0.0
+            namespace = camera_namespace(slot)
+            self.watcher = ConsumerWatcher(SoftcamMemoryReader(name=namespace + "/SharedMemory"))
+            self._vcam_gen = -1
+            if self._dshow is not None:
+                self._dshow.close()
+                self._dshow = phonecam_dshowctl.ControlBridge(shutter_snap=SHUTTER_VALUES, namespace=namespace)
+                self._next_dshow_retry = 0
+        self.changed("camera_slot", slot)
+        self.camera_registration = registration_status(slot) if self.frozen else "unavailable"
+        self.camera_registration_changed.emit()
 
     def version_text(self):
         return phonecam_update.display_version(APP_VERSION) if phonecam_update else APP_VERSION
@@ -632,7 +662,7 @@ class Controller:
         if not AUDIO_AVAILABLE:
             return
         self._audio_retry_t = time.monotonic()
-        if self.settings["mic_enabled"]:
+        if self.settings["mic_enabled"] and self.link.audio_enabled():
             self.audio.low_latency = self.settings["mic_priority"] == "low"
             self.audio.start(self.settings["mic_device"], self.settings["mic_exclusive"])
         else:
@@ -710,7 +740,7 @@ class Controller:
             except Empty:
                 break
             done(result)
-        if not self.demo and phonecam_update and now >= self._next_update:
+        if not self.secondary and not self.demo and phonecam_update and now >= self._next_update:
             if self._setup_process is not None:
                 self._next_update = now + 1.0
             else:
@@ -733,7 +763,7 @@ class Controller:
 
     def _housekeeping(self, now):
         """音声ストリームが止まっていたら、3秒以上あけて開き直す。"""
-        if AUDIO_AVAILABLE and self.settings["mic_enabled"] and not self.audio.running:
+        if AUDIO_AVAILABLE and self.link.audio_enabled() and self.settings["mic_enabled"] and not self.audio.running:
             if now - self._audio_retry_t >= 3.0:
                 self.apply_audio()
 

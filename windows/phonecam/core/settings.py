@@ -11,7 +11,7 @@ from phonecam.core.audio_engine import AUDIO_PRIORITIES
 from phonecam.core.deps import np, phonecam_audio, phonecam_hotkeys, sd
 from phonecam.core.paths import _app_dir, _appdata_dir
 from phonecam.core.softcam_reg import softcam_path
-from phonecam.core.wireless import read_device
+from phonecam.core.wireless import device_id, read_device
 
 
 CAMERA_DROP_LABELS = [("late", "遅延"), ("outOfBuffers", "バッファ不足"), ("discontinuity", "不連続")]
@@ -50,6 +50,11 @@ def migrate_legacy_settings(new_path=None, old_path=None):
 
 DEFAULT_SETTINGS = {
     "known_devices": [],
+    "camera_slot": 1,
+    "camera_profiles": [],
+    "audio_camera": 0,
+    "target_device": "",
+    "usb_serial": "",
     "mode": "auto",        # "auto" (USB があれば USB、なければ登録済みの iPhone へ Wi-Fi) / "usb" / "wifi"
     "mode_auto": False,    # 旧設定の mode を auto へ移行済みか
     "ip": "",
@@ -308,6 +313,15 @@ def mirror_key(settings):
 
 def sanitize_settings(s):
     """読み込んだ設定の新規項目を検証し、不正値は既定値へ戻す (古い設定ファイルとの互換用)。"""
+    slot = s.get("camera_slot")
+    s["camera_slot"] = slot if type(slot) is int and 1 <= slot <= 4 else 1
+    audio = s.get("audio_camera")
+    s["audio_camera"] = audio if type(audio) is int and 0 <= audio <= 3 else 0
+    profiles = s.get("camera_profiles")
+    s["camera_profiles"] = [p for p in profiles[:3] if isinstance(p, dict)] if isinstance(profiles, list) else []
+    s["target_device"] = device_id(s.get("target_device"))
+    serial = s.get("usb_serial")
+    s["usb_serial"] = serial[:128] if isinstance(serial, str) else ""
     known = s.get("known_devices")
     s["known_devices"] = [device.stored() for entry in known[:64] if (device := read_device(entry))] if isinstance(known, list) else []
     expanded = s.get("ui_expanded")

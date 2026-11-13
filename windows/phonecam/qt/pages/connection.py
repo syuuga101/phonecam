@@ -23,6 +23,7 @@ from phonecam.qt import icons
 from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
     Card,
+    Combo,
     ErrorLabel,
     Hint,
     Page,
@@ -267,6 +268,7 @@ class ConnectionPage(Page):
         self._build_preview()
         self._build_numbers()
         self._build_wifi()
+        self._build_output()
         self._build_run()
         self.finish()
         ctrl.status_changed.connect(self.update_status)
@@ -372,6 +374,55 @@ class ConnectionPage(Page):
         self.add(box)
 
     # -- Wi-Fi ----------------------------------------------------------------------
+    def _build_output(self):
+        group = getattr(self.ctrl, "camera_group", None)
+        if group is None:
+            return
+        slot = self.ctrl.get("camera_slot")
+        section = self.add_section(t("multi.output"))
+        row = section.add_row("camera", t("multi.output"))
+        outputs = Combo()
+        for number in range(1, 5):
+            outputs.addItem(t("multi.camera_number", n=number), number)
+        outputs.setCurrentIndex(outputs.findData(slot))
+
+        def change_output(index):
+            if not group.move_output(self.ctrl, outputs.itemData(index)):
+                self.ctrl.toast.emit(t("multi.output_busy"), "error")
+                outputs.setCurrentIndex(outputs.findData(self.ctrl.get("camera_slot")))
+
+        outputs.activated.connect(change_output)
+        self.ctrl.settings_changed.connect(lambda key, value: outputs.setCurrentIndex(outputs.findData(value))
+                                           if key == "camera_slot" else None)
+        row.addControl(outputs)
+        register = row.addControl(button(t("video.vcam.register")))
+        register.clicked.connect(lambda: self.ctrl.change_camera_registration("register"))
+
+        def refresh_registration():
+            state = self.ctrl.camera_registration
+            row.setHint(t(f"video.vcam.status.{state}") if self.ctrl.frozen else t("video.vcam.src_only"))
+            register.setEnabled(self.ctrl.frozen and not self.ctrl.camera_registration_busy
+                                and state in ("missing", "outdated"))
+
+        self.ctrl.camera_registration_changed.connect(refresh_registration)
+        refresh_registration()
+        audio = section.add_row("mic", t("multi.audio_source"))
+        audio_select = Combo()
+
+        def refresh_audio():
+            audio_select.clear()
+            for index, _ in enumerate(group.cameras):
+                audio_select.addItem(t("multi.camera_number", n=index + 1), index)
+            audio_select.setCurrentIndex(group.audio_index)
+            section.setVisible(len(group.cameras) > 1 or self.ctrl.get("camera_slot") != 1)
+
+        audio_select.activated.connect(group.select_audio)
+        audio.addControl(audio_select)
+        group.primary.settings_changed.connect(lambda key, value: refresh_audio()
+                                               if key in ("audio_camera", "camera_profiles") else None)
+        refresh_audio()
+        self.ctrl.settings_changed.connect(lambda key, value: refresh_audio() if key == "camera_slot" else None)
+
     def _build_wifi(self):
         sec = self.add_section(t("connection.wifi.title"))
         self.wireless = WirelessOptions(self, sec, self.ctrl)
