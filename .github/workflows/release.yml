@@ -17,6 +17,8 @@ jobs:
 
   windows:
     uses: ./.github/workflows/windows.yml
+    with:
+      skip_screens: true
 
   release:
     needs: [ios, windows]
