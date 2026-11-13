@@ -1,1494 +1,6516 @@
 {
-  "sourceLanguage": "ja",
-  "strings": {
-    "設定": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "設定"
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "設定" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Settings"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "設定"
+          }
+        }
+      }
+    },
+    "一般" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "一般"
+          }
+        }
+      }
+    },
+    "言語" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "言語"
+          }
+        }
+      }
+    },
+    "翻訳に参加する" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help translate"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳に参加する"
+          }
+        }
+      }
+    },
+    "画面" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面"
+          }
+        }
+      }
+    },
+    "画面を暗くする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dim screen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面を暗くする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を暗くする"
+          }
+        }
+      }
+    },
+    "画面を真っ黒にする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black out screen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "画面を真っ黒にする"
+          }
+        }
+      }
+    },
+    "しない" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "しない"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "しない"
+          }
+        }
+      }
+    },
+    "10秒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 sec"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10秒"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "10秒"
+          }
+        }
+      }
+    },
+    "30秒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 sec"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30秒"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "30秒"
+          }
+        }
+      }
+    },
+    "60秒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "60 sec"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "60秒"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "60秒"
+          }
+        }
+      }
+    },
+    "自動で黒くする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto black-out"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動で黒くする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "自動で黒くする"
+          }
+        }
+      }
+    },
+    "接続時に振動" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibrate on connect"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続時に振動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続時に振動"
+          }
+        }
+      }
+    },
+    "グリッド" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grid"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グリッド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "グリッド"
+          }
+        }
+      }
+    },
+    "水平メーター" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level meter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "水平メーター"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平メーター"
+          }
+        }
+      }
+    },
+    "Wi-Fiからの接続を許可" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Wi-Fi connections"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fiからの接続を許可"
+          }
+        }
+      }
+    },
+    "コードを変更" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change code"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コードを変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "コードを変更"
+          }
+        }
+      }
+    },
+    "接続" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "接続"
+          }
+        }
+      }
+    },
+    "PCの『ペアリングコード』欄に入力します。USB接続では不要です。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter this in the \"Pairing code\" field on your PC. Not needed for USB."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+          }
+        }
+      }
+    },
+    "アプリについて" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリについて"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリについて"
+          }
+        }
+      }
+    },
+    "作成者" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Author"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作成者"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "作成者"
+          }
+        }
+      }
+    },
+    "配布場所" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配布場所"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配布場所"
+          }
+        }
+      }
+    },
+    "翻訳" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translation"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "翻訳"
+          }
+        }
+      }
+    },
+    "ライセンス" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "License"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
+    "バージョン" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バージョン"
+          }
+        }
+      }
+    },
+    "使い方ガイド" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User guide"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使い方ガイド"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使い方ガイド"
+          }
+        }
+      }
+    },
+    "GPL-2.0以降" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPL-2.0 or later"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GPL-2.0以降"
+          }
+        }
+      }
+    },
+    "システムに合わせる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match system"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムに合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "システムに合わせる"
+          }
+        }
+      }
+    },
+    "日本語" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本語"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "日本語"
+          }
+        }
+      }
+    },
+    "English" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "English"
+          }
+        }
+      }
+    },
+    "アプリを再起動すると反映されます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the app to apply."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリを再起動すると反映されます"
+          }
+        }
+      }
+    },
+    "ミュート中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muted"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュート中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ミュート中"
+          }
+        }
+      }
+    },
+    "Wi-Fi アドレス" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi address"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi アドレス"
+          }
+        }
+      }
+    },
+    "映像" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "映像"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "映像"
+          }
+        }
+      }
+    },
+    "ビットレート" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitrate"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ビットレート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ビットレート"
+          }
+        }
+      }
+    },
+    "送信 fps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent fps"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信 fps"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "送信 fps"
+          }
+        }
+      }
+    },
+    "温度状態" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thermal state"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "温度状態"
+          }
+        }
+      }
+    },
+    "バッテリー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Battery"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バッテリー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "バッテリー"
+          }
+        }
+      }
+    },
+    "配信情報" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stream info"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信情報"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信情報"
+          }
+        }
+      }
+    },
+    "録画" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画"
+          }
+        }
+      }
+    },
+    "停止" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "停止"
+          }
+        }
+      }
+    },
+    "録画開始" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start recording"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画開始"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画開始"
+          }
+        }
+      }
+    },
+    "マイク: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mic: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイク: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク: %@"
+          }
+        }
+      }
+    },
+    "アプリは前面に表示したままにしてください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the app in the foreground."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "アプリは前面に表示したままにしてください"
+          }
+        }
+      }
+    },
+    "プレビューはオフです" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview is off"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューはオフです"
+          }
+        }
+      }
+    },
+    "プレビューの高さを変更" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resize preview height"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの高さを変更"
+          }
+        }
+      }
+    },
+    "プレビューの幅を変更" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resize preview width"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューの幅を変更"
+          }
+        }
+      }
+    },
+    "レンズ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lens"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "レンズ"
+          }
+        }
+      }
+    },
+    "マイク（ミュート）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone (mute)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "マイク（ミュート）"
+          }
+        }
+      }
+    },
+    "音声と録画" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio & recording"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声と録画"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "音声と録画"
+          }
+        }
+      }
+    },
+    "プレビュー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビュー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビュー"
+          }
+        }
+      }
+    },
+    "表示" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "表示"
+          }
+        }
+      }
+    },
+    "プレビューをオンにすると映る範囲を確認できます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Preview to check the framing."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "プレビューをオンにすると映る範囲を確認できます"
+          }
+        }
+      }
+    },
+    "上向きに置かれています" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lying face up"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "上向きに置かれています"
+          }
+        }
+      }
+    },
+    "水平" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "水平"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "水平"
+          }
+        }
+      }
+    },
+    "横向き" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Landscape"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "横向き"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "横向き"
+          }
+        }
+      }
+    },
+    "縦向き" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portrait"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦向き"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "縦向き"
+          }
+        }
+      }
+    },
+    "%@で配信中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming in %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@で配信中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@で配信中"
+          }
+        }
+      }
+    },
+    "%@ · 待機中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Standby"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ · 待機中"
+          }
+        }
+      }
+    },
+    "未接続" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未接続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "未接続"
+          }
+        }
+      }
+    },
+    "オフ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オフ"
+          }
+        }
+      }
+    },
+    "オン" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン"
+          }
+        }
+      }
+    },
+    "オン (許可されていません)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On (not permitted)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "オン (許可されていません)"
+          }
+        }
+      }
+    },
+    "正常" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正常"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "正常"
+          }
         }
       }
     },
-    "一般": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一般"
+    "やや高い" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fair"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やや高い"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "General"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
           }
-        }
-      }
-    },
-    "言語": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "言語"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Language"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "やや高い"
+          }
         }
       }
     },
-    "翻訳に参加する": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "翻訳に参加する"
+    "高い" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serious"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Help translate"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
-        }
-      }
-    },
-    "画面": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "画面"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Display"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
-        }
-      }
-    },
-    "画面を暗くする": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "画面を暗くする"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dim screen"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高い"
           }
-        }
-      }
-    },
-    "画面を真っ黒にする": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "画面を真っ黒にする"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Black out screen"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
-        }
-      }
-    },
-    "しない": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "しない"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Off"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "高い"
           }
         }
       }
     },
-    "10秒": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "10秒"
+    "危険" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Critical"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "10 sec"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "危険"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "危険"
+          }
         }
       }
     },
-    "30秒": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30秒"
+    "PCとつながりました（%@）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected to PC (%@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "30 sec"
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとつながりました（%@）"
+          }
         }
       }
     },
-    "60秒": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "60秒"
+    "PCとの接続が切れました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnected from PC"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "60 sec"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
           }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PCとの接続が切れました"
+          }
         }
       }
     },
-    "自動で黒くする": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "自動で黒くする"
+    "配信中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auto black-out"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中"
           }
         }
       }
     },
-    "接続時に振動": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接続時に振動"
+    "録画中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vibrate on connect"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
           }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画中"
+          }
         }
       }
     },
-    "グリッド": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "グリッド"
+    "待機中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standby"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grid"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中"
+          }
         }
       }
     },
-    "水平メーター": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "水平メーター"
+    "配信中 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streaming · %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信中 · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Level meter"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信中 · %@"
+          }
         }
       }
     },
-    "Wi-Fiからの接続を許可": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wi-Fiからの接続を許可"
+    "待機中（カメラ停止）· %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standby (camera off) · %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機中（カメラ停止）· %@"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allow Wi-Fi connections"
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
           }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "待機中（カメラ停止）· %@"
+          }
         }
       }
     },
-    "コードを変更": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "コードを変更"
+    "前面" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Front"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Change code"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前面"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "前面"
+          }
         }
       }
     },
-    "接続": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接続"
+    "新しいバージョン v%@ があります" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version v%@ is available"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connection"
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "新しいバージョン v%@ があります"
+          }
         }
       }
     },
-    "PCの『ペアリングコード』欄に入力します。USB接続では不要です。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
+    "閉じる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enter this in the \"Pairing code\" field on your PC. Not needed for USB."
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
           }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "閉じる"
+          }
         }
       }
     },
-    "アプリについて": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリについて"
+    "AltStoreで更新" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update with AltStore"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "About"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
           }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AltStoreで更新"
+          }
         }
       }
     },
-    "作成者": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "作成者"
+    "更新内容" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What's new"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新内容"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Author"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容"
           }
         }
       }
     },
-    "配布場所": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配布場所"
+    "このバージョンを通知しない" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip this version"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download"
-          }
-        }
-      }
-    },
-    "翻訳": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "翻訳"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Translation"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
-        }
-      }
-    },
-    "ライセンス": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ライセンス"
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "License"
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
-        }
-      }
-    },
-    "バージョン": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "バージョン"
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンを通知しない"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version"
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
-        }
-      }
-    },
-    "使い方ガイド": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使い方ガイド"
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "User guide"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
-        }
-      }
-    },
-    "GPL-2.0以降": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GPL-2.0以降"
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GPL-2.0 or later"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "このバージョンを通知しない"
           }
         }
       }
     },
-    "システムに合わせる": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "システムに合わせる"
+    "更新内容の記載はありません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No release notes."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Match system"
-          }
-        }
-      }
-    },
-    "日本語": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "日本語"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "日本語"
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
-        }
-      }
-    },
-    "English": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "English"
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "English"
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
-        }
-      }
-    },
-    "アプリを再起動すると反映されます": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリを再起動すると反映されます"
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新内容の記載はありません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restart the app to apply."
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
-        }
-      }
-    },
-    "ミュート中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ミュート中"
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Muted"
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
-        }
-      }
-    },
-    "Wi-Fi アドレス": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wi-Fi アドレス"
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wi-Fi address"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容の記載はありません。"
           }
         }
       }
     },
-    "映像": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "映像"
+    "空き容量が足りないため録画を停止しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording stopped: not enough storage space."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Video"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
-        }
-      }
-    },
-    "ビットレート": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ビットレート"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bitrate"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
-        }
-      }
-    },
-    "送信 fps": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "送信 fps"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sent fps"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
-        }
-      }
-    },
-    "温度状態": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "温度状態"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Thermal state"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
-        }
-      }
-    },
-    "バッテリー": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "バッテリー"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Battery"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "空き容量が足りないため録画を停止しました"
           }
         }
       }
     },
-    "配信情報": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配信情報"
+    "録画に失敗しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording failed."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stream info"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
-        }
-      }
-    },
-    "録画": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
-        }
-      }
-    },
-    "停止": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stop"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画に失敗しました"
           }
-        }
-      }
-    },
-    "録画開始": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画開始"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start recording"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
-        }
-      }
-    },
-    "マイク: %@": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "マイク: %@"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mic: %@"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画に失敗しました"
           }
         }
       }
     },
-    "アプリは前面に表示したままにしてください": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリは前面に表示したままにしてください"
+    "録画を開始できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't start recording."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep the app in the foreground."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
-        }
-      }
-    },
-    "プレビューはオフです": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューはオフです"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preview is off"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
-        }
-      }
-    },
-    "プレビューの高さを変更": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューの高さを変更"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resize preview height"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画を開始できませんでした"
           }
-        }
-      }
-    },
-    "プレビューの幅を変更": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューの幅を変更"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resize preview width"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
-        }
-      }
-    },
-    "レンズ": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "レンズ"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lens"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画を開始できませんでした"
           }
         }
       }
     },
-    "マイク（ミュート）": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "マイク（ミュート）"
+    "録画ファイルの保存に失敗しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the recording file."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Microphone (mute)"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
-        }
-      }
-    },
-    "音声と録画": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声と録画"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio & recording"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
-        }
-      }
-    },
-    "プレビュー": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビュー"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preview"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画ファイルの保存に失敗しました"
           }
-        }
-      }
-    },
-    "表示": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表示"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
-        }
-      }
-    },
-    "プレビューをオンにすると映る範囲を確認できます": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューをオンにすると映る範囲を確認できます"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on Preview to check the framing."
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルの保存に失敗しました"
           }
         }
       }
     },
-    "上向きに置かれています": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上向きに置かれています"
+    "写真への保存が許可されていません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos is not allowed."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lying face up"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
-        }
-      }
-    },
-    "水平": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "水平"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Level"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
-        }
-      }
-    },
-    "横向き": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "横向き"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Landscape"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存が許可されていません"
           }
-        }
-      }
-    },
-    "縦向き": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "縦向き"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Portrait"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
-        }
-      }
-    },
-    "%@で配信中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@で配信中"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Streaming in %@"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存が許可されていません"
           }
         }
       }
     },
-    "%@ · 待機中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · 待機中"
+    "写真への保存に失敗しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save to Photos."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · Standby"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
-        }
-      }
-    },
-    "未接続": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未接続"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not connected"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
-        }
-      }
-    },
-    "オフ": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "オフ"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Off"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存に失敗しました"
           }
-        }
-      }
-    },
-    "オン": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "オン"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "On"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
-        }
-      }
-    },
-    "オン (許可されていません)": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "オン (許可されていません)"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "On (not permitted)"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "写真への保存に失敗しました"
           }
         }
       }
     },
-    "正常": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正常"
+    "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera access is not allowed. Enable the camera for PhoneCam in the Settings app."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Normal"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
-        }
-      }
-    },
-    "やや高い": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "やや高い"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fair"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
-        }
-      }
-    },
-    "高い": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "高い"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Serious"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
-        }
-      }
-    },
-    "危険": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "危険"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Critical"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
-        }
-      }
-    },
-    "PCとつながりました（%@）": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PCとつながりました（%@）"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connected to PC (%@)"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         }
       }
     },
-    "PCとの接続が切れました": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PCとの接続が切れました"
+    "使用できるカメラが見つかりません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No usable camera found."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disconnected from PC"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
-        }
-      }
-    },
-    "配信中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配信中"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Streaming"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
-        }
-      }
-    },
-    "録画中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画中"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用できるカメラが見つかりません。"
           }
-        }
-      }
-    },
-    "待機中": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "待機中"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standby"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
-        }
-      }
-    },
-    "配信中 · %@": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配信中 · %@"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Streaming · %@"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラが見つかりません。"
           }
         }
       }
     },
-    "待機中（カメラ停止）· %@": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "待機中（カメラ停止）· %@"
+    "使用できるカメラフォーマットが見つかりません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No usable camera format found."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standby (camera off) · %@"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
-        }
-      }
-    },
-    "前面": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "前面"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Front"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
-        }
-      }
-    },
-    "新しいバージョン v%@ があります": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新しいバージョン v%@ があります"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version v%@ is available"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
-        }
-      }
-    },
-    "閉じる": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "閉じる"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Close"
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
-        }
-      }
-    },
-    "AltStoreで更新": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AltStoreで更新"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Update with AltStore"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         }
       }
     },
-    "更新内容": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新内容"
+    "カメラ入力を追加できませんでした。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add the camera input."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "What's new"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
-        }
-      }
-    },
-    "このバージョンを通知しない": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このバージョンを通知しない"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Skip this version"
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
-        }
-      }
-    },
-    "更新内容の記載はありません。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新内容の記載はありません。"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No release notes."
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラ入力を追加できませんでした。"
           }
-        }
-      }
-    },
-    "空き容量が足りないため録画を停止しました": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "空き容量が足りないため録画を停止しました"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording stopped: not enough storage space."
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
-        }
-      }
-    },
-    "録画に失敗しました": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画に失敗しました"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recording failed."
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラ入力を追加できませんでした。"
           }
         }
       }
     },
-    "録画を開始できませんでした": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画を開始できませんでした"
+    "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the camera. Check that no other app is using it."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't start recording."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
-        }
-      }
-    },
-    "録画ファイルの保存に失敗しました": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画ファイルの保存に失敗しました"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't save the recording file."
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
-        }
-      }
-    },
-    "写真への保存が許可されていません": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写真への保存が許可されていません"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saving to Photos is not allowed."
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
-        }
-      }
-    },
-    "写真への保存に失敗しました": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写真への保存に失敗しました"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't save to Photos."
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
-        }
-      }
-    },
-    "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Camera access is not allowed. Enable the camera for PhoneCam in the Settings app."
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         }
       }
     },
-    "使用できるカメラが見つかりません。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用できるカメラが見つかりません。"
+    "カメラの設定を変更できませんでした。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the camera settings."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No usable camera found."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
-        }
-      }
-    },
-    "使用できるカメラフォーマットが見つかりません。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用できるカメラフォーマットが見つかりません。"
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No usable camera format found."
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
-        }
-      }
-    },
-    "カメラ入力を追加できませんでした。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "カメラ入力を追加できませんでした。"
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't add the camera input."
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラの設定を変更できませんでした。"
           }
-        }
-      }
-    },
-    "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't open the camera. Check that no other app is using it."
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
-        }
-      }
-    },
-    "カメラの設定を変更できませんでした。": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "カメラの設定を変更できませんでした。"
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't change the camera settings."
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "カメラの設定を変更できませんでした。"
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }
