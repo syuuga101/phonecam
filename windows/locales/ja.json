@@ -210,6 +210,7 @@
  "recording.control.section": "録画",
  "recording.custom.hint": "詳細設定",
  "recording.custom.label": "ビットレートを指定",
+ "recording.disabled_hint": "iPhone につなぐと録画できます",
  "recording.estimate.label": "サイズの目安",
  "recording.estimate.summary": "{resolution}・約 {minute} MB/分（{detail}）、1時間で約 {hour} GB",
  "recording.estimate.video": "映像 {mbps} Mbps",

@@ -14,7 +14,8 @@ def build(ctrl):
     page = Page()
     control = page.add_section(t("recording.control.section"))
     start = button(t("recording.button.start"), primary=True)
-    control.add_row("record", t("recording.button.label")).addControl(start)
+    start_row = control.add_row("record", t("recording.button.label"))
+    start_row.addControl(start)
     values = {}
     for key, icon in (("state", "info"), ("file", "document"), ("size", "download"), ("free", "folder")):
         label = QLabel("-")
@@ -65,8 +66,10 @@ def build(ctrl):
         rec = status.phone.get("recording")
         rec = rec if isinstance(rec, dict) else {}
         start.setEnabled(status.rec_enabled)
+        # 押せない理由 (未接続) を出す。録画中・接続中は出さない
+        start_row.setHint("" if status.get("connected") else t("recording.disabled_hint"))
         start.setText(t("recording.button.stop" if status.rec_active else "recording.button.start"))
-        state = t("shell.sync.rec_stopped") if status.get("connected") else "-"   # 折りたたみの要約が「—」だけにならないように
+        state = t("shell.sync.rec_stopped") if status.get("connected") else t("connection.card.off")   # 折りたたみの要約が「—」だけにならないように
         if rec:
             state = (t("shell.sync.rec_active", time=format_mmss(rec.get("seconds", 0)))
                      if status.rec_active else t("shell.sync.rec_stopped"))

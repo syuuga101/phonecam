@@ -210,6 +210,7 @@
  "recording.control.section": "Recording",
  "recording.custom.hint": "Advanced",
  "recording.custom.label": "Set bitrate manually",
+ "recording.disabled_hint": "Connect an iPhone to record",
  "recording.estimate.label": "Estimated size",
  "recording.estimate.summary": "{resolution} · about {minute} MB/min ({detail}), {hour} GB/hour",
  "recording.estimate.video": "Video {mbps} Mbps",
