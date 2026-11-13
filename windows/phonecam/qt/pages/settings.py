@@ -33,8 +33,8 @@ def build(ctrl):
     check.clicked.connect(lambda: ctrl.check_updates())
     check_row.addControl(check)
     updates.add_row("clock", t("update.auto.label")).addControl(bound_switch(ctrl, "update_check"))
-    status = Hint("")
-    updates.add_padded(status)
+    status_row = updates.add_row("clock", t("compact.update_status"))
+    status = status_row.addControl(Hint("", wrap=False))
 
     def refresh_update(text, busy):
         status.setText(text)

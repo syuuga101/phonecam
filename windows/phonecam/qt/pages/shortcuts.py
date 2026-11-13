@@ -17,11 +17,12 @@ def build(ctrl):
     options = page.add_section(t("shortcuts.title"))
     options.add_row("keyboard", t("shortcuts.enable.label"), t("shortcuts.enable.hint")).addControl(
         bound_switch(ctrl, "hotkeys_enabled"))
-    keys = page.add_section(t("shortcuts.list.title"))
+    keys = page.add_section(t("compact.shortcuts.capture"))
     if phonecam_hotkeys is None:
         keys.add_padded(Hint(t("shortcuts.windows_only")))
         return page.finish()
 
+    adjustment = page.add_section(t("compact.shortcuts.adjust"))
     icons = {"camera": "camera", "mic": "mic", "blur": "sparkles", "pause": "pause",
              "rec": "record", "zoom_in": "zoom", "zoom_out": "zoom"}
     editors = {}
@@ -64,7 +65,8 @@ def build(ctrl):
             refresh()
 
     for action, _, _ in phonecam_hotkeys.ACTIONS:
-        row = keys.add_row(icons[action], t(f"shortcuts.action.{action}"))
+        section = adjustment if action in ("zoom_in", "zoom_out", "blur") else keys
+        row = section.add_row(icons[action], t(f"shortcuts.action.{action}"))
         rows[action] = row
         editor = QKeySequenceEdit()
         editor.setMaximumSequenceLength(1)
@@ -84,7 +86,7 @@ def build(ctrl):
     reset.clicked.connect(reset_bindings)
     keys.add_row("rotate", t("shortcuts.reset")).addControl(reset)
     keys.add_padded(message)
-    keys.add_padded(Hint(t("shortcuts.hint")))
+    keys.add_padded(Hint(t("compact.shortcuts.edit_hint")))
     if not phonecam_hotkeys.is_windows():
         keys.add_padded(Hint(t("shortcuts.windows_only")))
 

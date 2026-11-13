@@ -82,13 +82,16 @@ def child(scale, out):
             win.resize(W, H)
             win.select(i)
             _settle(app)
+            win.current_page().verticalScrollBar().setValue(0)
+            _settle(app)
             base = "%02d_%s_%s_x%s" % (i, key, theme, scale)
             win.grab().save(os.path.join(out, base + ".png"))
             expanders = win.current_page().findChildren(Expander)
             if not expanders:
                 failed.append((key, "no expander"))
             else:
-                expanders[0].set_expanded(True, animate=False, save=False)
+                for expander in expanders:
+                    expander.set_expanded(True, animate=False, save=False)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, base + "_expanded.png"))
                 win.resize(W, SCROLL_H)
@@ -97,7 +100,8 @@ def child(scale, out):
                 expanded_bar.setValue(expanded_bar.maximum() // 2)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, base + "_expanded_scroll.png"))
-                expanders[0].set_expanded(False, animate=False, save=False)
+                for expander in expanders:
+                    expander.set_expanded(False, animate=False, save=False)
             # スクロール: 低いウィンドウで中ほどまで送る
             win.resize(W, SCROLL_H)
             _settle(app, 150)

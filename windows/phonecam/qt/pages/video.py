@@ -1,7 +1,7 @@
 """Video input, output and power settings."""
 
 from phonecam.i18n import t
-from phonecam.qt.widgets import Hint, Page, bound_combo, bound_slider, bound_switch, button
+from phonecam.qt.widgets import Hint, Page, StatusValue, bound_combo, bound_slider, bound_switch, button
 from phonecam.ui.labels import (
     BACKEND_LABELS, CANVAS_LABELS, CODEC_LABELS, DECODER_LABELS, FIT_LABELS,
     FPS_LABELS, LENS_LABELS, ORIENT_LABELS, OUTPUT_SIZE_LABELS, RES_LABELS, SCREEN_AUTO_LABELS,
@@ -10,7 +10,7 @@ from phonecam.ui.labels import (
 
 def build(ctrl):
     page = Page()
-    send = page.add_section(t("video.send.title"))
+    send = page.add_section(t("compact.video.input"))
     for icon, name, key, choices, group, setter in (
         ("lens", "lens", "lens", LENS_LABELS, None, ctrl.set_lens),
         ("video", "resolution", "resolution", RES_LABELS, "video", None),
@@ -18,14 +18,15 @@ def build(ctrl):
     ):
         send.add_row(icon, t(f"video.{name}.label")).addControl(
             bound_combo(ctrl, key, choices, group=group, setter=setter))
-    send.add_row("download", t("video.bitrate.label")).addControl(
+    encoding = page.add_section(t("compact.video.encoding"))
+    encoding.add_row("download", t("video.bitrate.label")).addControl(
         bound_slider(ctrl, "bitrate", 5, 50, 1, lambda v: f"{v} Mbps", group="bitrate", as_int=True))
     # 「現在: …」は補足文に混ぜず、操作の左に小さく置く (Tk 版と同じ。補足文が長くて切れるのを避ける)
-    codec = send.add_row("video", t("video.codec.label"), t("video.codec.hint"))
+    codec = encoding.add_row("video", t("video.codec.label"), t("video.codec.hint"))
     codec_now = Hint("", wrap=False)
     codec.addControl(codec_now)
     codec.addControl(bound_combo(ctrl, "codec", CODEC_LABELS, group="codec"))
-    decoder = send.add_row("gear", t("video.hw.label"), t("video.hw.hint"))
+    decoder = encoding.add_row("gear", t("video.hw.label"), t("video.hw.hint"))
     decoder_now = Hint("", wrap=False)
     decoder.addControl(decoder_now)
     decoder.addControl(bound_switch(ctrl, "hw_decode", setter=ctrl.set_hw_decode))
@@ -36,7 +37,7 @@ def build(ctrl):
     orientation.add_row("flip", t("video.mirror.label")).addControl(bound_switch(ctrl, "mirror_current"))
     orientation.add_row("rotate", t("video.rotate180.label")).addControl(bound_switch(ctrl, "rotate180"))
 
-    output = page.add_section(t("video.output.title"))
+    output = send
     output.add_row("camera", t("video.backend.label")).addControl(
         bound_combo(ctrl, "backend", BACKEND_LABELS, setter=ctrl.set_backend))
     for name, key, choices in (
@@ -50,6 +51,7 @@ def build(ctrl):
 
     camera = page.add_section(t("video.vcam.title"))
     registration = camera.add_row("camera", t("video.vcam.label"))
+    registration_status = registration.addControl(StatusValue())
     controls = {}
     for action in ("register", "unregister"):
         control = button(t(f"video.vcam.{action}"))
@@ -61,7 +63,8 @@ def build(ctrl):
         state = ctrl.camera_registration
         hint = t("video.vcam.hint_exe" if ctrl.frozen else "video.vcam.hint_src")
         text = t(f"video.vcam.status.{state}") if ctrl.frozen else t("video.vcam.src_only")
-        registration.setHint(hint + " · " + text)
+        registration.setHint(hint)
+        registration_status.set_status(text, {"ok": "ok", "outdated": "warning"}.get(state))
         controls["register"].setEnabled(ctrl.frozen and not ctrl.camera_registration_busy and state != "unavailable")
         controls["unregister"].setEnabled(ctrl.frozen and not ctrl.camera_registration_busy and state in ("ok", "outdated"))
 

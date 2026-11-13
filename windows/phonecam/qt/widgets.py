@@ -15,7 +15,7 @@
 """
 
 from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
@@ -240,6 +240,52 @@ class IconLabel(QLabel):
         self._render()
 
 
+class StatusValue(QWidget):
+    """A status value with a theme-aware icon when its severity is known."""
+
+    _icons = {"ok": "check", "warning": "warning", "error": "warning"}
+
+    def __init__(self, text="", parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.label = QLabel(text)
+        self.label.setWordWrap(True)
+        self.label.setMaximumWidth(300)
+        self.icon = QLabel()
+        self.icon.setFixedSize(16, 16)
+        self.icon.hide()
+        layout.addWidget(self.label, 0, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        self.level = None
+
+    def text(self):
+        return self.label.text()
+
+    def set_status(self, text, level=None):
+        if self.label.text() != text:
+            self.label.setText(text)
+        if self.level != level:
+            self.level = level
+            self._render()
+
+    def _render(self):
+        name = self._icons.get(self.level)
+        self.icon.setVisible(bool(name))
+        if name:
+            palette = ref_palette(self)
+            colors = {"ok": ok_color(palette), "error": error_color(palette),
+                      "warning": QColor("#ffb864" if is_dark(palette) else "#9d5000")}
+            self.icon.setPixmap(icons.pixmap(name, 16, colors[self.level], self.devicePixelRatioF()))
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in _ICON_REFRESH and hasattr(self, "icon"):
+            self._render()
+
+
 # ---------------------------------------------------------------------------
 # Page / Section / Row
 # ---------------------------------------------------------------------------
@@ -314,6 +360,9 @@ class Row(QWidget):
         self._controls.addWidget(widget, stretch, Qt.AlignmentFlag.AlignVCenter)
         return widget
 
+    def controls(self):
+        return (self._controls.itemAt(i).widget() for i in range(self._controls.count()))
+
     def setTitle(self, text):
         self.title_label.setText(text)
 
@@ -371,16 +420,13 @@ class Section(QWidget):
         return self.add(box)
 
 
-class _ExpanderContent(QWidget):
-    def changeEvent(self, event):
-        super().changeEvent(event)
-        if event.type() in _THEME_EVENTS:
-            self.update()
-
+class _ExpanderHeader(QPushButton):
     def paintEvent(self, event):
-        painter = QPainter(self)
-        palette = ref_palette(self)
-        painter.fillRect(self.rect(), blend(card_color(palette), _role(palette, QPalette.ColorRole.WindowText), 0.035))
+        # The surrounding card paints the background and its shared border.
+        if self.hasFocus():
+            painter = QPainter(self)
+            painter.setPen(QPen(secondary_color(ref_palette(self)), 1, Qt.PenStyle.DotLine))
+            painter.drawRoundedRect(self.rect().adjusted(3, 3, -4, -4), 3, 3)
 
 
 class Expander(Card):
@@ -390,8 +436,8 @@ class Expander(Card):
         super().__init__(parent)
         self.ctrl, self.key = ctrl, key
         self.expanded = False
-        self.header = QPushButton()
-        self.header.setFlat(True)
+        self.header = _ExpanderHeader()
+        self.header.installEventFilter(self)
         self.header.setCheckable(True)
         self.header.setMinimumHeight(64)
         self.header.setAccessibleName(title)
@@ -418,10 +464,10 @@ class Expander(Card):
         self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         header_layout.addWidget(self.arrow)
         self.layout().addWidget(self.header)
-        self.content = _ExpanderContent()
+        self.content = QWidget()
         content_layout = QVBoxLayout(self.content)
-        content_layout.setContentsMargins(12, 8, 12, 12)
-        content_layout.setSpacing(12)
+        content_layout.setContentsMargins(1, 0, 1, 1)
+        content_layout.setSpacing(0)
         self.layout().addWidget(self.content)
         self.animation = QPropertyAnimation(self.content, b"maximumHeight", self)
         self.animation.setDuration(160)
@@ -429,8 +475,7 @@ class Expander(Card):
         self.animation.finished.connect(self._animation_finished)
         self.header.clicked.connect(lambda: self.set_expanded(not self.expanded))
         ctrl.settings_changed.connect(self._settings_changed)
-        saved = ctrl.get("ui_expanded", {})
-        self.set_expanded(bool(saved.get(key, False)) if isinstance(saved, dict) else False, animate=False, save=False)
+        self.set_expanded(self._saved_state(ctrl.get("ui_expanded", {})), animate=False, save=False)
 
     def add(self, widget):
         self.content.layout().addWidget(widget)
@@ -440,9 +485,56 @@ class Expander(Card):
         self.controls.addWidget(widget)
         return widget
 
+    def set_summary(self, text):
+        if text != self.summary_label.text():
+            self.summary_label.setText(text)
+        self.header.setToolTip(text)
+        self.header.setAccessibleDescription(text)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        palette = ref_palette(self)
+        bounds = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        shape = QPainterPath()
+        shape.addRoundedRect(bounds, 5, 5)
+        painter.fillPath(shape, card_color(palette))
+        if self.header.underMouse():
+            painter.save()
+            painter.setClipPath(shape)
+            painter.fillRect(self.header.geometry(), blend(card_color(palette), text_color(self), 0.065))
+            painter.restore()
+
+        if self.content.isVisible() and self.content.height() > 0:
+            painter.save()
+            painter.setClipPath(shape)
+            painter.fillRect(self.content.geometry(), blend(card_color(palette), QColor("black"),
+                                                           0.22 if is_dark(palette) else 0.045))
+            painter.setPen(QPen(separator_color(palette), 1))
+            top = self.content.y()
+            painter.drawLine(1, top, self.width() - 2, top)
+            layout = self.content.layout()
+            for i in range(layout.count()):
+                child = layout.itemAt(i).widget()
+                y = top + child.y()
+                if child.isVisible() and top < y < top + self.content.height():
+                    painter.drawLine(1, y, self.width() - 2, y)
+            painter.restore()
+        painter.setPen(QPen(border_color(palette), 1))
+        painter.drawPath(shape)
+
+    def eventFilter(self, obj, event):
+        if obj is self.header and event.type() in (QEvent.Type.Enter, QEvent.Type.Leave):
+            self.update()
+        return super().eventFilter(obj, event)
+
+    def _saved_state(self, states):
+        page = self.key.partition(".")[0]
+        return bool(states.get(self.key, states.get(page, False))) if isinstance(states, dict) else False
+
     def _settings_changed(self, key, value):
         if key == "ui_expanded" and isinstance(value, dict):
-            self.set_expanded(bool(value.get(self.key, False)), save=False)
+            self.set_expanded(self._saved_state(value), save=False)
 
     def set_expanded(self, expanded, animate=True, save=True):
         expanded = bool(expanded)
@@ -451,7 +543,6 @@ class Expander(Card):
         self.expanded = expanded
         self.header.setChecked(expanded)
         self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
-        self.header.setAccessibleDescription(self.summary_label.text())
         self.animation.stop()
         if animate and self.isVisible():
             start = self.content.height() if self.content.isVisible() else 0

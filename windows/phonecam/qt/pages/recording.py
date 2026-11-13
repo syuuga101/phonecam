@@ -29,11 +29,14 @@ def build(ctrl):
     quality = page.add_section(t("recording.quality.section"))
     for name, icon, choices, hint in (
         ("preset", "sparkles", REC_PRESET_LABELS, None),
-        ("resolution", "aspect", REC_RES_LABELS, t("recording.resolution.hint")),
+        ("resolution", "aspect", REC_RES_LABELS, None),
         ("container", "document", REC_CONTAINER_LABELS, t("recording.container.hint")),
     ):
-        quality.add_row(icon, t(f"recording.{name}.label"), hint).addControl(
-            bound_combo(ctrl, f"rec_{name}", choices, group="recordSettings"))
+        row = quality.add_row(icon, t(f"recording.{name}.label"), hint)
+        combo = row.addControl(bound_combo(ctrl, f"rec_{name}", choices, group="recordSettings"))
+        if name == "resolution":
+            row.setToolTip(t("recording.resolution.hint"))
+            combo.setToolTip(row.toolTip())
     estimate = quality.add_row("gauge", t("recording.estimate.label"))
     quality.add_row("wrench", t("recording.custom.label"), t("recording.custom.hint")).addControl(
         bound_switch(ctrl, "rec_custom_bitrate", group="recordSettings"))
@@ -45,7 +48,7 @@ def build(ctrl):
         save.add_row(icon, t(f"recording.{name}.label")).addControl(
             bound_switch(ctrl, f"rec_{name}", group="recordSettings"))
     save.add_row("folder", t("recording.location.label"), t("recording.location.hint"))
-    page.add(Hint(t("recording.hint.4k")))
+    quality.add_padded(Hint(t("recording.hint.4k")))
 
     def refresh_estimate(*_):
         bitrate.setEnabled(bool(ctrl.get("rec_custom_bitrate")))
