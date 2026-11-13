@@ -78,8 +78,11 @@ def _update_v13(app, st, connected, snap, now):
             app.screen_black_var.set(black)
             app._schedule_save()
         auto = st.get("autoBlackSeconds")
-        extra = t("shell.sync.screen_auto", v=app._value_to_label(SCREEN_AUTO_LABELS, auto)) if auto in SCREEN_AUTO_VALUES else ""
-        app.screen_state_var.set(t("shell.sync.screen", state=t("shell.sync.screen_black") if black else t("shell.sync.screen_normal"), extra=extra))
+        state = t("shell.sync.screen_black") if black else t("shell.sync.screen_normal")
+        if auto in SCREEN_AUTO_VALUES:
+            app.screen_state_var.set(t("shell.sync.screen_with_auto", state=state, auto=app._value_to_label(SCREEN_AUTO_LABELS, auto)))
+        else:
+            app.screen_state_var.set(t("shell.sync.screen", state=state))
     else:
         app.screen_state_var.set("")
 
@@ -123,7 +126,8 @@ def _update_v13(app, st, connected, snap, now):
             app.audio_err_var.set("")
             info = t("shell.sync.output", name=app.audio.device_name) if app.audio.running else ""
             if app.audio.running and connected and mic.get("sampleRate"):
-                info += t("shell.sync.audio_detail", hz=int(mic["sampleRate"]), buf=round(app.audio.buffered_ms()), target=round(app.audio.target_ms()))
+                info = t("shell.sync.output_detail", name=app.audio.device_name, hz=int(mic["sampleRate"]),
+                         buf=round(app.audio.buffered_ms()), target=round(app.audio.target_ms()))
             app.audio_info_var.set(info)
     elif AUDIO_AVAILABLE:
         app.audio_err_var.set("")

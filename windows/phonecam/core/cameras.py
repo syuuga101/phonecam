@@ -17,6 +17,12 @@ class DeviceRoutes:
         self.identities = {}
         self.usb_cache = {}
 
+    @property
+    def multi(self):
+        """カメラが 2 台以上あるときだけ、端末の固定 (USB シリアル・端末 ID) を厳しく見る。
+        1 台だけなら従来どおり、つないだ USB の iPhone をそのまま使う (機種変更で詰まらない)。"""
+        return len(self.cameras) > 1
+
     def available_usb(self, link):
         serials = usbmux_devices()
         with self.lock:
@@ -91,7 +97,10 @@ class DeviceRoutes:
             return True    # Older iOS apps have no identity field.
         target = link.settings.get("target_device")
         with self.lock:
-            if (target and target != identity) or not self.unbound_device(link, identity):
+            if self.multi:
+                if (target and target != identity) or not self.unbound_device(link, identity):
+                    return False
+            elif target and target != identity and link._mode != "usb":
                 return False
             self.identities[identity] = link
         return True

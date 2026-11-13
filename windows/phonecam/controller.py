@@ -65,6 +65,8 @@ from phonecam.ui.labels import (
 SAVE_DELAY_SEC = 0.5       # 設定の保存は最後の変更から 0.5 秒後
 POLL_SEC = 0.1             # status の更新間隔
 HOUSEKEEP_SEC = 1.0
+STATUS_JITTER_SEC = 0.5     # 下の STATUS_JITTER_KEYS だけが変わったときの反映間隔
+STATUS_JITTER_KEYS = frozenset(("latency_text", "audio_summary", "decode_ms"))
 PREVIEW_STALE_SEC = 1.5    # これより古い映像は「映像なし」
 
 
@@ -187,6 +189,7 @@ class Controller:
         self._save_due = None
         self._send_due = {}
         self._next_poll = 0.0
+        self._last_emit = 0.0
         self._next_stream = 0.0
         self._next_house = 0.0
         self._last_sample = 0.0
@@ -377,6 +380,7 @@ class Controller:
         if self._setup_process is not process:
             return
         self._setup_process = None
+        self.refresh_all_camera_registrations()  # ウィザード (別プロセス) が登録した結果を、起動時に覚えた古い状態のままにしない
         current = load_settings()
         for key in ("setup_done", "setup_shown_version", "audio_defaults_backup", "vbcable_restore_pending"):
             self.changed(key, current[key])
@@ -402,6 +406,22 @@ class Controller:
             self.open_setup(after_update=version)
             return
         self.prompt_camera_registration()
+
+    def refresh_camera_registration(self):
+        if self.demo or not self.frozen:
+            return
+        try:
+            self.camera_registration = registration_status(self.link.vcam.slot)
+            self.camera_registration_changed.emit()
+            self.link.vcam.request_reset()
+        except Exception:
+            pass
+
+    def refresh_all_camera_registrations(self):
+        """全スロット (カメラ 1〜4) の登録状態を取り直す。別プロセスのセットアップが何番を登録したか分からないため。"""
+        group = getattr(self, "camera_group", None)
+        for camera in (group.cameras if group is not None else [self]):
+            camera.refresh_camera_registration()
 
     def prompt_camera_registration(self):
         """セットアップ済みなのに専用カメラが「更新が必要 / 未登録」のとき、起動時に1回だけ確認を出す
@@ -501,12 +521,11 @@ class Controller:
         if not (self.status and self.status.connected and "screenBlack" in phone):
             return ""
         auto = phone.get("autoBlackSeconds")
-        extra = ""
+        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
         if auto in SCREEN_AUTO_VALUES:
             label = t("labels.screen_auto.0") if auto == 0 else t(f"labels.sec.{auto}")
-            extra = t("shell.sync.screen_auto", v=label)
-        state = t("shell.sync.screen_black") if phone.get("screenBlack") else t("shell.sync.screen_normal")
-        return t("shell.sync.screen", state=state, extra=extra)
+            return t("shell.sync.screen_with_auto", state=state, auto=label)
+        return t("shell.sync.screen", state=state)
 
     @property
     def update_status_text(self):
@@ -909,6 +928,7 @@ class Controller:
             res_fps=res_fps,
             resolution=snap["resolution"],
             recv_fps=fps,
+            rx_fps=snap.get("rx_fps", 0.0),
             decode_ms=snap["decode_ms"],
             latency_text="%d ms" % round(lat) if lat is not None else "-",
             thermal=thermal,
@@ -935,6 +955,12 @@ class Controller:
                            round(self.audio.latency_ms() or 0) if self.audio.running else None),                                  # iPhone の status JSON (接続中のみ。未接続は {})
         )
         if s != self.status:
+            # 遅延 (ms) や音声バッファのように毎回少しずつ変わる値だけの違いは、0.5秒に1回だけ反映する。
+            # status_changed には全ページの更新が繋がっていて、10回/秒で GUI スレッド (GIL) を使うため。
+            if (self.status and now - self._last_emit < STATUS_JITTER_SEC
+                    and all(s.get(k) == self.status.get(k) for k in s if k not in STATUS_JITTER_KEYS)):
+                return s
+            self._last_emit = now
             self.status = s
             self.status_changed.emit(s)
         return s

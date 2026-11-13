@@ -7,7 +7,7 @@ import socket
 import threading
 import time
 from phonecam.core.crashlog import log_error
-from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, pad_color_for
+from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, flip_image, pad_color_for
 from phonecam.core.decoder import (
     BacklogGuard,
     DecoderManager,
@@ -92,6 +92,9 @@ class Link:
         self._decode_avg = 0.0
         self._fps_count = 0
         self._fps_t0 = time.time()
+        self._rx_count = 0         # 届いた映像パケット数 (rx_fps の元。受信スレッドだけが触る)
+        self._rx_last = 0
+        self._rx_t0 = time.monotonic()
         if self.audio is not None:
             self.audio.offset_fn = self.latency.offset
 
@@ -126,7 +129,7 @@ class Link:
         if t is None or not t.is_alive():
             self._thread = None
             self.vcam.park()
-        self.state.update(status_text="停止中", connected=False, recv_fps=0.0, decode_ms=0.0, resolution="-",
+        self.state.update(status_text="停止中", connected=False, recv_fps=0.0, rx_fps=0.0, decode_ms=0.0, resolution="-",
                           codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="", transport="", peer="")
         self._decoder_key = None
         self.latency.reset()
@@ -195,6 +198,8 @@ class Link:
         if self.routes is None:
             return usbmux_available()
         serials = self.routes.available_usb(self)
+        if not self.routes.multi:
+            return (preferred if preferred in serials else serials[0]) if serials else None   # 1 台だけなら従来どおり
         if preferred and preferred in serials and self.routes.unbound_usb(self, preferred):
             return preferred
         if preferred and not target:
@@ -217,7 +222,7 @@ class Link:
         if mode == "usb":
             if self.routes is None:
                 return mode, ip, None
-            raise PhoneCamError("USB iPhone not available")
+            raise PhoneCamError("iPhoneがUSBで見つかりません。ケーブルとロック解除・このコンピュータを信頼を確認")
         if mode == "wifi" and self.routes is None:
             return mode, ip, None
         target = self.settings.get("target_device")
@@ -227,7 +232,7 @@ class Link:
             if not known:
                 if ip and valid_pair_code(self.settings.get("pair_code", "")) and allowed(ip):
                     return "wifi", ip, None
-                raise PhoneCamError("Selected iPhone is no longer registered")
+                raise PhoneCamError("選んだ iPhone が登録から外れています。接続ページで選び直してください")
             # Refresh the address of the selected device, never switch to another UUID.
             if self._last_wifi and allowed(self._last_wifi[0]):
                 return "wifi", self._last_wifi[0], known[0].code
@@ -237,7 +242,7 @@ class Link:
                     if allowed(address) and self._probe(address):
                         self._last_wifi = (address, d.code)
                         return "wifi", address, d.code
-            raise PhoneCamError("Selected iPhone is not reachable")
+            raise PhoneCamError("選んだ iPhone が見つかりません。PhoneCam を開いて同じ Wi-Fi につないでください")
         if mode == "wifi":
             return mode, ip, None
         if self._last_wifi and allowed(self._last_wifi[0]):
@@ -320,7 +325,7 @@ class Link:
                 if self.routes is not None:
                     resource = ("usb", self._usb_serial) if self._mode == "usb" else ("wifi", self._ip)
                     if stop.is_set() or not self.routes.claim(self, resource):
-                        raise PhoneCamError("iPhone is in use by another output")
+                        raise PhoneCamError("この iPhone は別のカメラ出力で使われています")
                     self._claimed = resource
                 info = {}
                 sock = self._connect(info=info)
@@ -368,7 +373,7 @@ class Link:
                     sock.close()
                 except Exception:
                     pass
-            self.state.update(connected=False, recv_fps=0.0)
+            self.state.update(connected=False, recv_fps=0.0, rx_fps=0.0)
             if stop.is_set():
                 break
             self._last_wifi = None
@@ -588,11 +593,8 @@ class Link:
                     self.request_keyframe(force=True)
                     continue
                 decoders.note_ok()
-                if self.settings.get(mirror_key(self.settings)):
-                    img = img[:, ::-1]
-                if self.settings.get("rotate180"):
-                    img = img[::-1, ::-1]
-                img = np.ascontiguousarray(img)
+                img = flip_image(img, bool(self.settings.get(mirror_key(self.settings))),
+                                 bool(self.settings.get("rotate180")))
                 fps_val = self.state.phone_status.get("fps", 60) or 60
                 self.vcam.send(img, fps_val)
                 if timing is not None:
@@ -623,6 +625,7 @@ class Link:
         self._fps_t0 = fps_t0
         self._decode_avg = decode_avg
         self._out_error = None
+        self._rx_count, self._rx_last, self._rx_t0 = 0, 0, time.monotonic()
         mailbox = FrameMailbox()
         guard = BacklogGuard()
         worker = threading.Thread(target=self._output_loop, args=(mailbox, decoders, fitter),
@@ -637,6 +640,7 @@ class Link:
                     raise self._out_error
                 codec_name = codec_for_msg(msg_type)
                 if codec_name is not None:
+                    self._rx_count += 1
                     timing, pending_timing = pending_timing, None
                     # フレームを作る間隔と、通信の遅れ (時計のずれ込み) を見積もる
                     interval_ms = 1000.0 / float(self.state.phone_status.get("fps", 30) or 30)
@@ -688,7 +692,11 @@ class Link:
                     except Exception:
                         pass
                     if not identity_ok:
-                        raise PhoneCamError("The iPhone belongs to another camera profile")
+                        raise PhoneCamError("つながった iPhone は別のカメラに割り当てられています")
+                    now_m = time.monotonic()   # 届いた数/秒 (iPhone の送出と、PC の出力の中間)。約1秒ごとの status で更新
+                    if now_m - self._rx_t0 >= 0.9:
+                        self.state.update(rx_fps=(self._rx_count - self._rx_last) / (now_m - self._rx_t0))
+                        self._rx_last, self._rx_t0 = self._rx_count, now_m
                     # カメラ停止中は映像が来ない (タイムアウトにはしない)。表示だけ 0 に戻す
                     now = time.time()
                     if now - self._fps_t0 >= 2.0:

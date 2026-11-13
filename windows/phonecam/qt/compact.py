@@ -5,7 +5,7 @@ from functools import partial
 from PySide6.QtWidgets import QCheckBox, QComboBox, QKeySequenceEdit, QLabel, QLineEdit
 
 from phonecam.i18n import t
-from phonecam.qt.widgets import Expander, Row, Section, SliderValue, StatusValue, Switch
+from phonecam.qt.widgets import NO_VALUE, Expander, Row, Section, SliderValue, StatusValue, Switch
 
 
 PRIMARY = {
@@ -97,14 +97,14 @@ def _row_value(row):
                 return control.text()
         if isinstance(control, QKeySequenceEdit):
             return control.keySequence().toString()
-        if isinstance(control, (QLabel, StatusValue)) and control.text() not in ("", "-", t("compact.no_value")):
+        if isinstance(control, (QLabel, StatusValue)) and control.text() not in ("", "-", NO_VALUE):
             return control.text()
     return ""
 
 
 def _set_summary(expander, rows):
     values = [_row_value(row) for row in rows]
-    expander.set_summary(" · ".join(value for value in values if value) or t("compact.no_value"))
+    expander.set_summary(" · ".join(value for value in values if value) or NO_VALUE)
 
 
 def compact_page(page, ctrl, key):

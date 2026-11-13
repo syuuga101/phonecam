@@ -460,7 +460,7 @@ def _update_apply(app, dl):
         parked = os.path.splitext(exe)[0] + ".failed.exe"
         ok = phonecam_update.undo_replace(exe, old, parked)
         app._upd_dl = None
-        app._update_fail(t("update.msg.relaunch_failed", restored=t("update.msg.restored") if ok else "", error=e))
+        app._update_fail(t("update.msg.relaunch_failed_restored" if ok else "update.msg.relaunch_failed", error=e))
         return
     app._upd_dl = None
     app.on_close()

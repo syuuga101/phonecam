@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 
 from phonecam.qt import icons
 
+NO_VALUE = "—"       # 値がないときの表示 (言語に依らない記号)
 MAX_CONTENT_W = 760   # 内容列の最大幅 (論理px)
 PAGE_PAD_X = 24
 

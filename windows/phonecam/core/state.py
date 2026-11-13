@@ -15,6 +15,7 @@ class SharedState:
         self.status_text = "停止中"
         self.error_text = ""
         self.recv_fps = 0.0
+        self.rx_fps = 0.0            # PCに届いた映像パケットの毎秒数 (間引き・デコード前。recv_fps は出力まで終えた数)
         self.decode_ms = 0.0
         self.resolution = "-"
         self.phone_status = {}
@@ -41,6 +42,7 @@ class SharedState:
                 "status_text": self.status_text,
                 "error_text": self.error_text,
                 "recv_fps": self.recv_fps,
+                "rx_fps": self.rx_fps,
                 "decode_ms": self.decode_ms,
                 "resolution": self.resolution,
                 "phone_status": dict(self.phone_status),

@@ -342,8 +342,8 @@ class DeviceRow(QWidget):
             lay.addWidget(Hint(t("wireless.connecting"), wrap=False), 0, Qt.AlignmentFlag.AlignVCenter)
         camera = owner._camera(entry)
         group = getattr(owner.ctrl, "camera_group", None)
-        if group and (camera or entry.registered):
-            active = camera or owner.ctrl
+        active = camera or owner.ctrl
+        if group and (len(group.cameras) > 1 or active.get("camera_slot") != 1) and (camera or entry.registered):
             outputs = Combo()
             outputs.setAccessibleName(t("multi.output"))
             outputs.setToolTip(t("multi.output"))

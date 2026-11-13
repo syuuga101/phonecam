@@ -66,8 +66,6 @@ _JA = {
  "setup.wizard.confirmed_done": "確認済みです",
  "setup.wizard.manual_check": "ご自身で確認してください。済んだら右の「済んだ」にチェック",
  "setup.wizard.done_hint": "完了済み。次へ進めます",
-    "setup.wizard.list_sep": "、",
-    "setup.wizard.sentence_fmt": "%s。",
     "setup.wizard.components_1": "PhoneCamカメラ",
     "setup.wizard.components_2": "OBSやDiscordに表示される専用カメラ",
     "setup.wizard.components_3": "Visual C++ ランタイム",
@@ -85,13 +83,12 @@ _JA = {
     "setup.wizard.detect_camera_1": "ソース実行ではregister.batを使ってください",
     "setup.wizard.detect_camera_2": "更新が必要です",
     "setup.wizard.detect_camera_3": "このexeにはカメラが含まれていません",
-    "setup.wizard.detect_itunes_1": "・",
-    "setup.wizard.detect_itunes_2": "Microsoft Store版の%sが入っています。AltServerと一緒に使えないため、インストール時に削除して公式サイト版のiTunesに入れ替えます",
+    "setup.wizard.detect_itunes_2": "Microsoft Store版の{names}が入っています。AltServerと一緒に使えないため、インストール時に削除して公式サイト版のiTunesに入れ替えます",
     "setup.wizard.detect_itunes_3": "USB接続はOK・AltServerには公式サイト版が必要",
     "setup.wizard.store_labels_1": "Appleデバイス",
-    "setup.wizard.remove_store_package_1": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: %s）",
-    "setup.wizard.remove_store_package_2": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード %s）",
-    "setup.wizard.remove_store_package_3": "Microsoft Store版（%s）を削除しました",
+    "setup.wizard.remove_store_package_1": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: {detail}）",
+    "setup.wizard.remove_store_package_2": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード {code}）",
+    "setup.wizard.remove_store_package_3": "Microsoft Store版（{names}）を削除しました",
     "setup.wizard.detect_icloud_1": "Microsoft Store版が入っています（インストール時に削除して公式サイト版に入れ替えます）",
     "setup.wizard.detect_all_1": "確認できませんでした。「再チェック」を押してください",
     "setup.wizard.friendly_net_error_1": "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
@@ -110,39 +107,38 @@ _JA = {
     "setup.wizard.safe_extract_zip_1": "zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください",
     "setup.wizard.safe_extract_zip_2": "zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください",
     "setup.wizard.evaluate_signature_1": "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_2": "署名を確認しました（%s）",
+    "setup.wizard.evaluate_signature_2": "署名を確認しました（{publisher}）",
     "setup.wizard.evaluate_signature_3": "不明",
-    "setup.wizard.evaluate_signature_4": "インストーラーの署名者が想定と違うため、実行しませんでした（想定: %s / 実際: %s）。ダウンロードをやり直してください",
-    "setup.wizard.evaluate_signature_5": "署名のないファイルです（%s は署名なしで配布されています）。ファイルの改ざん検知のみで実行します",
-    "setup.wizard.evaluate_signature_6": "インストーラーに電子署名がないため、実行しませんでした（%s の署名が必要です）。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
+    "setup.wizard.evaluate_signature_4": "インストーラーの署名者が想定と違うため、実行しませんでした（想定: {expected} / 実際: {actual}）。ダウンロードをやり直してください",
+    "setup.wizard.evaluate_signature_5": "署名のないファイルです（{publisher} は署名なしで配布されています）。ファイルの改ざん検知のみで実行します",
+    "setup.wizard.evaluate_signature_6": "インストーラーに電子署名がないため、実行しませんでした（{publisher} の署名が必要です）。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
     "setup.wizard.evaluate_signature_7": "インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: %s）",
+    "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: {detail}）",
     "setup.wizard.evaluate_signature_9": "不明なエラー",
     "setup.wizard.verify_authenticode_1": "Windows 以外では確認できません",
     "setup.wizard.step_register_camera_1": "PhoneCamカメラを登録",
     "setup.wizard.stage_for_run_1": "インストーラーの場所が不正です",
     "setup.wizard.explain_exit_code_1": "インストールが途中で取り消されました。もう一度やり直してください",
     "setup.wizard.explain_exit_code_2": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください",
-    "setup.wizard.explain_exit_code_3": "。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください",
     "setup.wizard.explain_exit_code_4": "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください",
     "setup.wizard.explain_exit_code_5": "インストーラーのファイルが壊れています。ダウンロードからやり直してください",
     "setup.wizard.explain_exit_code_6": "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
     "setup.wizard.explain_exit_code_7": "すでに新しい版が入っています。そのままお使いいただけます",
     "setup.wizard.explain_exit_code_8": "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください",
     "setup.wizard.run_installer_1": "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください",
-    "setup.wizard.run_installer_2": "終了コード %s",
+    "setup.wizard.run_installer_2": "終了コード {code}",
     "setup.wizard.execute_step_1": "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください",
     "setup.wizard.execute_step_2": "インストーラーが見つかりません。もう一度ダウンロードからやり直してください",
     "setup.wizard.execute_step_3": "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください",
     "setup.wizard.execute_step_4": "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください",
     "setup.wizard.execute_step_5": "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.execute_step_6": "winget 終了コード %s",
+    "setup.wizard.execute_step_6": "winget 終了コード {code}",
     "setup.wizard.execute_step_7": "不明な手順です。PhoneCamを最新版にしてからやり直してください",
     "setup.wizard.execute_step_8": "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください",
     "setup.wizard.execute_step_9": "予期しないエラーが起きました。もう一度お試しください",
     "setup.wizard.run_job_1": "ジョブファイルの検証情報がないため実行しませんでした",
     "setup.wizard.run_job_2": "ジョブファイルが変更されています",
-    "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: %s）",
+    "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: {detail}）",
     "setup.wizard.slow_hint_1": "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）",
     "setup.wizard.missing_common_1": "インストーラーを最後の「完了」まで進めてから「確認」を押してください。「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。",
     "setup.wizard.guide_1": "「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
@@ -150,40 +146,40 @@ _JA = {
     "setup.wizard.guide_3": "「ユーザーアカウント制御」が出たら「はい」を押します",
     "setup.wizard.guide_4": "「完了」が出たら押して、この画面の「確認」を押します",
     "setup.wizard.guide_5": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
-    "setup.wizard.guide_6": "Apple公式サイト版のiTunesがまだ見つかりません",
+    "setup.wizard.guide_6": "Apple公式サイト版のiTunesがまだ見つかりません。",
     "setup.wizard.guide_7": "「インストーラーを開く」を押します（iCloudのインストーラーが開きます）",
     "setup.wizard.guide_8": "使用許諾に同意して「インストール」を押します",
     "setup.wizard.guide_9": "完了したら「完了」を押して、この画面の「確認」を押します",
     "setup.wizard.guide_10": "iCloudにサインインする必要はありません。再起動を求められたら「いいえ（あとで）」を選び、すべて終わってからPCを再起動してください。",
-    "setup.wizard.guide_11": "Apple公式サイト版のiCloudがまだ見つかりません",
+    "setup.wizard.guide_11": "Apple公式サイト版のiCloudがまだ見つかりません。",
     "setup.wizard.guide_12": "「インストーラーを開く」を押します（AltServerのインストーラーが開きます）",
     "setup.wizard.guide_13": "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
     "setup.wizard.guide_14": "「Finish」を押します。画面右下のタスクトレイにAltServerのアイコンが出ます",
     "setup.wizard.guide_15": "この画面の「確認」を押します",
     "setup.wizard.guide_16": "Windowsファイアウォールの許可画面が出たら、「プライベート ネットワーク」にチェックを入れて「アクセスを許可する」を押してください（AltServerがiPhoneを見つけるのに必要です）。",
-    "setup.wizard.guide_17": "AltServerがまだ見つかりません",
+    "setup.wizard.guide_17": "AltServerがまだ見つかりません。",
     "setup.wizard.guide_18": "「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
     "setup.wizard.guide_19": "「Install Driver」ボタンを押します",
     "setup.wizard.guide_20": "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
     "setup.wizard.guide_21": "「OK」で閉じて、この画面の「確認」を押します",
     "setup.wizard.guide_22": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
-    "setup.wizard.guide_23": "VB-CABLE（CABLE Input）がまだ見つかりません",
-    "setup.wizard.missing_words_1": "「%s」はまだ使える状態になっていません（%s）",
-    "setup.wizard.missing_words_2": "「%s」がまだ見つかりません",
+    "setup.wizard.guide_23": "VB-CABLE（CABLE Input）がまだ見つかりません。",
+    "setup.wizard.missing_words_1": "「{name}」はまだ使える状態になっていません（{detail}）",
+    "setup.wizard.missing_words_2": "「{name}」がまだ見つかりません。",
     "setup.wizard.shell_open_1": "Windows 以外では開けません",
-    "setup.wizard.shell_open_2": "ShellExecute に失敗しました (%s)",
+    "setup.wizard.shell_open_2": "ShellExecute に失敗しました ({code})",
     "setup.wizard.guidedflow_skip_1": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます",
-    "setup.wizard.guidedflow_prepare_1": "%s: すでに入っています",
+    "setup.wizard.guidedflow_prepare_1": "{name}: すでに入っています",
     "setup.wizard.guidedflow_prepare_2": "すでに入っていました",
-    "setup.wizard.guidedflow_prepare_3": "%s のMicrosoft Store版を削除しています…",
-    "setup.wizard.prepare_prog_1": "%s をダウンロード中… %s / %s",
-    "setup.wizard.prepare_prog_2": "%s をダウンロード中… %s",
-    "setup.wizard.guidedflow_prepare_4": "%s をダウンロード中…",
-    "setup.wizard.guidedflow_prepare_5": "%s: ダウンロード完了",
-    "setup.wizard.guidedflow_prepare_6": "%s のインストーラーを確認しています…",
+    "setup.wizard.guidedflow_prepare_3": "{name} のMicrosoft Store版を削除しています…",
+    "setup.wizard.prepare_prog_1": "{name} をダウンロード中… {done} / {total}",
+    "setup.wizard.prepare_prog_2": "{name} をダウンロード中… {done}",
+    "setup.wizard.guidedflow_prepare_4": "{name} をダウンロード中…",
+    "setup.wizard.guidedflow_prepare_5": "{name}: ダウンロード完了",
+    "setup.wizard.guidedflow_prepare_6": "{name} のインストーラーを確認しています…",
     "setup.wizard.guidedflow_prepare_7": "このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。",
     "setup.wizard.guidedflow_prepare_8": "インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.guidedflow_prepare_9": "%s: 「インストーラーを開く」を押してください",
+    "setup.wizard.guidedflow_prepare_9": "{name}: 「インストーラーを開く」を押してください",
     "setup.wizard.guidedflow__locate_1": "zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください",
     "setup.wizard.guidedflow_launch_1": "インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください",
     "setup.wizard.guidedflow_launch_2": "インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください",
@@ -202,7 +198,7 @@ _JA = {
     "setup.wizard.run_diagnostics_10": "Bonjour Service が動いている",
     "setup.wizard.run_diagnostics_11": "Bonjour は公式サイト版のiTunes / iCloudと一緒に入ります。公式サイト版を入れ直してください",
     "setup.wizard.run_diagnostics_12": "サービスを開始してください（Windowsキー → 「サービス」→ Bonjour サービス →「開始」）。直らないときはPCを再起動します",
-    "setup.wizard.run_diagnostics_13": "%s を確認しています…",
+    "setup.wizard.run_diagnostics_13": "{service} を確認しています…",
     "setup.wizard.run_diagnostics_14": "サービスが止まっています",
     "setup.wizard.run_diagnostics_15": "サービスが見つかりません",
     "setup.wizard.run_diagnostics_16": "iTunes を確認しています…",
@@ -224,10 +220,10 @@ _JA = {
     "setup.wizard.run_diagnostics_32": "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、ネットワーク プロファイルを「プライベート」にしてください",
     "setup.wizard.run_diagnostics_33": "ネットワークが見つかりません",
     "setup.wizard.run_diagnostics_34": "Wi-Fi または有線LANにつないでください",
-    "setup.wizard.run_diagnostics_35": "「パブリック」になっています（%s）",
-    "setup.wizard.run_diagnostics_36": "「パブリック」のネットワークもあります（%s）",
-    "setup.wizard.run_diagnostics_37": "iPhoneと同じネットワークが「パブリック」なら、",
-    "setup.wizard.run_diagnostics_38": "VPNらしい接続が有効です（%s）",
+    "setup.wizard.run_diagnostics_35": "「パブリック」になっています（{networks}）",
+    "setup.wizard.run_diagnostics_36": "「パブリック」のネットワークもあります（{networks}）",
+    "setup.wizard.run_diagnostics_37": "iPhoneと同じネットワークが「パブリック」なら、設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、ネットワーク プロファイルを「プライベート」にしてください",
+    "setup.wizard.run_diagnostics_38": "VPNらしい接続が有効です（{adapters}）",
     "setup.wizard.run_diagnostics_39": "Tailscale などのVPNをいったんオフにしてから更新してください（AltServerがiPhoneを見つけにくくなります）",
     "setup.wizard.run_diagnostics_40": "ファイアウォールを確認しています…（少し時間がかかります）",
     "setup.wizard.run_diagnostics_41": "ファイアウォールがAltServerを許可している",
@@ -237,29 +233,26 @@ _JA = {
     "setup.wizard.run_diagnostics_45": "AltServer を許可するルールが見つかりません",
     "setup.wizard.run_diagnostics_46": "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します",
     "setup.wizard.diagnostics_summary_1": "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。",
-    "setup.wizard.diagnostics_summary_2": "直す必要があるもの: %d 件",
-    "setup.wizard.diagnostics_summary_3": "確認してほしいもの: %d 件",
-    "setup.wizard.diagnostics_summary_4": "。下の「→」の案内を上から順に試してください。",
-    "setup.wizard.setupengine__prepare_1": "%s をインストール",
+    "setup.wizard.setupengine__prepare_1": "{name} をインストール",
     "setup.wizard.setupengine__prepare_2": "zipの中にインストーラーが見つかりませんでした",
     "setup.wizard.setupengine_run_1": "準備に失敗しました。もう一度お試しください",
-    "setup.wizard.setupengine_run_2": "%s: wingetで代わりにインストールします",
-    "setup.wizard.setupengine_run_3": "%s をインストール (winget)",
+    "setup.wizard.setupengine_run_2": "{name}: wingetで代わりにインストールします",
+    "setup.wizard.setupengine_run_3": "{name} をインストール (winget)",
     "setup.wizard.setupengine_run_4": "結果を確認中…",
-    "setup.wizard.setupengine_run_5": "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: %s）",
+    "setup.wizard.setupengine_run_5": "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: {detail}）",
     "setup.wizard.setupengine_run_6": "インストールは終わりましたが、まだ認識できません。再起動してから再チェックしてください",
     "setup.wizard.setupengine_run_7": "登録の処理は終わりましたが、状態が変わっていません。もう一度お試しください",
     "setup.wizard.setupengine__run_elevated_1": "管理者の確認が表示されたら「はい」を押してください…",
-    "setup.wizard.setupengine__run_elevated_2": "管理者権限でインストールを開始します (%d 件)",
+    "setup.wizard.setupengine__run_elevated_2": "管理者権限でインストールを開始します ({count} 件)",
     "setup.wizard.setupengine__run_elevated_3": "管理者の確認がキャンセルされたため、インストールしませんでした。もう一度お試しください。",
     "setup.wizard.setupengine__run_elevated_4": "インストールが時間内に終わりませんでした。もう一度お試しください。",
     "setup.wizard.setupengine__run_elevated_5": "インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
-    "setup.wizard.setupengine__run_elevated_6": "詳細: %s %s",
+    "setup.wizard.setupengine__run_elevated_6": "詳細: {kind} {code}",
     "setup.wizard.setupengine__run_elevated_7": "完了",
-    "setup.wizard.setupengine__run_elevated_8": "失敗 ",
+    "setup.wizard.setupengine__run_elevated_8": "失敗 {detail}",
     "setup.wizard.setupengine__run_elevated_9": "実行されませんでした",
     "setup.wizard.setupcontroller_start_1": "準備しています…",
-    "setup.wizard.start_work_1": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: %s）",
+    "setup.wizard.start_work_1": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: {detail}）",
     "setup.wizard.guided_run_work_1": "予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
     "setup.wizard.guided_open_work_1": "インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
     "setup.wizard.icons_1": "導入済み",
@@ -276,7 +269,7 @@ _JA = {
     "setup.wizard.diagnosticsdialog___init___3": "もう一度診断する",
     "setup.wizard.diagnosticsdialog_run_1": "診断しています…",
     "setup.wizard.run_work_1": "診断",
-    "setup.wizard.run_work_2": "診断を実行できませんでした (%s)",
+    "setup.wizard.run_work_2": "診断を実行できませんでした ({detail})",
     "setup.wizard.run_work_3": "もう一度「診断する」を押してください",
     "setup.wizard.diagnosticsdialog_render_1": "更新に使うPCの条件",
     "setup.wizard.diagnosticsdialog_render_2": "AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。",
@@ -300,10 +293,10 @@ _JA = {
     "setup.wizard.setupwizard_overall_text_3": "完了しました（あとで入れる項目があります）",
     "setup.wizard.setupwizard_overall_text_4": "完了しました",
     "setup.wizard.setupwizard__show_outcome_1": "再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。",
-    "setup.wizard.setupwizard__show_outcome_2": "%s は自動で入れられませんでした。「%s」",
-    "setup.wizard.setupwizard__show_outcome_3": "%s の公式ページを開く",
-    "setup.wizard.setupwizard__render_results_1": "詳細: %s",
-    "setup.wizard.setupwizard__render_guided_1": "%s をインストール（%d / %d）",
+    "setup.wizard.setupwizard__show_outcome_2": "{name} は自動で入れられませんでした。「{text}」",
+    "setup.wizard.setupwizard__show_outcome_3": "{name} の公式ページを開く",
+    "setup.wizard.setupwizard__render_results_1": "詳細: {detail}",
+    "setup.wizard.setupwizard__render_guided_1": "{name} をインストール（{index} / {total}）",
     "setup.wizard.setupwizard__render_guided_2": "インストーラーを準備しています。上のバーが進みます…",
     "setup.wizard.setupwizard__render_guided_3": "インストールされたか確認しています…",
     "setup.wizard.setupwizard__render_guided_4": "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます（このまま「確認」を押しても進めます）",
@@ -312,8 +305,8 @@ _JA = {
     "setup.wizard.setupwizard__render_guided_7": "インストーラーをもう一度開く",
     "setup.wizard.setupwizard__render_guided_8": "公式ページを開く",
     "setup.wizard.setupwizard__render_guided_9": "この項目はあとで",
-    "setup.wizard.setupwizard__elapsed_text_1": "インストーラーを実行中です（経過 %d:%02d）。画面の案内に沿って進めてください",
-    "setup.wizard.setupwizard__page_step_1": "全%d段階",
+    "setup.wizard.setupwizard__elapsed_text_1": "インストーラーを実行中です（経過 {minutes}:{seconds:02d}）。画面の案内に沿って進めてください",
+    "setup.wizard.setupwizard__page_step_1": "全{total}段階",
     "setup.wizard.setupwizard__page_step_2": "あとで",
     "setup.wizard.setupwizard__page_step_3": "戻る",
     "setup.wizard.setupwizard__extra_itunes_1": "iTunesを開く",
@@ -327,9 +320,14 @@ _JA = {
     "setup.wizard.setupwizard__extra_phonecam_4": "QRが使えないときは、PhoneCam.ipaを直接入れる方法もあります。AltServerのアイコンをShiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。（この方法だと、アプリの更新は自分で入れ直します）",
     "setup.wizard.setupwizard__extra_phonecam_5": "インストール時に「AltServer.ServerError 2005」が出たときは、AltStoreの「My Apps」でAltStoreを一度「Refresh」してから、もう一度インストールしてください。",
     "setup.wizard.setupwizard__extra_phonecam_6": "PhoneCam.ipaをダウンロード",
-    "setup.wizard.setupwizard__extra_phonecam_7": "保存しました: %s",
+    "setup.wizard.setupwizard__extra_phonecam_7": "保存しました: {path}",
     "setup.wizard.setupwizard__copy_1": "✓ URLをコピーしました",
     "setup.wizard.setupwizard__download_ipa_1": "ダウンロード中…",
+ "common.list_separator": "、",
+ "setup.wizard.explain_exit_code_2_store": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください",
+ "setup.wizard.diagnostics_summary_ng": "直す必要があるもの: {fix_count} 件。下の「→」の案内を上から順に試してください。",
+ "setup.wizard.diagnostics_summary_warn": "確認してほしいもの: {check_count} 件。下の「→」の案内を上から順に試してください。",
+ "setup.wizard.diagnostics_summary_both": "直す必要があるもの: {fix_count} 件、確認してほしいもの: {check_count} 件。下の「→」の案内を上から順に試してください。",
 }
 
 
@@ -609,9 +607,9 @@ def detect_itunes(entries=None):
     nonstore = _has_entry(entries, "itunes", exact=True) or bool(_any_file([os.path.join("iTunes", "iTunes.exe")]))
     store = installed_store_packages("itunes")
     if store and (not nonstore or "AppleInc.AppleDevices" in store):
-        names = t("setup.wizard.detect_itunes_1").join("「%s」" % STORE_LABELS.get(p, p) for p in store)
+        names = t("common.list_separator").join("「%s」" % STORE_LABELS.get(p, p) for p in store)
         return {"state": STATE_WARN,
-                "detail": t("setup.wizard.detect_itunes_2") % names}
+                "detail": t("setup.wizard.detect_itunes_2", names=names)}
     if service and nonstore:
         return {"state": STATE_OK, "detail": ""}
     if service:
@@ -681,10 +679,10 @@ def remove_store_package(cid, runner=None):
             code = subprocess.run(cmd, creationflags=flags, timeout=300,
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
     except Exception as e:
-        return False, t("setup.wizard.remove_store_package_1") % e
+        return False, t("setup.wizard.remove_store_package_1", detail=e)
     if code != 0:
-        return False, t("setup.wizard.remove_store_package_2") % code
-    return True, t("setup.wizard.remove_store_package_3") % t("setup.wizard.detect_itunes_1").join(STORE_LABELS.get(p, p) for p in pkgs)
+        return False, t("setup.wizard.remove_store_package_2", code=code)
+    return True, t("setup.wizard.remove_store_package_3", names=t("common.list_separator").join(STORE_LABELS.get(p, p) for p in pkgs))
 
 
 def detect_icloud(entries=None):
@@ -948,16 +946,16 @@ def evaluate_signature(cid, info):
     result = (info or {}).get("result")
     if result == "valid":
         if _signer_matches(policy, (info or {}).get("signers") or []):
-            return True, t("setup.wizard.evaluate_signature_2") % policy["publisher"], False
+            return True, t("setup.wizard.evaluate_signature_2", publisher=policy["publisher"]), False
         found = ", ".join(n for n in (info.get("signers") or []) if n) or t("setup.wizard.evaluate_signature_3")
-        return False, (t("setup.wizard.evaluate_signature_4") % (policy["publisher"], found)), False
+        return False, (t("setup.wizard.evaluate_signature_4", expected=policy["publisher"], actual=found)), False
     if result == "unsigned":
         if policy["unsigned_ok"]:
-            return True, t("setup.wizard.evaluate_signature_5") % policy["publisher"], True
-        return False, (t("setup.wizard.evaluate_signature_6") % policy["publisher"]), False
+            return True, t("setup.wizard.evaluate_signature_5", publisher=policy["publisher"]), True
+        return False, (t("setup.wizard.evaluate_signature_6", publisher=policy["publisher"])), False
     if result == "invalid":
         return False, (t("setup.wizard.evaluate_signature_7")), False
-    return False, (t("setup.wizard.evaluate_signature_8") % ((info or {}).get("detail") or t("setup.wizard.evaluate_signature_9"))), False
+    return False, (t("setup.wizard.evaluate_signature_8", detail=(info or {}).get("detail") or t("setup.wizard.evaluate_signature_9"))), False
 
 
 def _wintrust():
@@ -1154,10 +1152,7 @@ def explain_exit_code(code, cid=None):
     if c in (1602, 1223):
         return t("setup.wizard.explain_exit_code_1")
     if c == 1603:
-        msg = t("setup.wizard.explain_exit_code_2")
-        if cid in STORE_PACKAGES:
-            msg += t("setup.wizard.explain_exit_code_3")
-        return msg
+        return t("setup.wizard.explain_exit_code_2_store" if cid in STORE_PACKAGES else "setup.wizard.explain_exit_code_2")
     if c == 1618:
         return t("setup.wizard.explain_exit_code_4")
     if c in (1619, 1620):
@@ -1193,7 +1188,7 @@ def _run_installer(step, kind, path, res, runner, verifier):
     res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT or bool(step.get("reboot"))
     if not res["ok"]:
         res["detail"] = explain_exit_code(code, step.get("id"))
-        res["technical"] = t("setup.wizard.run_installer_2") % code
+        res["technical"] = t("setup.wizard.run_installer_2", code=code)
     return res
 
 
@@ -1234,7 +1229,7 @@ def execute_step(step, runner=None, verifier=None):
             res["reboot"] = (code & 0xFFFFFFFF) in EXIT_REBOOT
             if not res["ok"]:
                 res["detail"] = t("setup.wizard.execute_step_5")
-                res["technical"] = t("setup.wizard.execute_step_6") % code
+                res["technical"] = t("setup.wizard.execute_step_6", code=code)
             return res
         res["detail"] = t("setup.wizard.execute_step_7")
         res["technical"] = "type=%s" % kind
@@ -1271,7 +1266,7 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
             if progress:
                 _append_progress(progress, "%d|%d|done" % (i + 1, total))
     except Exception as e:
-        result["error"] = t("setup.wizard.run_job_3") % e
+        result["error"] = t("setup.wizard.run_job_3", detail=e)
     try:
         if result_path is None:
             result_path = os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
@@ -1347,9 +1342,9 @@ def missing_words(cid, status):
     g = GUIDE.get(cid, {})
     detail = (status or {}).get("detail") or ""
     if (status or {}).get("state") == STATE_WARN and detail:
-        head = t("setup.wizard.missing_words_1") % (name, detail)
+        head = t("setup.wizard.missing_words_1", name=name, detail=detail)
     else:
-        head = t("setup.wizard.sentence_fmt") % g.get("missing", t("setup.wizard.missing_words_2") % name)
+        head = g.get("missing") or t("setup.wizard.missing_words_2", name=name)
     return head + "\n" + MISSING_COMMON
 
 
@@ -1417,7 +1412,7 @@ def shell_open(path, args=None, cwd=None):
         err = ctypes.get_last_error()
         if err == 1223:
             raise UserDeclined()
-        raise OSError(err, t("setup.wizard.shell_open_2") % err)
+        raise OSError(err, t("setup.wizard.shell_open_2", code=err))
     return LaunchedProcess(info.hProcess, kernel32)
 
 
@@ -1534,11 +1529,11 @@ class GuidedFlow:
         except Exception:
             self.statuses = {}
         if self.statuses.get(cid, {}).get("state") == STATE_OK:
-            emit("log", text=t("setup.wizard.guidedflow_prepare_1") % name)
+            emit("log", text=t("setup.wizard.guidedflow_prepare_1", name=name))
             self._finish_ok(cid, t("setup.wizard.guidedflow_prepare_2"))
             return
         if cid in STORE_PACKAGES and self.store_check(cid):
-            emit("stage", text=t("setup.wizard.guidedflow_prepare_3") % name)
+            emit("stage", text=t("setup.wizard.guidedflow_prepare_3", name=name))
             ok, msg = self.store_remover(cid)
             emit("log", text="%s: %s" % (name, msg))
             if not ok:
@@ -1549,17 +1544,17 @@ class GuidedFlow:
 
         def prog(done, total, _n=name):
             if total:
-                emit("stage", text=t("setup.wizard.prepare_prog_1") % (_n, _mb(done), _mb(total)))
+                emit("stage", text=t("setup.wizard.prepare_prog_1", name=_n, done=_mb(done), total=_mb(total)))
                 emit("progress", value=min(1.0, done / float(total)))
             else:
-                emit("stage", text=t("setup.wizard.prepare_prog_2") % (_n, _mb(done)))
+                emit("stage", text=t("setup.wizard.prepare_prog_2", name=_n, done=_mb(done)))
 
-        emit("stage", text=t("setup.wizard.guidedflow_prepare_4") % name)
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_4", name=name))
         emit("progress", value=0.0)
         try:
             self.downloader(src["url"], dest, src["kind"], progress=prog, cancel=cancel)
-            emit("log", text=t("setup.wizard.guidedflow_prepare_5") % name)
-            emit("stage", text=t("setup.wizard.guidedflow_prepare_6") % name)
+            emit("log", text=t("setup.wizard.guidedflow_prepare_5", name=name))
+            emit("stage", text=t("setup.wizard.guidedflow_prepare_6", name=name))
             job = self._locate(cid, dest)
             allowed, msg, unsigned = check_installer_signature(cid, job["path"], self.verifier)
             emit("log", text="%s: %s" % (name, msg))
@@ -1577,7 +1572,7 @@ class GuidedFlow:
             return
         self.job = job
         self.phase = self.READY
-        emit("stage", text=t("setup.wizard.guidedflow_prepare_9") % name)
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_9", name=name))
         emit("progress", value=1.0)
 
     def _locate(self, cid, dest):
@@ -1863,7 +1858,7 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
             ("bonjour", t("setup.wizard.run_diagnostics_10"), "Bonjour Service",
              t("setup.wizard.run_diagnostics_11"),
              t("setup.wizard.run_diagnostics_12"))):
-        note(t("setup.wizard.run_diagnostics_13") % svc)
+        note(t("setup.wizard.run_diagnostics_13", service=svc))
         rc, txt = run(["sc.exe", "query", svc], 15)
         state = "unknown" if rc is None else parse_sc_state(rc, txt)
         if state == "running":
@@ -1923,16 +1918,16 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
                              t("setup.wizard.run_diagnostics_34")))
         elif publics and not others:
             out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_NG,
-                             t("setup.wizard.run_diagnostics_35") % t("setup.wizard.detect_itunes_1").join(p["name"] or p["alias"] for p in publics), fix_net))
+                             t("setup.wizard.run_diagnostics_35", networks=t("common.list_separator").join(p["name"] or p["alias"] for p in publics)), fix_net))
         elif publics:
             out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN,
-                             t("setup.wizard.run_diagnostics_36") % t("setup.wizard.detect_itunes_1").join(p["name"] or p["alias"] for p in publics),
-                             t("setup.wizard.run_diagnostics_37") + fix_net))
+                             t("setup.wizard.run_diagnostics_36", networks=t("common.list_separator").join(p["name"] or p["alias"] for p in publics)),
+                             t("setup.wizard.run_diagnostics_37")))
         else:
             out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_OK))
         vpns = find_vpn_adapters(net["adapters"])
         if vpns:
-            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_38") % t("setup.wizard.detect_itunes_1").join(vpns),
+            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_38", adapters=t("common.list_separator").join(vpns)),
                              t("setup.wizard.run_diagnostics_39")))
         else:
             out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_OK))
@@ -1963,12 +1958,11 @@ def diagnostics_summary(results):
     warn = [r for r in results if r["state"] == DIAG_WARN]
     if not ng and not warn:
         return t("setup.wizard.diagnostics_summary_1")
-    parts = []
+    if ng and warn:
+        return t("setup.wizard.diagnostics_summary_both", fix_count=len(ng), check_count=len(warn))
     if ng:
-        parts.append(t("setup.wizard.diagnostics_summary_2") % len(ng))
-    if warn:
-        parts.append(t("setup.wizard.diagnostics_summary_3") % len(warn))
-    return t("setup.wizard.list_sep").join(parts) + t("setup.wizard.diagnostics_summary_4")
+        return t("setup.wizard.diagnostics_summary_ng", fix_count=len(ng))
+    return t("setup.wizard.diagnostics_summary_warn", check_count=len(warn))
 
 
 # ---------------------------------------------------------------------------
@@ -2035,9 +2029,9 @@ class SetupEngine:
     def _prepare(self, cid, emit, cancel, progress):
         src = SOURCES[cid]
         dest = os.path.join(self.dir, src["file"])
-        emit("stage", text=t("setup.wizard.guidedflow_prepare_4") % COMPONENT_BY_ID[cid]["name"])
+        emit("stage", text=t("setup.wizard.guidedflow_prepare_4", name=COMPONENT_BY_ID[cid]["name"]))
         self.downloader(src["url"], dest, src["kind"], progress=progress, cancel=cancel)
-        title = t("setup.wizard.setupengine__prepare_1") % COMPONENT_BY_ID[cid]["name"]
+        title = t("setup.wizard.setupengine__prepare_1", name=COMPONENT_BY_ID[cid]["name"])
         if cid == "altserver":
             root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
             msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
@@ -2079,22 +2073,22 @@ class SetupEngine:
 
             def prog(done, total, _name=name):
                 if total:
-                    emit("stage", text=t("setup.wizard.prepare_prog_1") % (_name, _mb(done), _mb(total)))
+                    emit("stage", text=t("setup.wizard.prepare_prog_1", name=_name, done=_mb(done), total=_mb(total)))
                     set_progress(done / float(total))
                 else:
-                    emit("stage", text=t("setup.wizard.prepare_prog_2") % (_name, _mb(done)))
+                    emit("stage", text=t("setup.wizard.prepare_prog_2", name=_name, done=_mb(done)))
 
             try:
                 steps.append(self._prepare(cid, emit, cancel, prog))
-                emit("log", text=t("setup.wizard.guidedflow_prepare_5") % name)
+                emit("log", text=t("setup.wizard.guidedflow_prepare_5", name=name))
             except Exception as e:
                 msg = str(e) if isinstance(e, DownloadError) else t("setup.wizard.setupengine_run_1")
                 emit("log", text="%s: %s%s" % (name, msg, (" [%s]" % getattr(e, "technical", "")) if getattr(e, "technical", "")
                                               else ("" if isinstance(e, DownloadError) else " [%s]" % e)))
                 src = SOURCES[cid]
                 if src.get("winget") and self.winget_finder():
-                    emit("log", text=t("setup.wizard.setupengine_run_2") % name)
-                    steps.append(step_winget(cid, t("setup.wizard.setupengine_run_3") % name, src["winget"]))
+                    emit("log", text=t("setup.wizard.setupengine_run_2", name=name))
+                    steps.append(step_winget(cid, t("setup.wizard.setupengine_run_3", name=name), src["winget"]))
                 else:
                     out["results"][cid] = {"ok": False, "detail": msg, "code": None}
                     out["manual"].append({"id": cid, "name": name, "url": src["page"], "text": MANUAL_TEXT.get(cid, "")})
@@ -2107,7 +2101,7 @@ class SetupEngine:
             cid = st.get("id")
             if cid in STORE_PACKAGES and store_package_installed(cid):
                 name = COMPONENT_BY_ID[cid]["name"]
-                emit("stage", text=t("setup.wizard.guidedflow_prepare_3") % name)
+                emit("stage", text=t("setup.wizard.guidedflow_prepare_3", name=name))
                 ok, msg = self.store_remover(cid)
                 emit("log", text="%s: %s" % (name, msg))
                 if not ok:
@@ -2125,7 +2119,7 @@ class SetupEngine:
         try:
             out["statuses"] = self.detector()
         except Exception as e:
-            out["error"] = out["error"] or t("setup.wizard.setupengine_run_5") % e
+            out["error"] = out["error"] or t("setup.wizard.setupengine_run_5", detail=e)
         # インストールは成功したのに検出できない場合は「要確認」
         for cid, r in out["results"].items():
             st = out["statuses"].get(cid, {}).get("state")
@@ -2152,7 +2146,7 @@ class SetupEngine:
             if script:
                 params = '"%s" %s' % (script(), params)
         emit("stage", text=t("setup.wizard.setupengine__run_elevated_1"))
-        emit("log", text=t("setup.wizard.setupengine__run_elevated_2") % len(steps))
+        emit("log", text=t("setup.wizard.setupengine__run_elevated_2", count=len(steps)))
         box = []
 
         def work():
@@ -2184,7 +2178,7 @@ class SetupEngine:
                 out["error"] = t("setup.wizard.setupengine__run_elevated_4")
             else:
                 out["error"] = (t("setup.wizard.setupengine__run_elevated_5"))
-                emit("log", text=t("setup.wizard.setupengine__run_elevated_6") % (kind, code))
+                emit("log", text=t("setup.wizard.setupengine__run_elevated_6", kind=kind, code=code))
             for cid in step_by_id:
                 out["results"][cid] = {"ok": False, "detail": out["error"], "code": None}
             return
@@ -2196,7 +2190,7 @@ class SetupEngine:
             if r.get("reboot"):
                 out["reboot"] = True
             emit("log", text="%s: %s" % (r.get("title", r.get("id")), t("setup.wizard.setupengine__run_elevated_7") if r.get("ok") else (
-                t("setup.wizard.setupengine__run_elevated_8") + r.get("detail", "") + ((" [" + r["technical"] + "]") if r.get("technical") else ""))))
+                t("setup.wizard.setupengine__run_elevated_8", detail=r.get("detail", "") + ((" [" + r["technical"] + "]") if r.get("technical") else "")))))
         for cid in step_by_id:
             out["results"].setdefault(cid, {"ok": False, "detail": t("setup.wizard.setupengine__run_elevated_9"), "code": None})
         state["units"] = base_units + len(steps)
@@ -2422,7 +2416,7 @@ class SetupController:
                 out = self.engine.run(ids, emit=emit, cancel=self.cancel)
             except Exception as e:
                 out = {"results": {}, "manual": [], "reboot": False, "statuses": {}, "ids": ids,
-                       "error": t("setup.wizard.start_work_1") % e}
+                       "error": t("setup.wizard.start_work_1", detail=e)}
             if guard is not None:
                 self.audio_polling = True  # "done" より先に立てる (UI の更新ループを止めないため)
             self._q.put(("done", out))
@@ -3040,7 +3034,7 @@ def text_section(parent, title, lines, container, numbered=False, intro=""):
     if intro:
         wrapped_label(parent, intro, container, font=(FONT, 9)).pack(fill="x", pady=(px(2), 0))
     for n, line in enumerate(lines, 1):
-        mark = ("%d." % n) if numbered else t("setup.wizard.detect_itunes_1").strip()
+        mark = ("%d." % n) if numbered else "•"
         row = tk.Frame(parent, bg=BG)
         row.pack(fill="x", pady=(px(3), 0))
         mk = tk.Label(row, text=mark, bg=BG, fg=FG, font=(FONT, 9), anchor="ne", justify="right", width=3 if numbered else 2)
@@ -3157,7 +3151,7 @@ class DiagnosticsDialog:
             try:
                 self._box.append(self.runner(progress=prog))
             except Exception as e:
-                self._box.append([_diag("error", t("setup.wizard.run_work_1"), DIAG_WARN, t("setup.wizard.run_work_2") % e, t("setup.wizard.run_work_3"))])
+                self._box.append([_diag("error", t("setup.wizard.run_work_1"), DIAG_WARN, t("setup.wizard.run_work_2", detail=e), t("setup.wizard.run_work_3"))])
 
         threading.Thread(target=work, name="altserver-diag", daemon=True).start()
         self._schedule()
@@ -3633,7 +3627,7 @@ class SetupWizard:
         if out.get("reboot"):
             notes.append(t("setup.wizard.setupwizard__show_outcome_1"))
         for m in out.get("manual", []):
-            notes.append(t("setup.wizard.setupwizard__show_outcome_2") % (m["name"], m["text"]))
+            notes.append(t("setup.wizard.setupwizard__show_outcome_2", name=m["name"], text=m["text"]))
         for w in list(self.manual_holder.winfo_children()):
             w.destroy()
         if notes:
@@ -3647,7 +3641,7 @@ class SetupWizard:
         self.manual_holder.pack(fill="x", before=self.guided_holder)
         for m in out.get("manual", []):
             url = m["url"]
-            make_link(self.manual_holder, t("setup.wizard.setupwizard__show_outcome_3") % m["name"], lambda u=url: self.open_url(u)).pack(anchor="w")
+            make_link(self.manual_holder, t("setup.wizard.setupwizard__show_outcome_3", name=m["name"]), lambda u=url: self.open_url(u)).pack(anchor="w")
         failed = [cid for cid, r in out.get("results", {}).items() if not r.get("ok") and not r.get("skipped")
                   and cid not in GUIDED_IDS]
         if failed and self.retry_btn is not None and not pending:
@@ -3680,9 +3674,9 @@ class SetupWizard:
             if r.get("detail"):
                 wrapped_label(col, r["detail"], row, px(40), fg=(BAD if not (r.get("ok") or r.get("skipped")) else WARN),
                               font=(FONT, 9)).pack(fill="x")
-            tech = r.get("technical") or ((t("setup.wizard.run_installer_2") % r["code"]) if r.get("code") not in (None, 0) and not r.get("ok") else "")
+            tech = r.get("technical") or (t("setup.wizard.run_installer_2", code=r["code"]) if r.get("code") not in (None, 0) and not r.get("ok") else "")
             if tech:
-                wrapped_label(col, t("setup.wizard.setupwizard__render_results_1") % tech, row, px(40), fg=SUB, font=(FONT, 8)).pack(fill="x")
+                wrapped_label(col, t("setup.wizard.setupwizard__render_results_1", detail=tech), row, px(40), fg=SUB, font=(FONT, 8)).pack(fill="x")
 
     # -- 手順つきインストール (iTunes / iCloud / AltServer / VB-CABLE) ----------
     def _render_guided(self):
@@ -3702,7 +3696,7 @@ class SetupWizard:
         cid = flow.current
         g = GUIDE.get(cid, {"steps": [], "note": ""})
         tk.Frame(holder, bg=LINE, height=1).pack(fill="x", pady=(0, px(10)))
-        tk.Label(holder, text=t("setup.wizard.setupwizard__render_guided_1") % (flow.name(cid), flow.index + 1, len(flow.ids)), bg=BG, fg=FG,
+        tk.Label(holder, text=t("setup.wizard.setupwizard__render_guided_1", name=flow.name(cid), index=flow.index + 1, total=len(flow.ids)), bg=BG, fg=FG,
                  font=(FONT, 14, "bold"), anchor="w").pack(anchor="w")
         phase = flow.phase
         if phase == GuidedFlow.PREPARING or phase == GuidedFlow.CHECKING:
@@ -3712,7 +3706,7 @@ class SetupWizard:
             if phase == GuidedFlow.FAILED:
                 wrapped_label(holder, flow.message, self.body, fg=BAD).pack(fill="x", pady=(px(8), 0))
                 if flow.technical:
-                    wrapped_label(holder, t("setup.wizard.setupwizard__render_results_1") % flow.technical, self.body, fg=SUB, font=(FONT, 8)).pack(fill="x")
+                    wrapped_label(holder, t("setup.wizard.setupwizard__render_results_1", detail=flow.technical), self.body, fg=SUB, font=(FONT, 8)).pack(fill="x")
             else:
                 for n, line in enumerate(g["steps"], 1):
                     wrapped_label(holder, "%d.  %s" % (n, line), self.body, fg=FG, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
@@ -3758,7 +3752,7 @@ class SetupWizard:
     @staticmethod
     def _elapsed_text(flow):
         sec = int(flow.elapsed())
-        return t("setup.wizard.setupwizard__elapsed_text_1") % (sec // 60, sec % 60)
+        return t("setup.wizard.setupwizard__elapsed_text_1", minutes=sec // 60, seconds=sec % 60)
 
     def _schedule_guided_timer(self):
         if getattr(self, "_g_job", None) is None:
@@ -3812,7 +3806,7 @@ class SetupWizard:
         head = tk.Frame(self.body, bg=BG)
         head.pack(fill="x")
         tk.Label(head, text=str(i + 1), bg=BG, fg=ACCENT, font=(FONT, 40, "bold")).pack(side="left")
-        tk.Label(head, text=t("setup.wizard.setupwizard__page_step_1") % len(steps), bg=BG, fg=SUB, font=(FONT, 9)).pack(side="right", anchor="s")
+        tk.Label(head, text=t("setup.wizard.setupwizard__page_step_1", total=len(steps)), bg=BG, fg=SUB, font=(FONT, 9)).pack(side="right", anchor="s")
         tk.Label(self.body, text=step["title"], bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
         for line in step["lines"]:
             wrapped_label(self.body, line, self.body, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
@@ -3941,7 +3935,7 @@ class SetupWizard:
         self.dl_label = wrapped_label(self.body, "", self.body, font=(FONT, 9))
         self.dl_label.pack(fill="x", pady=(px(4), 0))
         if self._dl_state and self._dl_state[0] == "ok":
-            self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7") % self._dl_state[1])
+            self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7", path=self._dl_state[1]))
 
     def _copy(self, text):
         try:
@@ -3985,7 +3979,7 @@ class SetupWizard:
                 self.dl_btn.config(state="normal")
             if st and st[0] == "ok":
                 if self.dl_label is not None:
-                    self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7") % st[1], fg=GOOD)
+                    self.dl_label.config(text=t("setup.wizard.setupwizard__extra_phonecam_7", path=st[1]), fg=GOOD)
                 _open_folder_select(st[1])
             elif st and self.dl_label is not None:
                 self.dl_label.config(text=st[1], fg=BAD)
