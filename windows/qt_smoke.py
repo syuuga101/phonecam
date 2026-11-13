@@ -56,7 +56,7 @@ def child(scale, out):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
     from phonecam.controller import Controller
-    from phonecam.qt.app import apply_theme, configure
+    from phonecam.qt.app import configure
     from phonecam.qt.main_window import NAV_ITEMS, MainWindow
 
     ctrl = Controller.demo_connected("ja")
@@ -72,8 +72,7 @@ def child(scale, out):
     _settle(app)
     failed = list(win.page_errors)
     for theme in THEMES:
-        ctrl.set_theme(theme)   # settings_changed -> apply_theme
-        apply_theme(app, theme)
+        ctrl.set_theme(theme)   # アプリと同じ経路: settings_changed -> apply_theme (ウィジェット構築後の実行時切替)
         _settle(app)
         print("scale=%s theme=%s window_lightness=%d" % (scale, theme, app.palette().window().color().lightness()))
         for i, (key, _icon) in enumerate(NAV_ITEMS):

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from phonecam.core.paths import WINDOWS_DIR
 from phonecam.i18n import t
 from phonecam.qt import icons
-from phonecam.qt.widgets import Hint, Page, blend, button, text_color
+from phonecam.qt.widgets import _THEME_EVENTS, Hint, Page, blend, button, ref_palette, text_color
 
 # (キー, アイコン名)。順番がページ番号 (qt/pages/<キー>.py の build(ctrl) -> QWidget)
 NAV_ITEMS = [("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
@@ -57,8 +57,8 @@ class NavDelegate(QStyledItemDelegate):
     def paint(self, p, opt, index):
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        pal = opt.palette
-        win, txt = pal.color(QPalette.ColorRole.Window), pal.color(QPalette.ColorRole.WindowText)
+        pal = ref_palette(opt.widget) if opt.widget is not None else opt.palette
+        win, txt = pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Window), pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.WindowText)
         r = QRectF(opt.rect).adjusted(8, 1, -8, -1)
         selected = bool(opt.state & QStyle.StateFlag.State_Selected)
         hover = bool(opt.state & QStyle.StateFlag.State_MouseOver)
@@ -68,7 +68,7 @@ class NavDelegate(QStyledItemDelegate):
             p.drawRoundedRect(r, 4, 4)
         if selected:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(pal.color(QPalette.ColorRole.Highlight))
+            p.setBrush(pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight))
             p.drawRoundedRect(QRectF(r.left(), r.center().y() - 8, 3, 16), 1.5, 1.5)
         ic = index.data(Qt.ItemDataRole.DecorationRole)
         x = r.left() + 14
@@ -99,11 +99,17 @@ class Bar(QFrame):
         self._buttons = []
         self.hide()
 
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() in _THEME_EVENTS:
+            self.update()
+
     def paintEvent(self, e):
         p = QPainter(self)
-        pal = self.palette()
-        p.fillRect(self.rect(), blend(pal.color(QPalette.ColorRole.Window), pal.color(QPalette.ColorRole.WindowText), 0.06))
-        p.setPen(blend(pal.color(QPalette.ColorRole.Window), pal.color(QPalette.ColorRole.WindowText), 0.12))
+        pal = ref_palette(self)
+        win, txt = pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Window), pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.WindowText)
+        p.fillRect(self.rect(), blend(win, txt, 0.06))
+        p.setPen(blend(win, txt, 0.12))
         p.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
         p.end()
 
@@ -262,7 +268,7 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, e):
         super().changeEvent(e)
-        if e.type() == QEvent.Type.PaletteChange and hasattr(self, "nav"):
+        if e.type() in _THEME_EVENTS and hasattr(self, "nav"):
             self._refresh_nav_icons()
             self.nav.viewport().update()
 
@@ -281,11 +287,11 @@ class MainWindow(QMainWindow):
             self.update_bar.hide()
 
     def show_toast(self, text, kind="info"):
-        pal = self.palette()
+        pal = ref_palette(self)
         # 反転配色 (ライト = 暗い帯 / ダーク = 明るい帯)
-        bg = pal.color(QPalette.ColorRole.WindowText)
-        fg = pal.color(QPalette.ColorRole.Window)
-        pal2 = QPalette(self.toast_label.palette())
+        bg = pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.WindowText)
+        fg = pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Window)
+        pal2 = QPalette()
         pal2.setColor(QPalette.ColorRole.WindowText, fg)
         pal2.setColor(QPalette.ColorRole.Window, bg)
         self.toast_label.setPalette(pal2)

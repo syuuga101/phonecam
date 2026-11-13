@@ -51,31 +51,49 @@ def blend(a, b, t):
                   int(a.blue() + (b.blue() - a.blue()) * t))
 
 
+def _role(palette, role):
+    """Active グループの色を返す (Inactive/Disabled グループが未設定で黒になる環境への備え)。"""
+    return palette.color(QPalette.ColorGroup.Active, role)
+
+
+def ref_palette(w=None):
+    """色計算の基準パレット。ウィジェットが属するトップレベルのパレット (= 実際に背景を塗っている色)。
+    無ければアプリのパレット。個々のウィジェット自身のパレットは使わない。"""
+    try:
+        if w is not None:
+            top = w.window()
+            if top is not None:
+                return top.palette()
+    except Exception:
+        pass
+    return QApplication.palette()
+
+
 def is_dark(palette):
-    return palette.color(QPalette.ColorRole.Window).lightness() < 128
+    win = _role(palette, QPalette.ColorRole.Window)
+    txt = _role(palette, QPalette.ColorRole.WindowText)
+    return win.lightness() < txt.lightness()
 
 
 def text_color(w):
-    return w.palette().color(QPalette.ColorRole.WindowText)
+    return _role(ref_palette(w), QPalette.ColorRole.WindowText)
 
 
 def secondary_color(palette):
-    return blend(palette.color(QPalette.ColorRole.Window), palette.color(QPalette.ColorRole.WindowText), 0.62)
+    return blend(_role(palette, QPalette.ColorRole.Window), _role(palette, QPalette.ColorRole.WindowText), 0.62)
 
 
 def card_color(palette):
-    win = palette.color(QPalette.ColorRole.Window)
-    if is_dark(palette):
-        return blend(win, palette.color(QPalette.ColorRole.WindowText), 0.05)
-    return blend(win, QColor(255, 255, 255), 0.75)
+    """カードの面の色 (Windows 11 設定: ライト #FBFBFB / ダーク #2B2B2B)。"""
+    return QColor("#2b2b2b") if is_dark(palette) else QColor("#fbfbfb")
 
 
 def border_color(palette):
-    return blend(palette.color(QPalette.ColorRole.Window), palette.color(QPalette.ColorRole.WindowText), 0.12)
+    return QColor("#353535") if is_dark(palette) else QColor("#e5e5e5")
 
 
 def separator_color(palette):
-    return blend(palette.color(QPalette.ColorRole.Window), palette.color(QPalette.ColorRole.WindowText), 0.09)
+    return QColor("#353535") if is_dark(palette) else QColor("#ebebeb")
 
 
 def error_color(palette):
@@ -88,6 +106,18 @@ def ok_color(palette):
 
 def app_palette():
     return QApplication.palette()
+
+
+_THEME_EVENTS = tuple(x for x in (getattr(QEvent.Type, n, None) for n in
+                                  ("PaletteChange", "ApplicationPaletteChange", "ThemeChange", "StyleChange"))
+                      if x is not None)
+
+
+def _own_text_palette(w, color):
+    """w の WindowText だけを color にする (パレット全体のコピーは持たない)。"""
+    pal = QPalette()
+    pal.setColor(QPalette.ColorRole.WindowText, color)
+    w.setPalette(pal)
 
 
 # ---------------------------------------------------------------------------
@@ -112,20 +142,17 @@ class Hint(QLabel):
             return
         self._busy = True
         try:
-            src = self.parentWidget().palette() if self.parentWidget() is not None else app_palette()
-            pal = QPalette(self.palette())
-            pal.setColor(QPalette.ColorRole.WindowText, secondary_color(src))
-            self.setPalette(pal)
+            _own_text_palette(self, secondary_color(ref_palette(self.parentWidget())))
         finally:
             self._busy = False
 
     def changeEvent(self, e):
         super().changeEvent(e)
-        if e.type() in (QEvent.Type.PaletteChange, QEvent.Type.ParentChange):
+        if e.type() in _THEME_EVENTS or e.type() == QEvent.Type.ParentChange:
             self._apply()
 
 
-_ICON_REFRESH = tuple(x for x in (QEvent.Type.PaletteChange, getattr(QEvent.Type, "DevicePixelRatioChange", None)) if x is not None)
+_ICON_REFRESH = _THEME_EVENTS + tuple(x for x in (getattr(QEvent.Type, "DevicePixelRatioChange", None),) if x is not None)
 
 
 class ErrorLabel(QLabel):
@@ -150,16 +177,13 @@ class ErrorLabel(QLabel):
             return
         self._busy = True
         try:
-            src = self.parentWidget().palette() if self.parentWidget() is not None else app_palette()
-            pal = QPalette(self.palette())
-            pal.setColor(QPalette.ColorRole.WindowText, error_color(src))
-            self.setPalette(pal)
+            _own_text_palette(self, error_color(ref_palette(self.parentWidget())))
         finally:
             self._busy = False
 
     def changeEvent(self, e):
         super().changeEvent(e)
-        if e.type() in (QEvent.Type.PaletteChange, QEvent.Type.ParentChange):
+        if e.type() in _THEME_EVENTS or e.type() == QEvent.Type.ParentChange:
             self._apply()
 
 
@@ -204,10 +228,15 @@ class Card(QFrame):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() in _THEME_EVENTS:
+            self.update()
+
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        pal = self.palette()
+        pal = ref_palette(self)   # 毎回その時点のパレットから計算 (テーマ切替に追従)
         r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         p.setPen(QPen(border_color(pal), 1))
         p.setBrush(card_color(pal))
@@ -384,25 +413,30 @@ class Switch(QAbstractButton):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() in _THEME_EVENTS:
+            self.update()
+
     def sizeHint(self):
         return QSize(40, 20)
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        pal = self.palette()
+        pal = ref_palette(self)
         on = self.isChecked()
         enabled = self.isEnabled()
         r = QRectF(1, 1, self.width() - 2, self.height() - 2)
-        txt = pal.color(QPalette.ColorRole.WindowText)
+        txt = _role(pal, QPalette.ColorRole.WindowText)
         if on:
-            track = pal.color(QPalette.ColorRole.Highlight)
-            knob = pal.color(QPalette.ColorRole.HighlightedText)
+            track = _role(pal, QPalette.ColorRole.Highlight)
+            knob = _role(pal, QPalette.ColorRole.HighlightedText)
             p.setPen(Qt.PenStyle.NoPen)
         else:
             track = Qt.GlobalColor.transparent
-            knob = blend(pal.color(QPalette.ColorRole.Window), txt, 0.62)
-            p.setPen(QPen(blend(pal.color(QPalette.ColorRole.Window), txt, 0.55), 1))
+            knob = blend(_role(pal, QPalette.ColorRole.Window), txt, 0.62)
+            p.setPen(QPen(blend(_role(pal, QPalette.ColorRole.Window), txt, 0.55), 1))
         if not enabled:
             p.setOpacity(0.4)
         p.setBrush(track)
