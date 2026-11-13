@@ -162,6 +162,72 @@ jobs:
           $exe = Get-Item windows/dist/PhoneCamReceiver.exe
           Write-Host ("PhoneCamReceiver.exe: {0:N2} MB" -f ($exe.Length / 1MB))
 
+      # ---- 起動テスト: 出来上がった exe を実際に起動する (起動しない exe は自動更新でも直せないため) ----
+      - name: Launch smoke test
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PHONECAM_SMOKE: "1"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = (Resolve-Path windows/dist/PhoneCamReceiver.exe).Path
+          $appdata = Join-Path $env:RUNNER_TEMP "smoke-appdata"
+          Remove-Item -Recurse -Force $appdata -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force (Join-Path $appdata "PhoneCam") | Out-Null
+          $env:APPDATA = $appdata
+          $logDir = Join-Path $appdata "PhoneCam"
+          # ウィザード・更新確認が出ないように設定を事前に置く
+          '{"setup_done": true, "setup_shown_version": "", "update_check": false}' | Set-Content -Path (Join-Path $logDir "phonecam_settings.json") -Encoding utf8
+          $failed = $false
+          function Show-Logs {
+            foreach ($n in @("phonecam_crash.log", "phonecam_error.log", "selftest.txt")) {
+              $f = Join-Path $logDir $n
+              if (Test-Path $f) { Write-Host "---- $n ----"; Get-Content $f -Raw | Write-Host }
+            }
+          }
+          function Has-Traceback {
+            foreach ($n in @("phonecam_crash.log", "phonecam_error.log")) {
+              $f = Join-Path $logDir $n
+              if ((Test-Path $f) -and ((Get-Content $f -Raw) -match "Traceback")) { return $true }
+            }
+            return $false
+          }
+
+          # 1. 本体を起動して 15 秒生きているか
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) {
+            Write-Host "::error::exe が起動後 15 秒以内に終了しました (exit code $($p.ExitCode))"
+            $failed = $true
+          } else {
+            Write-Host "exe は 15 秒後も動作中 (pid $($p.Id))"
+            Stop-Process -Id $p.Id -Force
+          }
+          Show-Logs
+          if (Has-Traceback) { Write-Host "::error::クラッシュ/エラーログに Traceback があります"; $failed = $true }
+
+          # 2. --selftest (import・QR・QImage)
+          $t = Start-Process -FilePath $exe -ArgumentList "--selftest" -PassThru
+          if (-not $t.WaitForExit(90000)) { Stop-Process -Id $t.Id -Force; Write-Host "::error::--selftest が 90 秒で終わりませんでした"; $failed = $true }
+          elseif ($t.ExitCode -ne 0) { Write-Host "::error::--selftest が失敗しました (exit code $($t.ExitCode))"; $failed = $true }
+          else { Write-Host "--selftest 成功" }
+          Show-Logs
+
+          # 3. --setup-diagnose (Tk とウィザードの経路の import)。5 秒生きていれば成功、先に終了したときは exit code 0 のみ成功
+          $d = Start-Process -FilePath $exe -ArgumentList "--setup-diagnose" -PassThru
+          Start-Sleep -Seconds 5
+          if ($d.HasExited) {
+            if ($d.ExitCode -ne 0) { Write-Host "::error::--setup-diagnose が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
+            else { Write-Host "--setup-diagnose は正常終了" }
+          } else {
+            Write-Host "--setup-diagnose は動作中 (成功扱い)"
+            Stop-Process -Id $d.Id -Force
+          }
+          Show-Logs
+          if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
+
+          if ($failed) { throw "起動テストに失敗しました" }
+
       - name: Upload exe
         uses: actions/upload-artifact@v4
         with:

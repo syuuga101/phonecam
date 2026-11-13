@@ -389,6 +389,8 @@ class Controller:
     def first_run_setup(self):
         if self.demo or not self.frozen or phonecam_update is None:
             return
+        if os.environ.get("PHONECAM_SMOKE") == "1":
+            return  # CI の起動テスト用: ウィザード・登録確認 (UAC) を出さない
         version = phonecam_update.parse_version(APP_VERSION)
         version = phonecam_update.display_version(APP_VERSION) if version and version != (0, 0, 0) else ""
         if not self.get("setup_done"):
