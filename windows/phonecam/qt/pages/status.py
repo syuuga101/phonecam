@@ -146,7 +146,7 @@ def build(ctrl):
         card = page.add_section(t(f"status.{name}.title"))
         for key, icon in specs:
             row = card.add_row(icon, t(f"status.{name}.{key}"))
-            values[name, key] = row.addControl(StatusValue(wrap=(name, key) != ("video", "dropped")))
+            values[name, key] = row.addControl(StatusValue(wrap=(name, key) not in (("video", "dropped"), ("video", "dropreasons"), ("video", "sentfps"))))
         if name == "iphone":
             version_note = Hint("")
             card.add_padded(version_note)
@@ -207,8 +207,13 @@ def build(ctrl):
         dropped_warn = _drop_trend.update(dropped_total, time.monotonic())
         reasons = phone.get("cameraDropReasons")
         reasons = reasons if isinstance(reasons, dict) else {}
-        drops = " / ".join(t(f"status.video.drop.{key}", count=reasons.get(key, "-"))
-                           for key in ("late", "outOfBuffers", "discontinuity")) if reasons else "-"
+        drops = " / ".join(str(reasons.get(key, "-")) for key in ("late", "outOfBuffers", "discontinuity")) if reasons else "-"
+        sent = phone.get("sentFps")
+        if status.connected and isinstance(sent, (int, float)) and not isinstance(sent, bool):
+            fps_text = t("status.video.fps_fmt", sent=f"{sent:.0f}", rx=f"{snap.get('rx_fps', 0.0):.0f}",
+                         out=f"{snap.get('recv_fps', 0.0):.0f}")
+        else:
+            fps_text = _number(sent, ".1f")
         pressure = phone.get("pressureLevel")
         pressure_text = (t("status.iphone.pressure_shutdown") if pressure == "shutdown"
                          else THERMAL_LABELS.get(pressure, "-"))
@@ -227,7 +232,7 @@ def build(ctrl):
             "iphone": (status.thermal_text, pressure_text, factor_text or "-",
                        format_mmss(ctrl.thermal_log.hot_seconds) if status.connected else "-", status.battery_text,
                        "-" if low is None else t("status.iphone.on" if low else "status.iphone.off")),
-            "video": (_number(phone.get("sentFps"), ".1f"), dropped, drops,
+            "video": (fps_text, dropped, drops,
                       _number(rec.get("droppedFrames"), "d") if isinstance(rec, dict) and isinstance(rec.get("droppedFrames"), int) else "-",
                       _number(phone.get("encodeMs"), ".1f") + " ms" if isinstance(phone.get("encodeMs"), (float, int)) else "-",
                       _number(phone.get("processingMs"), ".1f") + " ms" if isinstance(phone.get("processingMs"), (float, int)) else "-"),
@@ -254,7 +259,9 @@ def build(ctrl):
             for (key, _), value in zip(specs, data[section]):
                 values[section, key].set_status(value if value and value != "-" else t("compact.no_value"),
                                                 levels.get((section, key)),
-                                                t("status.video.dropped_tip") if (section, key) == ("video", "dropped") else None)
+                                                {("video", "dropped"): t("status.video.dropped_tip"),
+                                                 ("video", "dropreasons"): t("status.video.dropreasons_tip"),
+                                                 ("video", "sentfps"): t("status.video.fps_tip")}.get((section, key)))
         latency = ctrl.link.latency.averages() if status.connected else {}
         for key, _ in sections[-1][1]:
             value = latency.get(key)

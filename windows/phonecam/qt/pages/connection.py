@@ -70,9 +70,11 @@ def frame_to_image(img, fmt, max_w, max_h):
     small = np.ascontiguousarray(small)
     sh, sw = small.shape[:2]
     qfmt = QImage.Format.Format_BGR888 if fmt == "bgr24" else QImage.Format.Format_RGB888
-    buf = small.tobytes()
-    qi = QImage(buf, sw, sh, small.strides[0], qfmt)
-    return qi.copy()   # buf から切り離す (buf はこの関数を出ると消える)
+    # small のメモリをそのまま参照する QImage (tobytes と copy の2回のコピーを省く)。
+    # 呼び出し側は、これを scaled() / copy() で別の画像にするまで _keep を手放さないこと (qi._keep が持つ)。
+    qi = QImage(small.data, sw, sh, small.strides[0], qfmt)
+    qi._keep = small
+    return qi
 
 
 class PreviewView(QWidget):
@@ -180,6 +182,9 @@ class PreviewView(QWidget):
     def _tick(self):
         if not self.isVisible():
             return
+        win = self.window()
+        if win is not None and win.isMinimized():
+            return   # 最小化中は見えないので変換しない
         w0, h0 = self._rect_size()
         if h0 != self.height():
             self._relayout()
@@ -200,7 +205,10 @@ class PreviewView(QWidget):
         qi = frame_to_image(img, fmt, pw, ph)
         if qi is None:
             return
-        qi = qi.scaled(QSize(pw, ph), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        if qi.width() <= pw and qi.height() <= ph:
+            qi = qi.copy()   # 拡大はしない。参照している numpy から切り離す
+        else:
+            qi = qi.scaled(QSize(pw, ph), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         pm = QPixmap.fromImage(qi)
         pm.setDevicePixelRatio(dpr)
         self._pix = pm
@@ -378,7 +386,9 @@ class ConnectionPage(Page):
         self.wifi_warning = self.wireless.warning
 
     def on_activated(self):
-        self.wireless.start()
+        # つないでいる間は Wi-Fi の検索 (Bonjour / 走査) を始めない。一覧の「再検索」ボタンを押したときだけ動かす
+        if not self.ctrl.status.get("connected"):
+            self.wireless.start()
 
     # -- iPhone のカメラの動作 -----------------------------------------------------------
     def _build_run(self):
