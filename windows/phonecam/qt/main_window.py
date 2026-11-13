@@ -65,6 +65,7 @@ class NavDelegate(QStyledItemDelegate):
 
     def paint(self, p, opt, index):
         p.save()
+        p.setClipRect(opt.rect)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         pal = ref_palette(opt.widget) if opt.widget is not None else opt.palette
         win, txt = pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Window), pal.color(QPalette.ColorGroup.Active, QPalette.ColorRole.WindowText)
@@ -313,8 +314,9 @@ class MainWindow(QMainWindow):
             notes.setReadOnly(True)
             notes.setPlainText(phonecam_update.markdown_to_text(release.get("body", "")) or t("update.notes.empty"))
             layout.addWidget(notes)
-            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+            buttons = QDialogButtonBox()
             open_page = buttons.addButton(t("update.notes.open_release"), QDialogButtonBox.ButtonRole.ActionRole)
+            buttons.addButton(t("update.notes.close"), QDialogButtonBox.ButtonRole.RejectRole)
             open_page.clicked.connect(lambda: webbrowser.open(url))
             buttons.rejected.connect(dialog.reject)
             layout.addWidget(buttons)
@@ -343,10 +345,16 @@ class MainWindow(QMainWindow):
         timer = QTimer(progress, interval=150)
 
         def show_progress():
+            from phonecam.core.stats import format_bytes
             done, total = values
             progress.setRange(0, 100 if total else 0)
             if total:
-                progress.setValue(min(100, int(done * 100 / total)))
+                percent = min(100, int(done * 100 / total))
+                progress.setValue(percent)
+                progress.setLabelText(t("update.progress.percent", percent=percent,
+                                        done=format_bytes(done), total=format_bytes(total)))
+            else:
+                progress.setLabelText(t("update.progress.bytes", done=format_bytes(done)))
 
         timer.timeout.connect(show_progress)
         timer.start()
@@ -361,20 +369,26 @@ class MainWindow(QMainWindow):
 
         def finished(result):
             timer.stop()
+            progress.canceled.disconnect(cancel.set)
             progress.close()
             self._update_download = None
             if isinstance(result, Exception):
-                self.show_toast(t("update.msg.failed", error=result), "error")
+                if not cancel.is_set():
+                    self.show_toast(t("update.msg.failed", error=result), "error")
                 return
             try:
+                if cancel.is_set():
+                    os.remove(dest)
+                    return
                 old = phonecam_update.self_replace(exe, dest)
                 try:
                     flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0
                     subprocess.Popen([exe] + sys.argv[1:], close_fds=True, cwd=os.path.dirname(exe),
                                      env=phonecam_update.relaunch_env(), creationflags=flags)
-                except Exception:
-                    phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
-                    raise
+                except Exception as error:
+                    restored = phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
+                    self.show_toast(t("update.msg.relaunch_failed", restored=t("update.msg.restored") if restored else "", error=error), "error")
+                    return
             except Exception as error:
                 self.show_toast(t("update.msg.failed", error=error), "error")
                 return

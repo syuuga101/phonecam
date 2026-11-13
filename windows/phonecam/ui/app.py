@@ -740,10 +740,10 @@ def main():
     root = tk.Tk()
     apply_ui_scale(root)
     if setup_window:
-        root.withdraw()
         settings = load_settings()
         set_language(settings.get("language", "system"))
-        theme.apply(root, settings.get("theme", "system"))
+        theme.init(root, settings.get("theme", "system"))
+        root.update()
         if phonecam_setup is None:
             messagebox.showerror("PhoneCam", t("setup.unavailable"), parent=root)
             root.destroy()
@@ -764,6 +764,8 @@ def main():
         if dialog is not None:
             dialog.top.transient("")
             dialog.top.deiconify()
+            dialog.top.update()
+            root.withdraw()
             root.wait_window(dialog.top)
         root.destroy()
         return 0 if dialog is not None else 1

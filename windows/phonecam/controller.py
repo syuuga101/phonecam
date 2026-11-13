@@ -156,6 +156,8 @@ class Controller:
         self._next_update = time.monotonic() + 3
         self._results = SimpleQueue()
         self.frozen = bool(getattr(sys, "frozen", False))
+        if self.frozen and not demo and phonecam_update is not None:
+            phonecam_update.cleanup_old(os.path.dirname(sys.executable), prefix=Path(sys.executable).stem)
         self.camera_registration = registration_status() if self.frozen and not demo else "unavailable"
         self.camera_registration_busy = False
         self.camera_registration_changed = CallbackList()
@@ -481,7 +483,8 @@ class Controller:
         self._show_update_status(t(key, time=stamp, version=version))
         if not auto:
             self._dismissed_update = None
-        if tag == self._dismissed_update or not phonecam_update.should_notify(tag, APP_VERSION, self.get("update_skip_version", "")):
+        if tag == self._dismissed_update or not phonecam_update.should_notify(
+                tag, APP_VERSION, self.get("update_skip_version", "") if auto else ""):
             return
 
         def dismiss():
@@ -681,8 +684,11 @@ class Controller:
                 break
             done(result)
         if not self.demo and phonecam_update and now >= self._next_update:
-            self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC
-            self.check_updates(auto=True)
+            if self._setup_process is not None:
+                self._next_update = now + 1.0
+            else:
+                self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC
+                self.check_updates(auto=True)
         if now >= self._next_poll:
             self._next_poll = now + POLL_SEC
             self._poll_dshow(now)
@@ -888,6 +894,8 @@ class Controller:
     # ------------------------------------------------------------------
     def close(self):
         """アプリ終了時に呼ぶ。受信・音声を止め、設定を保存する。"""
+        if self.closing:
+            return
         self.closing = True
         if self._hotkeys is not None:
             self._hotkeys.stop()
