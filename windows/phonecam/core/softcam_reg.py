@@ -87,8 +87,13 @@ def softcam_installed_path():
         return None
 
 
+def _norm_path(p):
+    p = str(p).strip().strip('"').rstrip("\\/ ")
+    return os.path.normcase(os.path.abspath(p))
+
+
 def _same_path(a, b):
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+    return _norm_path(a) == _norm_path(b)
 
 
 def softcam_registered_path():
@@ -101,6 +106,25 @@ def softcam_registered_path():
         return None
 
 
+_last_outdated_logged = None
+
+
+def _log_outdated(reg, expected):
+    """「更新が必要」と判定した理由 (登録先と期待するパス) を phonecam_error.log に1行残す。同じ内容は1回だけ。"""
+    global _last_outdated_logged
+    key = (reg, expected)
+    if _last_outdated_logged == key:
+        return
+    _last_outdated_logged = key
+    try:
+        from phonecam.core import crashlog
+        why = "same path but file missing" if _same_path(reg, expected) else "registered path differs"
+        crashlog.log_error("softcam outdated", "softcam outdated: %s registered=%r expected=%r rev=%s exists=%s" % (
+            why, reg, expected, os.path.basename(os.path.dirname(expected)), os.path.isfile(expected)))
+    except Exception:
+        pass
+
+
 def registration_status():
     """exe 版での登録状態。"ok" / "missing"(未登録) / "outdated"(更新が必要) / "unavailable"(埋め込み DLL なし)。"""
     expected = softcam_installed_path()
@@ -111,6 +135,7 @@ def registration_status():
         return "missing"
     if _same_path(reg, expected) and os.path.isfile(expected):
         return "ok"
+    _log_outdated(reg, expected)
     return "outdated"
 
 
