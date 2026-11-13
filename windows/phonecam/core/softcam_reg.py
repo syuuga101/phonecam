@@ -8,9 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
-from phonecam.core.deps import phonecam_setup
 from phonecam.core.paths import _app_dir, _is_frozen
-from phonecam.core.deps import messagebox, tk
 
 
 # 専用仮想カメラ (softcam)。CLSID は build-slots.ps1 と同一
@@ -255,18 +253,26 @@ def helper_unregister(slot=1):
 
 def _error_box(text):
     try:
-        r = tk.Tk() if tk is not None else None
-        if r is not None:
-            r.withdraw()
-            messagebox.showerror("PhoneCam", text)
-            r.destroy()
+        import tkinter as tk  # 管理者ヘルパの失敗時だけ使うので、起動時には読まない
+        from tkinter import messagebox
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror("PhoneCam", text)
+        r.destroy()
     except Exception:
         pass
+
+
+def _setup_module():
+    """phonecam_setup (4000 行超) は --setup / ウィザードのときだけ読む。"""
+    from phonecam.core import deps
+    return deps.phonecam_setup
 
 
 def bind_setup_host(link_connected=None):
     """phonecam_setup (ウィザード/管理者ジョブ) に本体のホスト関数を渡す。
     Tk 版・Qt 版のどの入口から呼んでも同じ関数が bind される (管理者ヘルパ --setup も register_camera を使う)。"""
+    phonecam_setup = _setup_module()
     if phonecam_setup is None:
         return
     from phonecam.core.elevate import ELEVATED_TIMEOUT_MS, run_elevated
@@ -291,6 +297,7 @@ def helper_main(argv):
         try:
             job = args[args.index("--setup") + 1]
             sha = args[args.index("--sha256") + 1] if "--sha256" in args else None
+            phonecam_setup = _setup_module()
             if phonecam_setup is None:
                 return 1
             bind_setup_host()  # register_camera などのホスト関数 (Qt 入口では ui.app が読まれない)
