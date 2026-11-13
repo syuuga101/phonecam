@@ -20,7 +20,7 @@ from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
-    EmptyState, FitBox, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
+    EmptyState, FitBox, FixedHint, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
 
@@ -328,9 +328,8 @@ class DeviceRow(FitBox):
         font = name.font()
         font.setWeight(QFont.Weight.Bold)
         name.setFont(font)
-        name.setWordWrap(True)
         texts.addWidget(name)
-        texts.addWidget(Hint(entry.detail()))
+        texts.addWidget(FixedHint(entry.detail()))
         lay.addLayout(texts, 1)
         if entry.registered:
             name.setToolTip(t("wireless.rename_tip"))

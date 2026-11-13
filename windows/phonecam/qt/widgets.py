@@ -633,9 +633,10 @@ class FitBox(QWidget):
         layout = self.layout()
         if layout is None or self.width() <= 0:
             return None
-        hfw = layout.totalHeightForWidth(self.width())
-        if hfw < 0:
-            hfw = layout.minimumSize().height()
+        if layout.hasHeightForWidth():
+            hfw = layout.totalHeightForWidth(self.width())
+        else:
+            hfw = layout.minimumSize().height()   # 折り返しがなければ、中身の最小高さがそのまま答え
         return max(self._base_height, hfw)
 
     def _fit(self):
@@ -669,6 +670,33 @@ class _ExpanderContent(FitBox):
         self._fit()
 
 
+class FixedHint(Hint):
+    """折り返す説明文だが、heightForWidth を使わず、今の幅での高さを固定する。
+    heightForWidth は入れ子のレイアウトの途中で最小高さが無視され、親が足りない高さを割り当てて重なることがある。
+    高さが固定なら、レイアウトは minimumSize/sizeHint だけで正しく並べられる。"""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, True, parent)
+        policy = self.sizePolicy()
+        policy.setHeightForWidth(False)
+        self.setSizePolicy(policy)
+
+    def _pin(self):
+        if self.width() <= 0:
+            return
+        h = QLabel.heightForWidth(self, self.width())
+        if h > 0 and (h != self.minimumHeight() or h != self.maximumHeight()):
+            self.setFixedHeight(h)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._pin()
+
+    def setText(self, text):
+        super().setText(text)
+        self._pin()
+
+
 class EmptyState(FitBox):
     """一覧が空のときの表示。上から アイコン -> タイトル -> 説明 -> ボタン を縦に並べる (すべてレイアウト内)。"""
 
@@ -683,11 +711,10 @@ class EmptyState(FitBox):
         font = self.title_label.font()
         font.setWeight(QFont.Weight.DemiBold)
         self.title_label.setFont(font)
-        self.title_label.setWordWrap(True)
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(self.title_label)
         if note:
-            self.note_label = Hint(note)
+            self.note_label = FixedHint(note)
             self.note_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             lay.addWidget(self.note_label)
         if action is not None:
