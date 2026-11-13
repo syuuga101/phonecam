@@ -38,7 +38,11 @@ def build(ctrl):
 
     def refresh_update(text, busy):
         status.setText(text)
+        # 押した結果は折りたたみの中の行だけだと見えないので、「よく使う設定」に移る行の補足にも出す
+        check_row.setHint(text)
         check.setEnabled(not busy)
+        check.setText(t("update.check.busy" if busy else "update.check.button"))
+        check.setToolTip(t("update.check.busy_hint") if busy else "")
 
     ctrl.update_status_changed.connect(refresh_update)
     refresh_update(ctrl.update_status_text, ctrl.update_check_busy)

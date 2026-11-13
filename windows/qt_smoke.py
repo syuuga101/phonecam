@@ -191,6 +191,44 @@ def child(scale, out):
                 win.current_page().verticalScrollBar().setValue(0)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, "multi_cam%d_%02d_%s_%s_x%s.png" % (cam + 1, i, key, theme, scale)))
+    # カメラ 2 のとき: 全ページの「よく使う設定」の行に操作部品が出ているか / 録画・設定ページを撮る / 更新確認ボタンが有効か
+    from PySide6.QtWidgets import QPushButton
+    from phonecam.i18n import t
+    from phonecam.qt.widgets import Row, Section
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app)
+        win._select_camera(1)
+        for i, (key, _icon) in enumerate(NAV_ITEMS):
+            win.select(i)
+            win._select_camera(1)
+            _settle(app, 250)
+            page = win.current_page()
+            page.verticalScrollBar().setValue(0)
+            _settle(app, 100)
+            sections = [w for w in page.widget().findChildren(Section) if w.title_label and w.title_label.text() == t("compact.primary")]
+            for section in sections:
+                for row in section.findChildren(Row):
+                    for control in row.controls():
+                        ok = control.isVisibleTo(page) and control.width() > 0 and control.height() > 0
+                        if not ok:
+                            failed.append((key, "camera2 row '%s' control %s is not shown" % (row.title_label.text(), type(control).__name__)))
+            if key in ("recording", "settings", "quality", "effects", "status"):
+                win.grab().save(os.path.join(out, "cam2_%02d_%s_%s_x%s.png" % (i, key, theme, scale)))
+            if key == "settings":
+                button = next((b for b in page.findChildren(QPushButton) if b.text() == t("update.check.button")), None)
+                if button is None or not button.isEnabled():
+                    failed.append((key, "update check button is missing or disabled"))
+                else:
+                    button.click()
+                    _settle(app, 200)
+                    hints = [row.hint_label.text() for row in page.findChildren(Row)
+                             if row.title_label.text() == t("update.check.label")]
+                    if not hints or not hints[0]:
+                        failed.append((key, "update check shows no status after click"))
+                    if not button.isEnabled():
+                        failed.append((key, "update check button stays disabled after click"))
+                    win.grab().save(os.path.join(out, "cam2_%02d_%s_checked_%s_x%s.png" % (i, key, theme, scale)))
     failed += list(win.page_errors)
     win.close()
     if failed:
