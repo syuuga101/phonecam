@@ -20,6 +20,7 @@ from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
+    Combo,
     IconLabel, Hint, Row, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
@@ -339,10 +340,22 @@ class DeviceRow(QWidget):
             lay.addWidget(status, 0, Qt.AlignmentFlag.AlignVCenter)
         elif state == "connecting":
             lay.addWidget(Hint(t("wireless.connecting"), wrap=False), 0, Qt.AlignmentFlag.AlignVCenter)
+        camera = owner._camera(entry)
+        group = getattr(owner.ctrl, "camera_group", None)
+        active = camera or owner.ctrl
+        if group and (len(group.cameras) > 1 or active.get("camera_slot") != 1) and (camera or entry.registered):
+            outputs = Combo()
+            outputs.setAccessibleName(t("multi.output"))
+            outputs.setToolTip(t("multi.output"))
+            for slot in range(1, 5):
+                outputs.addItem(t("multi.camera_number", n=slot), slot)
+            outputs.setCurrentIndex(outputs.findData(active.get("camera_slot")))
+            outputs.activated.connect(lambda index: owner._output(entry, outputs, index))
+            lay.addWidget(outputs)
         action = button(t("wireless.disconnect") if state else t("wireless.connect"))
         action.setMinimumWidth(84)
         if state:
-            action.clicked.connect(owner.disconnect)
+            action.clicked.connect(lambda: owner.disconnect(entry))
         else:
             action.clicked.connect(lambda: owner.connect_entry(entry))
         lay.addWidget(action, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -365,6 +378,7 @@ class WirelessOptions:
         self.expander = None
         self._signature = None
         self._pending = None
+        self._pending_camera = None
         self.timer = QTimer(page, interval=100)
         self.timer.timeout.connect(self._result)
         self.hint_timer = QTimer(page, interval=12000, singleShot=True)
@@ -521,6 +535,8 @@ class WirelessOptions:
     def _manual_connect(self):
         if self.ctrl.wanted:
             self.ctrl.toggle_connect()
+        self.ctrl.changed("target_device", "")
+        self.ctrl.changed("usb_serial", "")
         self.ctrl.set_mode("wifi")
         self.ctrl.toggle_connect()
 
@@ -610,14 +626,36 @@ class WirelessOptions:
             out.append(Entry(device, address, route_of(address) if live else "registered", bool(live)))
         return sorted(out, key=lambda e: not e.found)
 
+    def _camera(self, entry):
+        group = getattr(self.ctrl, "camera_group", None)
+        return group.for_device(entry.device.id, entry.device.addresses) if group else self.ctrl
+
     def _state(self, entry):
-        """"connected" / "connecting" / "" (この行が今つないでいる相手か)。"""
-        status = self.ctrl.status
-        if not self.ctrl.wanted or status.get("transport") != "wifi":
+        camera = self._camera(entry)
+        if camera is None or not camera.wanted:
             return ""
-        if status.get("peer") not in entry.device.addresses:
+        status = camera.status
+        if status.get("transport") == "usb":
+            if camera.get("target_device") != entry.device.id:
+                return ""
+        elif status.get("peer") not in entry.device.addresses and camera.get("target_device") != entry.device.id:
             return ""
-        return "connected" if status.get("connected") else "connecting"
+        return "connected" if status.get("connected") and status.get("auth_state") != "required" else "connecting"
+
+    def _output(self, entry, combo, index):
+        group = self.ctrl.camera_group
+        camera = self._camera(entry)
+        if camera is None:
+            if self.ctrl.get("target_device") or self.ctrl.wanted:
+                combo.setCurrentIndex(combo.findData(self.ctrl.get("camera_slot")))
+                self.ctrl.toast.emit(t("multi.select_profile"), "error")
+                return
+            camera = group.bind_device(self.ctrl, entry.device, entry.address)
+        if camera is None:
+            return
+        if not group.move_output(camera, combo.itemData(index)):
+            self.ctrl.toast.emit(t("multi.output_busy"), "error")
+        combo.setCurrentIndex(combo.findData(camera.get("camera_slot")))
 
     def _summary(self, entries):
         status = self.ctrl.status
@@ -640,7 +678,10 @@ class WirelessOptions:
         scanning = self.timer.isActive()
         states = [self._state(entry) for entry in entries]
         summary = self._summary(entries)
-        signature = (tuple(e.key() for e in entries), tuple(states), scanning, self.scanned, summary)
+        group = getattr(self.ctrl, "camera_group", None)
+        slots = tuple((camera.get("camera_slot"), camera.get("target_device"))
+                      for camera in group.cameras) if group else ()
+        signature = (tuple(e.key() for e in entries), tuple(states), scanning, self.scanned, summary, slots)
         if signature == self._signature:
             return
         self._signature = signature
@@ -702,7 +743,7 @@ class WirelessOptions:
     # -- 行の操作 -------------------------------------------------------------------
     def connect_entry(self, entry):
         if entry.registered:
-            self._start(entry.address, entry.device.code)
+            self._start(entry.address, entry.device.code, entry.device)
             return
         dialog = CodeDialog(self.page, entry.name)
         accepted = dialog.exec() == QDialog.DialogCode.Accepted
@@ -712,15 +753,26 @@ class WirelessOptions:
             return
         device = entry.device
         self._pending = (replace(device, code=code, addresses=(entry.address,)) if device.id else None)
-        self._start(entry.address, code)
+        self._start(entry.address, code, replace(device, code=code))
 
-    def _start(self, address, code):
-        self._apply(address, code)
-        self.ctrl.toggle_connect()
-
-    def disconnect(self):
-        if self.ctrl.wanted:
+    def _start(self, address, code, device=None):
+        group = getattr(self.ctrl, "camera_group", None)
+        if group and device:
+            camera = group.bind_device(self.ctrl, device, address)
+            if camera is None:
+                self.ctrl.toast.emit(t("multi.select_profile"), "error")
+            else:
+                if self._pending:
+                    self._pending_camera = camera
+                camera.toggle_connect()
+        else:
+            self._apply(address, code)
             self.ctrl.toggle_connect()
+
+    def disconnect(self, entry):
+        camera = self._camera(entry)
+        if camera and camera.wanted:
+            camera.toggle_connect()
 
     def _apply(self, address, code):
         if self.ctrl.wanted:
@@ -736,15 +788,22 @@ class WirelessOptions:
         pending = self._pending
         if not pending:
             return
-        if not self.ctrl.wanted:
+        camera = self._pending_camera or self.ctrl
+        status = camera.status if camera is not self.ctrl else status
+        if not camera.wanted:
             self._pending = None
-        elif status.connected and status.get("peer") == pending.addresses[0]:
+            self._pending_camera = None
+        elif (status.connected and status.get("peer") == pending.addresses[0]
+              and camera.state.snapshot().get("phone_status")):
             self._pending = None
+            self._pending_camera = None
             self._save_known([pending, *(item for item in self._known() if item.id != pending.id)])
 
     def _save_known(self, devices):
-        self.ctrl.changed("known_devices", [item.stored() for item in devices[:64]])
-        self.ctrl.save_now()
+        group = getattr(self.ctrl, "camera_group", None)
+        root = group.primary if group else self.ctrl
+        root.changed("known_devices", [item.stored() for item in devices[:64]])
+        root.save_now()
         self._signature = None
         self._render()
 
@@ -769,6 +828,13 @@ class WirelessOptions:
         answer = QMessageBox.question(self.page, t("wireless.forget"), t("wireless.forget_ask", name=entry.name))
         if answer != QMessageBox.StandardButton.Yes:
             return
+        camera = self._camera(entry)
+        if camera and camera.get("target_device") == entry.device.id:
+            if camera.wanted:
+                camera.toggle_connect()
+            camera.changed("target_device", "")
+            camera.set_ip("")
+            camera.set_pair_code("")
         self._save_known([item for item in self._known() if item.id != entry.device.id])
 
     def _show_qr(self):
@@ -782,5 +848,4 @@ class WirelessOptions:
         if old and old.alias:
             device = replace(device, alias=old.alias)
         self._save_known([device, *(item for item in self._known() if item.id != device.id)])
-        self._apply(device.addresses[0], device.code)
-        self.ctrl.toggle_connect()
+        self._start(device.addresses[0], device.code, device)

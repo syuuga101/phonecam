@@ -62,6 +62,7 @@ final class AppModel: ObservableObject {
 
     let camera = CameraController()
     let wirelessIdentity: WirelessIdentity
+    private var usbIdentityListener: USBIdentityListener?
     private let encoder = H264Encoder()
     private let security: SecurityManager
     private let server: StreamServer
@@ -382,6 +383,7 @@ final class AppModel: ObservableObject {
         stateLock.unlock()
         // 起動時は未接続なので黒画面にはしない (保存値は接続時に再適用する)
 
+        usbIdentityListener = USBIdentityListener(id: wirelessIdentity.id)
         server.start()
         audioServer.start()
         updateCameraRunning()   // camera.start() より前に要求を積む (最初は停止)
@@ -492,6 +494,7 @@ final class AppModel: ObservableObject {
 
     private func withExtras(_ base: [String: Any]) -> [String: Any] {
         var s = base
+        s["deviceId"] = wirelessIdentity.id
         stateLock.lock()
         let lvl = batteryLevel
         let bst = batteryStateText

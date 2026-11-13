@@ -135,6 +135,25 @@ def child(scale, out):
             _settle(app, 150)
             win.grab().save(os.path.join(out, base + "_scroll.png"))
             print("  %s: scroll max=%d" % (base, bar.maximum()))
+    # カメラが 2 台以上のとき (カメラ切り替え・出力先の欄が出る状態): 接続・映像ページをカメラ 1 / 2 で撮る
+    win.resize(W, H)
+    win._add_camera()
+    _settle(app)
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app)
+        for cam in (0, 1):
+            win._select_camera(cam)
+            for i, (key, _icon) in enumerate(NAV_ITEMS):
+                if key not in ("connection", "video", "audio"):
+                    continue
+                win.select(i)
+                win._select_camera(cam)
+                _settle(app)
+                win.current_page().verticalScrollBar().setValue(0)
+                _settle(app, 150)
+                win.grab().save(os.path.join(out, "multi_cam%d_%02d_%s_%s_x%s.png" % (cam + 1, i, key, theme, scale)))
+    failed += list(win.page_errors)
     win.close()
     if failed:
         for key, err in failed:

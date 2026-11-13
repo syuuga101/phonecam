@@ -609,3 +609,32 @@ final class StreamServer {
         conn.send(content: packet, completion: .contentProcessed({ _ in }))
     }
 }
+
+
+/// Read-only identification over USB. Loopback only, with no effect on the
+/// main/audio listeners or their current clients.
+final class USBIdentityListener {
+    private let queue = DispatchQueue(label: "phonecam.usb.identity")
+    private var listener: NWListener?
+    private let payload: Data
+
+    init(id: String) {
+        payload = Data((id + "\n").utf8)
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: 5557)
+        guard let listener = try? NWListener(using: params) else { return }
+        self.listener = listener
+        listener.newConnectionHandler = { [weak self] conn in
+            guard let self else { conn.cancel(); return }
+            conn.stateUpdateHandler = { [weak conn, payload = self.payload] state in
+                guard let conn, case .ready = state else { return }
+                conn.send(content: payload, completion: .contentProcessed { _ in conn.cancel() })
+            }
+            conn.start(queue: self.queue)
+            self.queue.asyncAfter(deadline: .now() + 2) { conn.cancel() }
+        }
+        listener.start(queue: queue)
+    }
+
+    deinit { listener?.cancel() }
+}

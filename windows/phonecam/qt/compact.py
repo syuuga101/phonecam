@@ -119,7 +119,7 @@ def compact_page(page, ctrl, key):
         widget = item.widget()
         if widget is None:
             continue
-        if not isinstance(widget, Section):
+        if not isinstance(widget, Section) or widget.title_label and widget.title_label.text() == t("multi.output"):
             extra.append((widget, item.alignment(), widget.isHidden()))
             continue
         title = widget.title_label.text()
@@ -138,8 +138,9 @@ def compact_page(page, ctrl, key):
         widget.deleteLater()
 
     for widget, alignment, hidden in extra:
-        page.column.addWidget(widget, 0, alignment)
-        widget.setVisible(not hidden)
+        if not isinstance(widget, Section):
+            page.column.addWidget(widget, 0, alignment)
+            widget.setVisible(not hidden)
 
     primary = Section(t("compact.primary"))
     for label in wanted:
@@ -151,6 +152,10 @@ def compact_page(page, ctrl, key):
                 row.setHint("")
             primary.add(row)
     page.column.addWidget(primary)
+    for widget, alignment, hidden in extra:
+        if isinstance(widget, Section):
+            page.column.addWidget(widget, 0, alignment)
+            widget.setVisible(not hidden)
 
     for title_key, icon, summary_keys in GROUPS[key]:
         title = t(title_key)
