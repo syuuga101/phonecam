@@ -10,6 +10,7 @@ import os
 import plistlib
 import socket
 import struct
+import subprocess
 
 USBMUX_ADDR = ("127.0.0.1", 27015)
 PHONE_PORT = 5555
@@ -23,6 +24,8 @@ DONE = "done"        # ✓
 WAIT = "wait"        # まだ (自動で更新される)
 MANUAL = "manual"    # 自動では確認できない (利用者が目で見て進める)
 UNKNOWN = "unknown"  # 確認に失敗
+ISSUE = "issue"      # 要対応 (⚠ オレンジ表示)
+ALTSERVER_IMAGE = "AltServer.exe"
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +171,33 @@ def probe_phonecam(snap, addr=USBMUX_ADDR, port=PHONE_PORT, timeout=2.0, connect
             pass
 
 
+def altserver_running(runner=None):
+    """AltServer.exe のプロセスが動いているか。psutil があればそれ、なければ tasklist。例外は投げない。"""
+    if runner is None:
+        try:
+            import psutil  # type: ignore
+            for p in psutil.process_iter(["name"]):
+                if (p.info.get("name") or "").lower() == ALTSERVER_IMAGE.lower():
+                    return True
+            return False
+        except ImportError:
+            pass
+        except Exception:
+            pass
+    try:
+        if runner is not None:
+            out = runner(["tasklist", "/FI", "IMAGENAME eq " + ALTSERVER_IMAGE, "/FO", "CSV", "/NH"])
+        else:
+            kw = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "timeout": 8}
+            if os.name == "nt":
+                kw["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+            r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq " + ALTSERVER_IMAGE, "/FO", "CSV", "/NH"], **kw)
+            out = (r.stdout or b"").decode("mbcs" if os.name == "nt" else "utf-8", "replace")
+        return ('"%s"' % ALTSERVER_IMAGE).lower() in (out or "").lower()
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # 手順の定義と状態判定
 # ---------------------------------------------------------------------------
@@ -183,8 +213,7 @@ IPHONE_STEPS = [
                "7日ごとの自動更新に使います。更新を手動で行うなら省略できます。"]},
     {"id": "altstore", "title": "AltStoreをiPhoneに入れる",
      "lines": ["AltServerを起動し、タスクトレイのAltServerのアイコン → Install AltStore → このiPhone を選びます。",
-               "Apple IDとパスワードを入力します。サブのApple IDでも大丈夫です。",
-               "AltServerは「PCごと」の仕組みです。別のPCでAltStoreを更新するときは、そのPCでも下の条件がそろっている必要があります。"]},
+               "Apple IDとパスワードを入力します。サブのApple IDでも大丈夫です。"]},
     {"id": "settings", "title": "iPhone側の設定",
      "lines": ["設定 > プライバシーとセキュリティ > デベロッパモード をオンにして、iPhoneを再起動します。",
                "設定 > 一般 > VPNとデバイス管理 で自分のApple IDを開き、「信頼」を押します。"]},
@@ -201,8 +230,7 @@ ALTSTORE_REQUIREMENTS = [
     "そのPCにiPhoneをUSBでつないで、「このコンピュータを信頼」を一度押してある",
     "iTunesで「Wi-Fi経由でこのiPhoneと同期」がオンになっている",
     "AltServerが起動している（タスクトレイにアイコンがある）",
-    "iPhoneと同じネットワークにいて、VPN（Tailscaleなど）がオフ。Windowsのネットワークの種類が「プライベート」で、"
-    "ファイアウォールがAltServerとBonjourを許可している",
+    "同じネットワークにいて、VPNはオフ。Windowsのネットワークは「プライベート」",
 ]
 ALTSTORE_NEW_PC_NOTE = ("新しいPCで更新できないときは、そのPCで AltServer → Install AltStore を一度実行してください。"
                         "そのPCとiPhoneのペアリングがやり直され、入れてあるアプリはそのまま残ります。")
@@ -228,7 +256,7 @@ def step_status(step_id, snap, ctx=None):
     snap = snap or {}
     if step_id == "usb":
         if not snap.get("service"):
-            return WAIT, "Apple USBドライバが見つかりません"
+            return ISSUE, "Apple USBドライバが見つかりません"
         if snap.get("usb"):
             return DONE, "iPhoneが見つかりました"
         return WAIT, "iPhoneを待っています"
@@ -241,13 +269,18 @@ def step_status(step_id, snap, ctx=None):
         if t is False:
             return WAIT, "iPhoneのロックを解除して「信頼」を押してください"
         return UNKNOWN, "自動では確認できません"
-    if step_id == "itunes":
-        return MANUAL, "ご自身で確認してください"
+    confirmed = ctx.get("confirmed")  # 利用者が「済んだ」を押した手順
     if step_id == "altstore":
+        if ctx.get("altserver_running"):
+            return DONE, "AltServerは起動しています"
+        if confirmed:
+            return DONE, "確認済みです"
         if not ctx.get("altserver"):
-            return WAIT, "AltServerが未導入です（前の画面でインストールできます）"
-        return MANUAL, "ご自身で確認してください"
-    if step_id in ("settings", "phonecam"):
+            return ISSUE, "AltServerが未導入です（前の画面でインストールできます）"
+        return ISSUE, "AltServerを起動してください"
+    if step_id in ("itunes", "settings", "phonecam"):
+        if confirmed:
+            return DONE, "確認済みです"
         return MANUAL, "ご自身で確認してください"
     if step_id == "test":
         if ctx.get("link") or ctx.get("app"):

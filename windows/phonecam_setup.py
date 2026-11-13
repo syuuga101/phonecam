@@ -58,6 +58,14 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 _JA = {
+ "setup.wizard.step_confirm": "済んだ",
+ "setup.wizard.fold_requirements": "別のPCで更新するときの条件",
+ "setup.wizard.alt_running": "AltServerは起動しています",
+ "setup.wizard.alt_not_running": "AltServerを起動してください",
+ "setup.wizard.alt_missing": "AltServerが未導入です（前の画面でインストールできます）",
+ "setup.wizard.confirmed_done": "確認済みです",
+ "setup.wizard.manual_check": "ご自身で確認してください。済んだら右の「済んだ」にチェック",
+ "setup.wizard.done_hint": "完了済み。次へ進めます",
     "setup.wizard.list_sep": "、",
     "setup.wizard.sentence_fmt": "%s。",
     "setup.wizard.components_1": "PhoneCamカメラ",
@@ -3025,13 +3033,64 @@ def find_itunes():
 
 
 def text_section(parent, title, lines, container, numbered=False, intro=""):
-    """見出し + 箇条書き (または番号つき) の文章ブロック。"""
-    tk.Label(parent, text=title, bg=BG, fg=FG, font=(FONT, 11, "bold"), anchor="w").pack(anchor="w", pady=(px(14), 0))
+    """見出し + 箇条書き (または番号つき) の文章ブロック。title が空なら見出しなし。
+    番号 (記号) と本文は横並びにし、折り返すのは本文だけ。"""
+    if title:
+        tk.Label(parent, text=title, bg=BG, fg=FG, font=(FONT, 11, "bold"), anchor="w").pack(anchor="w", pady=(px(14), 0))
     if intro:
         wrapped_label(parent, intro, container, font=(FONT, 9)).pack(fill="x", pady=(px(2), 0))
     for n, line in enumerate(lines, 1):
-        mark = ("%d.  " % n) if numbered else t("setup.wizard.detect_itunes_1")
-        wrapped_label(parent, mark + line, container, fg=FG, font=(FONT, 9)).pack(fill="x", pady=(px(3), 0))
+        mark = ("%d." % n) if numbered else t("setup.wizard.detect_itunes_1").strip()
+        row = tk.Frame(parent, bg=BG)
+        row.pack(fill="x", pady=(px(3), 0))
+        mk = tk.Label(row, text=mark, bg=BG, fg=FG, font=(FONT, 9), anchor="ne", justify="right", width=3 if numbered else 2)
+        mk.pack(side="left", anchor="n")
+        lbl = wrapped_label(row, line, row, reserve=lambda m=mk: m.winfo_reqwidth() + px(8), fg=FG, font=(FONT, 9))
+        lbl.pack(side="left", fill="x", expand=True)
+
+
+def collapsible(parent, title, build, on_toggle=None):
+    """「▸ 見出し」をクリックで開閉する折りたたみ。build(frame) は最初に開いたときだけ呼ぶ。"""
+    box = tk.Frame(parent, bg=BG)
+    box.pack(fill="x", pady=(px(8), 0))
+    inner = tk.Frame(box, bg=BG)
+    st = {"open": False, "built": False}
+    btn = tk.Button(box, text="▸ " + title, bg=BG, fg=SUB, activebackground=BG, activeforeground=FG, relief="flat", bd=0,
+                    cursor="hand2", font=(FONT, 10), padx=px(2), pady=px(4), anchor="w")
+
+    def toggle():
+        st["open"] = not st["open"]
+        if st["open"]:
+            if not st["built"]:
+                st["built"] = True
+                build(inner)
+            inner.pack(fill="x", padx=(px(14), 0))
+        else:
+            inner.pack_forget()
+        btn.config(text=("▾ " if st["open"] else "▸ ") + title)
+        if on_toggle:
+            try:
+                on_toggle()
+            except Exception:
+                pass
+
+    btn.config(command=toggle)
+    btn.pack(anchor="w")
+    return box
+
+
+def work_area(widget):
+    """(left, top, right, bottom): タスクバーを除いた作業領域。Windows 以外・失敗時は画面全体。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        rc = wintypes.RECT()
+        if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rc), 0):  # SPI_GETWORKAREA
+            if rc.right > rc.left and rc.bottom > rc.top:
+                return rc.left, rc.top, rc.right, rc.bottom
+    except Exception:
+        pass
+    return 0, 0, widget.winfo_screenwidth(), widget.winfo_screenheight()
 
 
 DIAG_ICONS = {DIAG_OK: ("✓", GOOD), DIAG_NG: ("✗", BAD), DIAG_WARN: ("!", WARN)}
@@ -3209,6 +3268,7 @@ def _open_folder_select(path):
 # 画面ページの番号: 0 ようこそ / 1 確認 / 2 インストール / 3〜9 iPhone の手順 (7つ)
 PAGE_WELCOME, PAGE_CHECK, PAGE_INSTALL, PAGE_IPHONE = 0, 1, 2, 3
 POLL_MS = 2000
+MANUAL_STEPS = ("itunes", "altstore", "settings", "phonecam")  # 自動では確認しきれず、「済んだ」を押せる手順
 
 
 class SetupWizard:
@@ -3236,7 +3296,8 @@ class SetupWizard:
         self.top.title(t("setup.wizard.setupwizard___init___1"))
         self.top.configure(bg=BG)
         try:
-            self.top.minsize(px(520), px(440))
+            wl, wt, wr, wb = work_area(self.top)
+            self.top.minsize(min(px(520), wr - wl - px(40)), min(px(440), wb - wt - px(80)))
             self.top.resizable(True, True)
             self.top.transient(root)
             self.top.protocol("WM_DELETE_WINDOW", self._close)
@@ -3267,10 +3328,18 @@ class SetupWizard:
         self._visited = set()
         self._first = False
         self._probing = False
+        self._alt_probe = False
         self._probe_result = None
         self._next_probe = 0.0
         self._pump_job = None
         self._dl_state = None
+        self.alt_running = False
+        self._confirmed = set()
+        self._hop_job = None
+        self._just_auto = False
+        self.chip_icon = None
+        self.confirm_cb = None
+        self.alt_btn = None
         self.show(PAGE_IPHONE if start == "iphone" else (PAGE_INSTALL if start == "guided" else PAGE_WELCOME))
         try:
             self.top.grab_set()
@@ -3293,6 +3362,15 @@ class SetupWizard:
         self.note_label = None
         self.audio_label = None
         self.chip = None
+        self.chip_icon = None
+        self.confirm_cb = None
+        self.alt_btn = None
+        if self._hop_job is not None:
+            try:
+                self.top.after_cancel(self._hop_job)
+            except Exception:
+                pass
+            self._hop_job = None
         self.dl_label = None
         self.dl_btn = None
         self.guided_holder = None
@@ -3320,31 +3398,32 @@ class SetupWizard:
             self._start_pump()
 
     def _fit_window(self):
-        """中身の大きさに合わせてウィンドウを大きくする (画面の85%まで。小さくはしない)。"""
+        """中身の大きさに合わせてウィンドウを大きくする。作業領域 (タスクバーを除く画面) からははみ出させない。
+        中身が収まらないときは本文のスクロール領域で吸収し、下のボタン行は常に見える。"""
         try:
             self.top.update_idletasks()
+            wl, wt, wr, wb = work_area(self.top)
+            aw, ah = wr - wl, wb - wt
+            margin = px(48)  # タイトルバーと枠の分
             pad_w = 2 * px(28) + px(24)
             need_w = max(self.body.winfo_reqwidth() + pad_w, self.footer_wrap.winfo_reqwidth(), px(560))
             need_h = (self.body.winfo_reqheight() + px(24) + px(10) + self.footer_wrap.winfo_reqheight())
-            sw, sh = self.top.winfo_screenwidth(), self.top.winfo_screenheight()
             cur_w, cur_h = self.top.winfo_width(), self.top.winfo_height()
             if not self._placed:
                 cur_w = cur_h = 1
-            w = min(max(cur_w, need_w), int(sw * 0.85))
-            h = min(max(cur_h, need_h), int(sh * 0.85))
+            max_w = max(px(300), min(int(aw * 0.92), aw - px(24)))
+            max_h = max(px(300), ah - margin - px(8))
+            w = min(max(cur_w, need_w), max_w)
+            h = min(max(cur_h, need_h), max_h)
             if not self._placed:
-                try:
-                    rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
-                    rw, rh = self.root.winfo_width(), self.root.winfo_height()
-                except Exception:
-                    rx = ry = 0
-                    rw, rh = sw, sh
-                x = max(0, min(sw - w, rx + (rw - w) // 2))
-                y = max(0, min(sh - h - px(40), ry + max(0, (rh - h) // 3)))
+                x = wl + (aw - w) // 2
+                y = wt + max(0, (ah - h - margin) // 2)
                 self.top.geometry("%dx%d+%d+%d" % (w, h, x, y))
                 self._placed = True
             elif (w, h) != (cur_w, cur_h):
-                self.top.geometry("%dx%d" % (w, h))
+                x = max(wl, min(self.top.winfo_x(), wr - w))
+                y = max(wt, min(self.top.winfo_y(), wb - h - margin))
+                self.top.geometry("%dx%d+%d+%d" % (w, h, x, y))
         except Exception:
             pass
 
@@ -3719,7 +3798,8 @@ class SetupWizard:
                 link = bool(fn())
             except Exception:
                 link = False
-        return {"altserver": alt, "app": self.app_ok, "link": link}
+        return {"altserver": alt, "app": self.app_ok, "link": link, "altserver_running": self.alt_running,
+                "confirmed": getattr(self, "_step_id", "") in self._confirmed}
 
     def _page_step(self, i):
         steps = iphone.IPHONE_STEPS
@@ -3736,9 +3816,19 @@ class SetupWizard:
         tk.Label(self.body, text=step["title"], bg=BG, fg=FG, font=(FONT, 18, "bold"), anchor="w").pack(anchor="w")
         for line in step["lines"]:
             wrapped_label(self.body, line, self.body, font=(FONT, 10)).pack(fill="x", pady=(px(6), 0))
-        self.chip = tk.Label(self.body, text=t("setup.wizard.setuppanel_render_1"), bg=PANEL, fg=SUB, font=(FONT, 10), padx=px(12),
-                             pady=px(5), anchor="w")
-        self.chip.pack(anchor="w", pady=(px(16), px(12)))
+        row = tk.Frame(self.body, bg=BG)
+        row.pack(fill="x", pady=(px(16), px(12)))
+        self.chip_icon = tk.Label(row, text="○", bg=BG, fg=SUB, font=(FONT, 12, "bold"))
+        self.chip_icon.pack(side="left")
+        self.chip = tk.Label(row, text=t("setup.wizard.setuppanel_render_1"), bg=BG, fg=SUB, font=(FONT, 10), anchor="w",
+                             justify="left")
+        self.chip.pack(side="left", padx=(px(8), 0))
+        self.confirm_var = tk.BooleanVar(value=sid in self._confirmed)
+        self.confirm_cb = None
+        if sid in MANUAL_STEPS:
+            self.confirm_cb = _checkbutton(row, text=t("setup.wizard.step_confirm"), variable=self.confirm_var,
+                                           command=self._confirm_changed)
+            self.confirm_cb.pack(side="right")
         extra = getattr(self, "_extra_" + sid, None)
         if extra:
             extra()
@@ -3748,13 +3838,26 @@ class SetupWizard:
         if last:
             self.next_btn = make_button(self.footer, t("setup.wizard.setupengine__run_elevated_7"), self._finish, primary=True, state="disabled")
         else:
-            self.next_btn = make_button(self.footer, t("setup.wizard.setupwizard__page_welcome_3"), lambda: self.show(self.page + 1), primary=True)
+            self.next_btn = make_button(self.footer, t("setup.wizard.setupwizard__page_welcome_3"), self._next, primary=True)
         self.next_btn.pack(side="right")
         if not (i == 0 and self.mode == "iphone"):
             make_button(self.footer, t("setup.wizard.setupwizard__page_step_3"), self._back).pack(side="right", padx=(0, px(10)))
         self._render_chip()
 
+    def _next(self):
+        self._just_auto = False
+        self.show(self.page + 1)
+
+    def _confirm_changed(self):
+        sid = getattr(self, "_step_id", "")
+        if self.confirm_var.get():
+            self._confirmed.add(sid)
+        else:
+            self._confirmed.discard(sid)
+        self._render_chip()
+
     def _back(self):
+        self._just_auto = False
         if self.page == PAGE_IPHONE:
             self.controller.recheck()
             self.show(PAGE_CHECK)
@@ -3764,12 +3867,15 @@ class SetupWizard:
     def _btn_row(self, items):
         """ボタンを2つずつ並べる (幅が足りなくても切れない)。items = [(text, command, enabled)]"""
         row = None
+        out = []
         for n, (text, cmd, enabled) in enumerate(items):
             if n % 2 == 0:
                 row = tk.Frame(self.body, bg=BG)
                 row.pack(anchor="w", pady=(0, px(8)))
             b = make_button(row, text, cmd, state="normal" if enabled else "disabled")
             b.pack(side="left", padx=(0, px(10)))
+            out.append(b)
+        return out
 
     def _extra_itunes(self):
         path = find_itunes()
@@ -3780,16 +3886,23 @@ class SetupWizard:
 
     def _extra_altstore(self):
         path = find_altserver()
-        self._btn_row([(t("setup.wizard.setupwizard__extra_altstore_1"), lambda: self.launch(path), bool(path)),
-                       (t("setup.wizard.setupwizard__extra_altstore_2"), lambda: self.open_url(FAQ_URL), True),
-                       (t("setup.wizard.diagnosticsdialog___init___1"), lambda: open_diagnostics(self.top, self.open_url), True)])
+        btns = self._btn_row([(t("setup.wizard.setupwizard__extra_altstore_1"), lambda: self.launch(path), bool(path)),
+                              (t("setup.wizard.setupwizard__extra_altstore_2"), lambda: self.open_url(FAQ_URL), True),
+                              (t("setup.wizard.diagnosticsdialog___init___1"), lambda: open_diagnostics(self.top, self.open_url), True)])
+        self.alt_btn = btns[0]
+        self.alt_btn_next = btns[1]
         wrapped_label(self.body, t("setup.wizard.setupwizard__extra_altstore_3"),
                       self.body, font=(FONT, 9)).pack(fill="x")
         if iphone is not None:
-            text_section(self.body, t("setup.wizard.diagnosticsdialog_render_1"), iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
-                         intro=t("setup.wizard.diagnosticsdialog_render_2"))
-            wrapped_label(self.body, iphone.ALTSTORE_NEW_PC_NOTE, self.body, font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
-            text_section(self.body, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
+            def req(f):
+                text_section(f, "", iphone.ALTSTORE_REQUIREMENTS, self.body, numbered=True,
+                             intro=t("setup.wizard.diagnosticsdialog_render_2"))
+                wrapped_label(f, iphone.ALTSTORE_NEW_PC_NOTE, self.body, reserve=px(20), font=(FONT, 9)).pack(fill="x", pady=(px(6), 0))
+
+            def err(f):
+                text_section(f, "", iphone.ALT_2003_CHECKLIST, self.body, numbered=True)
+            collapsible(self.body, t("setup.wizard.fold_requirements"), req, self._fit_window)
+            collapsible(self.body, iphone.ALT_2003_TITLE, err, self._fit_window)
 
     def _extra_phonecam(self):
         repo = APP_REPO
@@ -3894,12 +4007,14 @@ class SetupWizard:
                 snap, app = self._probe_result
                 self._probe_result = None
                 self.snap, self.app_ok = snap, app
+                self.alt_running = bool(self._alt_probe)
                 self._next_probe = time.monotonic() + POLL_MS / 1000.0
                 if self._apply():
                     return
             if not self._probing and time.monotonic() >= self._next_probe:
                 self._probing = True
                 want_app = getattr(self, "_step_id", "") == "test"
+                want_alt = getattr(self, "_step_id", "") == "altstore"
                 linked = bool(self._ctx().get("link"))
 
                 def work():
@@ -3908,6 +4023,8 @@ class SetupWizard:
                         app = False
                         if want_app and not linked:
                             app = iphone.probe_phonecam(snap)
+                        if want_alt:
+                            self._alt_probe = iphone.altserver_running()
                         self._probe_result = (snap, app)
                     except Exception:
                         self._probe_result = ({}, False)
@@ -3919,29 +4036,88 @@ class SetupWizard:
             pass
         self._pump_job = self.top.after(250, self._pump)
 
+    def _status_text(self, sid, state, text, ctx):
+        """翻訳できる状態文 (自動検出の追加分)。それ以外は iphone モジュールの文言をそのまま使う。"""
+        if sid == "altstore":
+            if ctx.get("altserver_running"):
+                return t("setup.wizard.alt_running")
+            if state == iphone.ISSUE:
+                return t("setup.wizard.alt_not_running") if ctx.get("altserver") else t("setup.wizard.alt_missing")
+        if sid in MANUAL_STEPS:
+            if state == iphone.DONE:
+                return t("setup.wizard.confirmed_done")
+            if state == iphone.MANUAL:
+                return t("setup.wizard.manual_check")
+        return text
+
     def _render_chip(self):
         if self.chip is None:
             return
-        state, text = iphone.step_status(self._step_id, self.snap, self._ctx())
+        ctx = self._ctx()
+        state, text = iphone.step_status(self._step_id, self.snap, ctx)
+        text = self._status_text(self._step_id, state, text, ctx)
         if state == iphone.DONE:
-            self.chip.config(text="✓ " + text, fg=GOOD)
-        elif state == iphone.WAIT:
-            self.chip.config(text="● " + text, fg=SUB)
-        elif state == iphone.MANUAL:
-            self.chip.config(text="○ " + text, fg=SUB)
+            icon, color = "✓", GOOD
+            if self._step_id != "test":
+                text = "%s — %s" % (text, t("setup.wizard.done_hint"))
+        elif state in (iphone.ISSUE, iphone.UNKNOWN):
+            icon, color = "⚠", WARN
         else:
-            self.chip.config(text="! " + text, fg=WARN)
-        if self._step_id == "test" and self.next_btn is not None:
-            self.next_btn.config(state="normal" if state == iphone.DONE else "disabled")
+            icon, color = "○", SUB
+        self.chip.config(text=text, fg=FG if state == iphone.DONE else SUB)
+        if self.chip_icon is not None:
+            self.chip_icon.config(text=icon, fg=color)
+        detected = self._step_id == "altstore" and bool(ctx.get("altserver_running"))
+        if self.confirm_cb is not None:
+            try:
+                if detected:
+                    self.confirm_cb.pack_forget()
+                elif not self.confirm_cb.winfo_manager():
+                    self.confirm_cb.pack(side="right")
+            except Exception:
+                pass
+        if self.alt_btn is not None:
+            try:
+                if ctx.get("altserver_running"):
+                    self.alt_btn.pack_forget()
+                elif not self.alt_btn.winfo_manager():
+                    self.alt_btn.pack(side="left", padx=(0, px(10)), before=self.alt_btn_next)
+            except Exception:
+                pass
+        if self.next_btn is not None:
+            if self._step_id == "test":
+                self.next_btn.config(state="normal" if state == iphone.DONE else "disabled")
+            elif self.page < PAGE_IPHONE + len(iphone.IPHONE_STEPS) - 1:
+                self._style_next(state == iphone.DONE)
         return state
 
+    def _style_next(self, ready):
+        """検出できて ✓ のときだけ「次へ」を強調する。"""
+        try:
+            if ready:
+                self.next_btn.config(bg=ACCENT, fg=ACCENT_FG, activebackground=ACCENT_HOVER, activeforeground=ACCENT_FG,
+                                     font=(FONT, 10, "bold"))
+            else:
+                self.next_btn.config(bg=PANEL, fg=FG, activebackground=PANEL_HOVER, activeforeground=FG, font=(FONT, 10))
+        except Exception:
+            pass
+
     def _apply(self):
-        """新しい検出結果を画面へ。自動で次へ進んだら True。"""
+        """新しい検出結果を画面へ。自動で次へ進んだら True。
+        進むのは、初めて開いた手順が検出済みのときだけ。1回進んだら次の手順では自動では進まない (何段も飛ばさない)。"""
         state = self._render_chip()
-        if self._first and iphone.should_auto_advance(self._step_id, state, set()):
-            self.show(self.page + 1)
-            return True
+        if (self._first and not self._just_auto and self._hop_job is None
+                and iphone.should_auto_advance(self._step_id, state, set())):
+            page = self.page
+            self._hop_job = self.top.after(900, lambda: self._auto_hop(page))
         return False
+
+    def _auto_hop(self, page):
+        self._hop_job = None
+        if self.finished or self.page != page:
+            return
+        self.show(page + 1)
+        self._just_auto = True
 
     # -- 終了 -------------------------------------------------------------
     def _finish(self):
