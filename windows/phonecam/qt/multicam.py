@@ -52,6 +52,7 @@ from phonecam.qt.widgets import (
     border_color,
     button,
     card_color,
+    error_color,
     is_dark,
     ok_color,
     ref_palette,
@@ -968,7 +969,8 @@ class AddCameraWizard(QDialog):
         row.setSpacing(10)
         from phonecam.qt.wireless import Spinner
         self.prep_spinner = Spinner()
-        self.prep_icon = IconLabel("check", 18)
+        self.prep_icon = QLabel()
+        self.prep_icon.setFixedSize(18, 18)
         self.prep_text = QLabel("")
         font = self.prep_text.font()
         font.setWeight(QFont.Weight.DemiBold)
@@ -1110,7 +1112,10 @@ class AddCameraWizard(QDialog):
             self.prep_spinner.stop()
         self.prep_icon.setVisible(kind in ("ok", "error"))
         if kind in ("ok", "error"):
-            self.prep_icon.set_icon("check" if kind == "ok" else "warning")
+            pal = ref_palette(self)
+            self.prep_icon.setPixmap(icons.pixmap("check" if kind == "ok" else "warning", 18,
+                                                  ok_color(pal) if kind == "ok" else error_color(pal),
+                                                  self.devicePixelRatioF()))
         self._prepared = kind in ("ok", "skip")
         self._update_buttons()
 

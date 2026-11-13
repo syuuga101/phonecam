@@ -199,6 +199,9 @@ def child(scale, out):
     camera2 = win._add_camera()
     win.cameras.assign(camera2, known2, "172.20.10.1")
     camera2.poll()
+    camera2.frozen = True                  # exe 版の見た目 (仮想カメラの登録状態を出す) で撮る
+    camera2.camera_registration = "ok"
+    camera2.camera_registration_changed.emit()
     _settle(app)
     win.select(cams_row)
     win.select_camera(0)
@@ -227,6 +230,14 @@ def child(scale, out):
                 name = "multi_cam2_%s" % key if key != "audio" else "multi_audio"
             win.grab().save(os.path.join(out, "%s_%s_x%s.png" % (name, theme, scale)))
             if key == "connection":
+                # 仮想カメラが未登録のとき (「準備する」ボタン)
+                camera2.camera_registration = "missing"
+                camera2.camera_registration_changed.emit()
+                _settle(app, 200)
+                win.grab().save(os.path.join(out, "multi_cam2_connection_missing_%s_x%s.png" % (theme, scale)))
+                camera2.camera_registration = "ok"
+                camera2.camera_registration_changed.emit()
+                _settle(app, 200)
                 # 2 台目の接続ページ: 一番下の「このカメラ」折りたたみも開いて撮る
                 from phonecam.qt.widgets import Expander as _Expander
                 for expander in win.current_page().findChildren(_Expander):

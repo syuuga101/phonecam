@@ -224,6 +224,7 @@ class MainWindow(QMainWindow):
         self.page_header = QWidget()
         header_outer = QHBoxLayout(self.page_header)
         header_outer.setContentsMargins(0, 0, 0, 0)
+        self._header_outer = header_outer
         header_col = QWidget()
         header_col.setMaximumWidth(MAX_CONTENT_W + 2 * PAGE_PAD_X)
         header_col.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -231,7 +232,7 @@ class MainWindow(QMainWindow):
         header_outer.addWidget(header_col, 1000)
         header_outer.addStretch(1)
         header_lay = QHBoxLayout(header_col)
-        header_lay.setContentsMargins(PAGE_PAD_X, 16, PAGE_PAD_X, 0)
+        header_lay.setContentsMargins(PAGE_PAD_X, 16, PAGE_PAD_X, 8)
         header_lay.setSpacing(12)
         self.page_title = QLabel()
         f = self.page_title.font()
@@ -323,6 +324,13 @@ class MainWindow(QMainWindow):
                                       phone=self.cameras.phone_name(camera)))
         self.camera_sub.setVisible(multi)
 
+    def _sync_scrollbar(self, *_):
+        """ページの縦スクロールバーが出ているぶん、見出しの右を空けて、ページの内容列と左右をそろえる。"""
+        page = self.stack.currentWidget()
+        bar = page.verticalScrollBar() if hasattr(page, "verticalScrollBar") else None
+        width = bar.sizeHint().width() if bar is not None and bar.maximum() > bar.minimum() else 0
+        self._header_outer.setContentsMargins(0, 0, width, 0)
+
     def _sync_header(self):
         row = self.nav.currentRow()
         key = NAV_ITEMS[row][0] if row >= 0 else "connection"
@@ -330,6 +338,7 @@ class MainWindow(QMainWindow):
         self.page_header.setVisible(multi)
         self.page_title.setText(t("nav." + key))
         self.segment.setVisible(multi and key in PER_CAMERA)
+        self._sync_scrollbar()
 
     def _cameras_changed(self):
         cams = self.cameras.cameras
@@ -402,6 +411,9 @@ class MainWindow(QMainWindow):
             sec.add_padded(Hint(t("shell.page_error", name=t("nav." + key), err=e)))
             page.finish()
         self.pages.append(page)
+        bar = page.verticalScrollBar() if hasattr(page, "verticalScrollBar") else None
+        if bar is not None:
+            bar.rangeChanged.connect(self._sync_scrollbar)
         return page
 
     def select(self, index):

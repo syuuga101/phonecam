@@ -385,6 +385,9 @@ class WirelessOptions:
         section.add(self._build_trouble())
         section.add(self._build_manual())
         section.add(self._build_method())
+        group = getattr(ctrl, "camera_group", None)
+        if group is not None:
+            group.changed.connect(self._render)   # 「変更…」などで割り当てが変わったら、行の「カメラ N で使用中」を更新する
         self._render()
 
     # -- 部品 -------------------------------------------------------------------
