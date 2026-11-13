@@ -1,86 +1,356 @@
 {
-  "sourceLanguage": "ja",
-  "strings": {
-    "NSCameraUsageDescription": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "配信用カメラとして使用します"
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "NSCameraUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used as the camera for streaming."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Used as the camera for streaming."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "配信用カメラとして使用します"
           }
         }
       }
     },
-    "NSLocalNetworkUsageDescription": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wi-Fi経由でPCと接続するために使用します"
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to connect to your PC over Wi-Fi."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Used to connect to your PC over Wi-Fi."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCと接続するために使用します"
           }
         }
       }
     },
-    "NSMicrophoneUsageDescription": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+    "NSMicrophoneUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to send the iPhone's microphone audio to your PC and to record audio."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Used to send the iPhone's microphone audio to your PC and to record audio."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します"
           }
         }
       }
     },
-    "NSPhotoLibraryAddUsageDescription": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "録画した動画を写真アプリに保存するために使用します"
+    "NSPhotoLibraryAddUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to save recorded videos to Photos."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Used to save recorded videos to Photos."
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画した動画を写真アプリに保存するために使用します"
           }
         }
       }
     },
-    "CFBundleDisplayName": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PhoneCam"
+    "CFBundleDisplayName" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PhoneCam"
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PhoneCam"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PhoneCam"
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }
