@@ -287,7 +287,7 @@ class ConnectionPage(Page):
         f.setPointSizeF(14.0)
         f.setWeight(QFont.Weight.DemiBold)
         self.state_label.setFont(f)
-        self.state_label.setWordWrap(True)
+        self.state_label.setWordWrap(False)
         top.addWidget(self.state_label, 0)
         self.check = QLabel()
         self.check.setFixedSize(18, 18)
