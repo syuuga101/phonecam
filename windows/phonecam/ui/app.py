@@ -21,7 +21,7 @@ from phonecam.core.settings import (
     save_settings,
     settings_has_key,
 )
-from phonecam.core.softcam_reg import helper_main, helper_register, registration_status
+from phonecam.core.softcam_reg import bind_setup_host, helper_main, helper_register, registration_status
 from phonecam.core.softcam_shmem import ConsumerWatcher, SoftcamMemoryReader
 from phonecam.core.state import SharedState
 from phonecam.core.stats import ThermalLog
@@ -712,17 +712,8 @@ except ImportError:
 
 
 def _bind_setup():
-    """phonecam_setup へ、本体の関数を渡す (呼び出し時に本体側の最新の定義を参照する)。"""
-    if phonecam_setup is None:
-        return
-    phonecam_setup.bind(
-        is_frozen=lambda: _is_frozen(),
-        registration_status=lambda: registration_status(),
-        register_camera=lambda: helper_register(),
-        run_elevated=lambda params, timeout_ms=ELEVATED_TIMEOUT_MS: run_elevated(params, timeout_ms),
-        script_path=lambda: os.path.join(WINDOWS_DIR, "phonecam_receiver.py"),
-        link_connected=lambda: _link_connected(),
-    )
+    """phonecam_setup へ、本体の関数を渡す (Qt 入口・管理者ヘルパと同じ bind_setup_host を使う)。"""
+    bind_setup_host(link_connected=lambda: _link_connected())
 
 
 _APP_REF = []  # 起動中の App (セットアップ画面から接続状態を参照するため)

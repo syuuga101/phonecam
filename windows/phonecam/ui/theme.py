@@ -216,10 +216,12 @@ def _apply_fonts():
 _ind_photos = []   # PhotoImage を GC させない
 _ind_serial = [0]
 _IND = {
+    # Windows 11 標準: オン=アクセント色の角丸塗り+チェック (ライトは白、ダークは黒)、オフ=透明背景+グレー枠。
+    # 無効(disabled)のオンはアクセントを背景へ寄せた色 (必須項目のロック表示でも「オン」と読める)。
     "light": {"line": "#5e5e5e", "hover": "#efefef", "accent": "#005fb8", "accent_h": "#1a6fc0", "mark": "#ffffff",
-              "dis_line": "#bdbdbd", "dis_fill": "#d0d0d0", "knob_on": "#ffffff"},
-    "dark": {"line": "#a0a0a0", "hover": "#3a3a3a", "accent": "#57c8ff", "accent_h": "#78d3ff", "mark": "#1c1c1c",
-             "dis_line": "#5a5a5a", "dis_fill": "#4a4a4a", "knob_on": "#1c1c1c"},
+              "dis_line": "#bdbdbd", "dis_fill": "#7fa9d3", "dis_mark": "#f4f8fc", "knob_on": "#ffffff"},
+    "dark": {"line": "#a0a0a0", "hover": "#3a3a3a", "accent": "#4cc2ff", "accent_h": "#6dd0ff", "mark": "#000000",
+             "dis_line": "#5a5a5a", "dis_fill": "#2f6783", "dis_mark": "#a9cfe3", "knob_on": "#1c1c1c"},
 }
 
 
@@ -239,7 +241,7 @@ def _draw_indicator(kind, w, h, gap, state, pal):
     lw = max(1, int(round(h / 12.0 * ss)))
     line = _hex(pal["dis_line"] if dis else pal["line"])
     fill_on = _hex(pal["dis_fill"] if dis else (pal["accent_h"] if hov else pal["accent"]))
-    mark = _hex(pal["mark"])
+    mark = _hex(pal.get("dis_mark", pal["mark"]) if dis else pal["mark"])
     bw, bh = w * ss, h * ss
     if kind == "check":
         r = bh * 0.22
@@ -267,7 +269,7 @@ def _draw_indicator(kind, w, h, gap, state, pal):
         if on:
             d.rounded_rectangle([0, 0, bw - 1, bh - 1], radius=rr, fill=fill_on)
             kc = bw - rr
-            kcol = _hex(pal["dis_line"] if dis else pal["knob_on"]) if dis else _hex(pal["knob_on"])
+            kcol = _hex(pal.get("dis_mark", pal["knob_on"]) if dis else pal["knob_on"])
         else:
             d.rounded_rectangle([lw / 2, lw / 2, bw - 1 - lw / 2, bh - 1 - lw / 2], radius=rr, outline=line, width=lw)
             kc = rr

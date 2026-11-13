@@ -2591,10 +2591,28 @@ class SetupController:
 _FALLBACK_COLORS = {"bg": "#fafafa", "card": "#ffffff", "text": "#1c1c1c", "text2": "#616161",
                     "separator": "#e5e5e5", "accent": "#005fb8", "live": "#c42b1c", "ok": "#0f7b0f"}
 
+_CHECK_STYLE = "PCSetup.TCheckbutton"
+
+
+def _sync_check_style():
+    """チェックボックスの背景をウィザードの背景色 (BG) に固定する。
+    sv-ttk の既定の背景/状態ごとの背景 (hover 等) が BG と違うと、インジケータの周りに四角い下地が見えるため。"""
+    try:
+        st = ttk.Style()
+        st.configure(_CHECK_STYLE, background=BG, foreground=FG, focuscolor=BG)
+        states = ("active", "pressed", "disabled", "selected", "focus", "!disabled")
+        st.map(_CHECK_STYLE,
+               background=[(x, BG) for x in states],
+               foreground=[("disabled", DISABLED_FG), ("!disabled", FG)])
+    except Exception:
+        pass
+
+
 def _checkbutton(parent, **kw):
     """ttk.Checkbutton (theme.py の DPI 対応インジケータが効く)。ttk が無い環境だけ tk.Checkbutton。"""
     if ttk is not None:
-        return ttk.Checkbutton(parent, **kw)
+        _sync_check_style()
+        return ttk.Checkbutton(parent, style=_CHECK_STYLE, **kw)
     return tk.Checkbutton(parent, **kw)
 
 
@@ -2736,6 +2754,7 @@ def _recolor(widget, cmap):
 
 def _on_theme_change():
     old = _apply_palette()
+    _sync_check_style()
     cmap = {}
     for n in _COLOR_NAMES:
         if old.get(n) and old[n] != globals()[n]:

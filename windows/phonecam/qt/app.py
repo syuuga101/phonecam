@@ -109,7 +109,7 @@ def configure(app, ctrl):
 
 def main():
     if sys.argv[1:2] in (["--setup-wizard"], ["--setup-diagnose"]):
-        from phonecam.ui.app import main as setup_main
+        from phonecam.ui.app import main as setup_main  # import 時にホスト関数が bind される
         return setup_main()
     helper = helper_main(sys.argv[1:])
     if helper is not None:

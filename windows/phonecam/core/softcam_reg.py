@@ -194,6 +194,25 @@ def _error_box(text):
         pass
 
 
+def bind_setup_host(link_connected=None):
+    """phonecam_setup (ウィザード/管理者ジョブ) に本体のホスト関数を渡す。
+    Tk 版・Qt 版のどの入口から呼んでも同じ関数が bind される (管理者ヘルパ --setup も register_camera を使う)。"""
+    if phonecam_setup is None:
+        return
+    from phonecam.core.elevate import ELEVATED_TIMEOUT_MS, run_elevated
+    from phonecam.core.paths import WINDOWS_DIR
+    fns = dict(
+        is_frozen=lambda: _is_frozen(),
+        registration_status=lambda: registration_status(),
+        register_camera=lambda: helper_register(),
+        run_elevated=lambda params, timeout_ms=ELEVATED_TIMEOUT_MS: run_elevated(params, timeout_ms),
+        script_path=lambda: os.path.join(WINDOWS_DIR, "phonecam_receiver.py"),
+    )
+    if link_connected is not None:
+        fns["link_connected"] = link_connected
+    phonecam_setup.bind(**fns)
+
+
 def helper_main(argv):
     """--register / --unregister が渡されたときの処理 (GUI なし)。それ以外なら None。"""
     args = list(argv)
@@ -204,6 +223,7 @@ def helper_main(argv):
             sha = args[args.index("--sha256") + 1] if "--sha256" in args else None
             if phonecam_setup is None:
                 return 1
+            bind_setup_host()  # register_camera などのホスト関数 (Qt 入口では ui.app が読まれない)
             return phonecam_setup.run_job(job, expected_sha=sha)
         except Exception as e:
             _error_box("セットアップの実行に失敗しました。\n\n詳細: %s" % e)
