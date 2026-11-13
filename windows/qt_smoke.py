@@ -111,6 +111,18 @@ def child(scale, out):
                 expanded_bar.setValue(expanded_bar.maximum() // 2)
                 _settle(app, 150)
                 win.grab().save(os.path.join(out, base + "_expanded_scroll.png"))
+                # 小さな折りたたみ (Wi-Fi の「見つからないときは」「IP を手で入れる」) も開いて一番下を撮る
+                from phonecam.qt.wireless import Disclosure
+                discs = win.current_page().findChildren(Disclosure)
+                if discs:
+                    for d in discs:
+                        d.set_open(True)
+                    _settle(app, 200)
+                    expanded_bar.setValue(expanded_bar.maximum())
+                    _settle(app, 150)
+                    win.grab().save(os.path.join(out, base + "_expanded_bottom.png"))
+                    for d in discs:
+                        d.set_open(False)
                 for expander in expanders:
                     expander.set_expanded(False, animate=False, save=False)
             # スクロール: 低いウィンドウで中ほどまで送る
