@@ -728,7 +728,7 @@ _bind_setup()
 
 def main():
     args = sys.argv[1:]
-    setup_window = args in (["--setup-wizard"], ["--setup-diagnose"])
+    setup_window = args[:1] in (["--setup-wizard"], ["--setup-diagnose"])
     helper = None if setup_window else helper_main(args)
     if helper is not None:
         return helper
@@ -758,7 +758,9 @@ def main():
                 current["setup_done"] = True
                 save_settings(current)
 
-            dialog = phonecam_setup.SetupWizard(root, controller, on_finish=finish_setup, open_url=webbrowser_open)
+            after_update = args[args.index("--after-update") + 1] if "--after-update" in args else None
+            dialog = phonecam_setup.SetupWizard(root, controller, on_finish=finish_setup,
+                                                open_url=webbrowser_open, update_version=after_update)
         if dialog is not None:
             dialog.top.transient("")
             dialog.top.deiconify()

@@ -3,21 +3,30 @@
 
 import importlib
 import os
+import subprocess
 import sys
+import threading
+import webbrowser
 
 from PySide6.QtCore import QByteArray, QEvent, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
+    QProgressDialog,
     QStackedWidget,
     QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
+    QTextEdit,
     QWidget,
 )
 
@@ -175,6 +184,9 @@ class MainWindow(QMainWindow):
         rl.setSpacing(0)
         self.update_bar = Bar()
         self.warn_bar = Bar()
+        warning_icon = QLabel()
+        warning_icon.setPixmap(icons.pixmap("thermometer", 16, text_color(self.warn_bar)))
+        self.warn_bar._lay.insertWidget(0, warning_icon)
         rl.addWidget(self.update_bar)
         rl.addWidget(self.warn_bar)
         self.stack = QStackedWidget()
@@ -204,6 +216,7 @@ class MainWindow(QMainWindow):
         ctrl.toast.connect(self.show_toast)
         ctrl.status_changed.connect(self._status)
         ctrl.update_changed.connect(self._update_banner)
+        ctrl.update_action.connect(self._update_action)
         self._status(ctrl.status)
         self._update_banner(ctrl.update_banner)
 
@@ -285,6 +298,89 @@ class MainWindow(QMainWindow):
             self.update_bar.show()
         else:
             self.update_bar.hide()
+
+    def _update_action(self, action, release):
+        from phonecam.core.deps import phonecam_update
+        from phonecam.core.version import APP_REPO, APP_VERSION
+
+        url = release.get("html_url") or f"https://github.com/{APP_REPO}/releases/latest"
+        if action == "notes":
+            dialog = QDialog(self)
+            dialog.setWindowTitle(t("update.notes.window_title", version=release["version"]))
+            dialog.resize(520, 420)
+            layout = QVBoxLayout(dialog)
+            notes = QTextEdit()
+            notes.setReadOnly(True)
+            notes.setPlainText(phonecam_update.markdown_to_text(release.get("body", "")) or t("update.notes.empty"))
+            layout.addWidget(notes)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+            open_page = buttons.addButton(t("update.notes.open_release"), QDialogButtonBox.ButtonRole.ActionRole)
+            open_page.clicked.connect(lambda: webbrowser.open(url))
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            dialog.exec()
+            return
+        asset = release.get("asset")
+        exe = os.path.abspath(sys.executable)
+        if not self.ctrl.frozen or not asset or not phonecam_update.dir_writable(os.path.dirname(exe)):
+            webbrowser.open(url)
+            if self.ctrl.frozen:
+                self.show_toast(t("update.msg.no_asset" if not asset else "update.msg.not_writable"))
+            return
+        if self.ctrl.status.connected and QMessageBox.question(self, "PhoneCam", t("update.confirm.restart")) != QMessageBox.StandardButton.Yes:
+            return
+        if getattr(self, "_update_download", None) is not None:
+            return
+        dest = os.path.splitext(exe)[0] + ".download"
+        cancel = threading.Event()
+        progress = QProgressDialog(t("update.progress.downloading"), t("update.progress.cancel"), 0, 100, self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.canceled.connect(cancel.set)
+        self._update_download = progress
+        values = [0, 0]
+        timer = QTimer(progress, interval=150)
+
+        def show_progress():
+            done, total = values
+            progress.setRange(0, 100 if total else 0)
+            if total:
+                progress.setValue(min(100, int(done * 100 / total)))
+
+        timer.timeout.connect(show_progress)
+        timer.start()
+        progress.show()
+
+        def download():
+            def record_progress(done, total):
+                values[:] = [done, total]
+
+            phonecam_update.download_asset(asset, dest, progress=record_progress,
+                                           cancel=cancel, version=APP_VERSION)
+
+        def finished(result):
+            timer.stop()
+            progress.close()
+            self._update_download = None
+            if isinstance(result, Exception):
+                self.show_toast(t("update.msg.failed", error=result), "error")
+                return
+            try:
+                old = phonecam_update.self_replace(exe, dest)
+                try:
+                    flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0
+                    subprocess.Popen([exe] + sys.argv[1:], close_fds=True, cwd=os.path.dirname(exe),
+                                     env=phonecam_update.relaunch_env(), creationflags=flags)
+                except Exception:
+                    phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
+                    raise
+            except Exception as error:
+                self.show_toast(t("update.msg.failed", error=error), "error")
+                return
+            QApplication.quit()
+
+        self.ctrl.run_background(download, finished)
 
     def show_toast(self, text, kind="info"):
         pal = ref_palette(self)

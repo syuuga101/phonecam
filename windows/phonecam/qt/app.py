@@ -108,6 +108,9 @@ def configure(app, ctrl):
 
 
 def main():
+    if sys.argv[1:2] in (["--setup-wizard"], ["--setup-diagnose"]):
+        from phonecam.ui.app import main as setup_main
+        return setup_main()
     helper = helper_main(sys.argv[1:])
     if helper is not None:
         return helper
@@ -116,15 +119,22 @@ def main():
     except Exception as e:
         _message_box("PySide6 が見つかりません。\n\npython -m pip install -r windows/requirements-qt.txt を実行してください。\n\n%s" % e)
         return 1
+    from phonecam.core.settings import load_settings, migrate_legacy_settings
+    from phonecam.i18n import set_language
+    migrate_legacy_settings()
+    settings = load_settings()
+    set_language(settings.get("language", "system"))
     from phonecam.controller import Controller
     from phonecam.qt.main_window import MainWindow
     set_app_user_model_id()
-    ctrl = Controller()
+    ctrl = Controller(settings=settings)
     app = QApplication(sys.argv)
     app.setApplicationName("PhoneCam")
     app.setQuitOnLastWindowClosed(True)
     configure(app, ctrl)
     win = MainWindow(ctrl)
     win.restore_state()
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(600, ctrl.first_run_setup)
     app.aboutToQuit.connect(ctrl.close)
     return app.exec()
