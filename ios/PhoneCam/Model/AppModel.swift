@@ -439,7 +439,7 @@ final class AppModel: ObservableObject {
         } else if target != old {
             encoder.setBitrate(mbps: target)
         }
-        if target != old { updateBitrateText(target) }
+        if target != old || ceiling != nil { updateBitrateText(target) }
     }
 
     private func resetStreamRate(wifi: Bool) {
