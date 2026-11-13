@@ -114,6 +114,7 @@ DEFAULT_SETTINGS = {
     "idle_stop_sec": 10,
     # 初回セットアップ (ウィザード) を終えたか
     "setup_done": False,
+    "setup_shown_version": "",   # セットアップウィザードを最後に出した版 (更新後の初回起動で再表示するため)
     # VB-CABLE 導入前の既定の音声デバイス (導入後に CABLE へ切り替わったら戻すため。戻したら消す)
     "audio_defaults_backup": None,
     "vbcable_restore_pending": 0,
@@ -364,6 +365,8 @@ def sanitize_settings(s):
         s["output_size"] = DEFAULT_SETTINGS["output_size"]
     if not isinstance(s.get("update_skip_version"), str) or len(s["update_skip_version"]) > 40:
         s["update_skip_version"] = DEFAULT_SETTINGS["update_skip_version"]
+    if not isinstance(s.get("setup_shown_version"), str) or len(s["setup_shown_version"]) > 40:
+        s["setup_shown_version"] = DEFAULT_SETTINGS["setup_shown_version"]
     # v1.5 追加: ショートカットキー
     if phonecam_hotkeys is not None:
         s["hotkeys"] = phonecam_hotkeys.sanitize_hotkeys(s.get("hotkeys"))

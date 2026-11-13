@@ -215,6 +215,7 @@
  "settings.theme.label": "Appearance",
  "settings.theme.light": "Light",
  "settings.theme.system": "Follow system",
+ "setup.after_update": "Updated to v{version}. Checking that everything you need is installed.",
  "setup.components.title": "Required software",
  "setup.diagnose.button": "Diagnose",
  "setup.diagnose.hint": "For when AltStore shows errors such as \"2003\"",

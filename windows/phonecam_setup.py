@@ -3191,8 +3191,9 @@ class SetupWizard:
 
     TITLES = [t("setup.wizard.setupwizard_1"), t("setup.wizard.setupwizard_2"), t("setup.wizard.setuppanel__tab_action_2"), t("setup.wizard.setupwizard_3")]
 
-    def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None, start="setup"):
+    def __init__(self, root, controller, on_finish, on_skip=None, open_url=None, launch=None, start="setup", update_version=None):
         self.root = root
+        self.update_version = update_version
         self.controller = controller
         self.on_finish = on_finish
         self.on_skip = on_skip or on_finish
@@ -3325,6 +3326,9 @@ class SetupWizard:
     def _page_welcome(self):
         tk.Label(self.body, text=t("setup.wizard.setupwizard__page_welcome_1"), bg=BG, fg=FG, font=(FONT, 22, "bold"), anchor="w").pack(
             anchor="w", pady=(px(36), 0))
+        if self.update_version:
+            tk.Label(self.body, text=t("setup.after_update", version=self.update_version), bg=BG, fg=SUB,
+                     font=(FONT, 10), anchor="w", justify="left", wraplength=px(480)).pack(anchor="w", pady=(px(8), 0))
         wrapped_label(self.body, t("setup.wizard.setupwizard__page_welcome_2"),
                       self.body, font=(FONT, 11)).pack(fill="x", pady=(px(16), 0))
         make_link(self.footer, t("setup.wizard.setuppanel__wizard_action_1"), self._skip).pack(side="left")

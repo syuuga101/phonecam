@@ -215,6 +215,7 @@
  "settings.theme.label": "外観",
  "settings.theme.light": "ライト",
  "settings.theme.system": "システムに合わせる",
+ "setup.after_update": "v{version} に更新されました。必要なものがそろっているか確認します",
  "setup.components.title": "必要なソフト",
  "setup.diagnose.button": "診断する",
  "setup.diagnose.hint": "AltStoreの更新で「エラー2003」などが出るとき",

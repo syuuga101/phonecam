@@ -4,9 +4,10 @@
 
 import os
 import time
-from phonecam.core.deps import phonecam_audio, phonecam_setup
+from phonecam.core.deps import phonecam_audio, phonecam_setup, phonecam_update
 from phonecam.core.paths import _is_frozen
 from phonecam.core.settings import save_settings
+from phonecam.core.version import APP_VERSION
 from phonecam.i18n import t
 from phonecam.ui.dpi import px
 from phonecam.ui.labels import setup_outcome_text
@@ -15,17 +16,39 @@ from phonecam.ui.update_ui import hint, page, row, section
 from phonecam.ui.util import webbrowser_open
 
 
+def _update_wizard_version():
+    """更新後にウィザードを出す対象の版 (表示用)。dev などの実バージョンでないビルドは None。"""
+    try:
+        pv = phonecam_update.parse_version(APP_VERSION) if phonecam_update is not None else None
+        if pv is None or pv == (0, 0, 0):
+            return None
+        return phonecam_update.display_version(APP_VERSION)
+    except Exception:
+        return None
+
+
 def _first_run_check(app):
     """起動後の確認 (exe 版のみ)。初回はセットアップウィザード、2回目以降は専用カメラの更新だけを案内する。"""
     if app._closing or not _is_frozen():
         return
+    cur_ver = _update_wizard_version()
     if app.setup is not None and not app.settings.get("setup_done"):
         if app._setup_key_present is False and app._refresh_cam_status() == "ok":
             # 旧バージョンから使っていて、専用カメラも登録済み: ウィザードは出さない
             app.settings["setup_done"] = True
+            if cur_ver:
+                app.settings["setup_shown_version"] = cur_ver
             app._schedule_save()
             return
+        if cur_ver:
+            app.settings["setup_shown_version"] = cur_ver  # 初回ウィザード: この版では更新後の再表示をしない
         app.open_setup_wizard()
+        return
+    if app.setup is not None and cur_ver and app.settings.get("setup_shown_version", "") != cur_ver:
+        # 更新後の初回起動: 同じウィザードをもう一度 (導入済みの項目は「済み」と出る)。閉じても毎回は出さないよう、表示時点で保存する
+        app.settings["setup_shown_version"] = cur_ver
+        app._do_save_now()
+        app.open_setup_wizard(after_update=cur_ver)
         return
     if app.settings.get("backend") != "phonecam":
         return
@@ -313,7 +336,7 @@ def _audio_startup_check(app):
     app.root.after(500, poll)
 
 
-def open_setup_wizard(app, rerun=False, iphone_only=False):
+def open_setup_wizard(app, rerun=False, iphone_only=False, after_update=None):
     if app.setup is None or app._wizard is not None or tk is None:
         return
     if app.setup.busy:
@@ -336,7 +359,8 @@ def open_setup_wizard(app, rerun=False, iphone_only=False):
     app.setup_note_var.set("")
     try:
         app._wizard = phonecam_setup.SetupWizard(app.root, app.setup, on_finish=app._wizard_closed,
-                                                  on_skip=app._wizard_closed, open_url=webbrowser_open)
+                                                  on_skip=app._wizard_closed, open_url=webbrowser_open,
+                                                  **({"update_version": after_update} if after_update else {}))
     except Exception:
         app._wizard = None
 
