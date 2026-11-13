@@ -14,7 +14,7 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt
+from PySide6.QtCore import QEvent, QPointF, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -25,10 +25,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QProxyStyle,
     QPushButton,
     QScrollArea,
     QSizePolicy,
     QSlider,
+    QStyle,
+    QStyleFactory,
     QVBoxLayout,
     QWidget,
 )
@@ -431,10 +434,104 @@ class Combo(QComboBox):
             e.ignore()   # ページのスクロールに回す
 
 
+SLIDER_HANDLE = 20   # つまみの直径 (論理px。DPI スケールは Qt が掛ける)
+SLIDER_TRACK = 4     # トラックの太さ
+
+
+class SliderStyle(QProxyStyle):
+    """Windows 11 風の横スライダー: 太さ4pxのトラック (済み側はアクセント色) と、直径20pxの
+    つまみ (外側リング + 中心のアクセント色の点。ホバーで大きく、押下で小さく)。
+    色はパレットから計算するのでライト/ダークどちらでも自然。QSlider 以外は元のスタイルに任せる。"""
+
+    def __init__(self, base_name=None):
+        base = QStyleFactory.create(base_name) if base_name else None
+        super().__init__(base) if base is not None else super().__init__()
+
+    def pixelMetric(self, metric, option=None, widget=None):
+        if metric == QStyle.PixelMetric.PM_SliderLength or metric == QStyle.PixelMetric.PM_SliderThickness:
+            return SLIDER_HANDLE
+        if metric == QStyle.PixelMetric.PM_SliderControlThickness:
+            return SLIDER_HANDLE
+        return super().pixelMetric(metric, option, widget)
+
+    def subControlRect(self, control, option, sub_control, widget=None):
+        if control == QStyle.ComplexControl.CC_Slider and option is not None and hasattr(option, "sliderPosition") \
+                and option.orientation == Qt.Orientation.Horizontal:
+            r = option.rect
+            if sub_control == QStyle.SubControl.SC_SliderGroove:
+                return QRect(r.x(), r.y() + (r.height() - SLIDER_HANDLE) // 2, r.width(), SLIDER_HANDLE)
+            if sub_control == QStyle.SubControl.SC_SliderHandle:
+                span = max(1, r.width() - SLIDER_HANDLE)
+                x = QStyle.sliderPositionFromValue(option.minimum, option.maximum, option.sliderPosition,
+                                                   span, option.upsideDown)
+                return QRect(r.x() + x, r.y() + (r.height() - SLIDER_HANDLE) // 2, SLIDER_HANDLE, SLIDER_HANDLE)
+        return super().subControlRect(control, option, sub_control, widget)
+
+    def drawComplexControl(self, control, option, painter, widget=None):
+        if control != QStyle.ComplexControl.CC_Slider or option.orientation != Qt.Orientation.Horizontal:
+            return super().drawComplexControl(control, option, painter, widget)
+        pal = ref_palette(widget)
+        enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+        win, txt = _role(pal, QPalette.ColorRole.Window), _role(pal, QPalette.ColorRole.WindowText)
+        accent = _role(pal, QPalette.ColorRole.Highlight)
+        dark = is_dark(pal)
+        if not enabled:
+            accent = blend(win, txt, 0.35)
+        groove = self.subControlRect(control, option, QStyle.SubControl.SC_SliderGroove, widget)
+        handle = self.subControlRect(control, option, QStyle.SubControl.SC_SliderHandle, widget)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        cy = groove.y() + groove.height() / 2.0
+        track = QRectF(groove.x() + SLIDER_HANDLE / 2.0, cy - SLIDER_TRACK / 2.0,
+                       max(0.0, groove.width() - SLIDER_HANDLE), SLIDER_TRACK)
+        radius = SLIDER_TRACK / 2.0
+        painter.setBrush(blend(win, txt, 0.42 if dark else 0.38))
+        painter.drawRoundedRect(track, radius, radius)
+        cx = handle.x() + handle.width() / 2.0
+        if option.upsideDown:
+            filled = QRectF(cx, track.y(), track.right() - cx, track.height())
+        else:
+            filled = QRectF(track.x(), track.y(), cx - track.x(), track.height())
+        if filled.width() > 0:
+            painter.setBrush(accent)
+            painter.drawRoundedRect(filled, radius, radius)
+        # つまみ: 外側リング (影 + 縁 + 面) → 中心のアクセント点
+        ring = QRectF(handle).adjusted(1, 1, -1, -1)
+        painter.setBrush(QColor(0, 0, 0, 40 if not dark else 90))
+        painter.drawEllipse(ring.translated(0, 0.8))
+        painter.setBrush(QColor("#454545") if dark else QColor("#ffffff"))
+        painter.setPen(QPen(blend(win, txt, 0.22 if dark else 0.16), 1))
+        painter.drawEllipse(ring)
+        painter.setPen(Qt.PenStyle.NoPen)
+        pressed = bool(option.activeSubControls & QStyle.SubControl.SC_SliderHandle) and \
+            bool(option.state & QStyle.StateFlag.State_Sunken)
+        hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        d = 10.0 if pressed else (14.0 if hover else 12.0)
+        painter.setBrush(accent)
+        painter.drawEllipse(QPointF(cx, cy), d / 2.0, d / 2.0)
+        if option.state & QStyle.StateFlag.State_HasFocus and enabled:
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(accent, 1.5))
+            painter.drawEllipse(QRectF(handle).adjusted(-0.5, -0.5, 0.5, 0.5))
+        painter.restore()
+
+
 class Slider(QSlider):
     def __init__(self, parent=None):
         super().__init__(Qt.Orientation.Horizontal, parent)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        app_style = QApplication.style()
+        self._style = SliderStyle(app_style.objectName() if app_style is not None else None)   # 参照を保持 (ウィジェットは所有しない)
+        self.setStyle(self._style)
+        self.setMinimumHeight(SLIDER_HANDLE + 4)
+
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() in _THEME_EVENTS:
+            self.update()
 
     def wheelEvent(self, e):
         if self.hasFocus():

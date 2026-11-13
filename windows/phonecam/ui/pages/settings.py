@@ -13,7 +13,7 @@ from phonecam.ui.util import webbrowser_open
 AUTHOR = "syuuga101"
 REPO_URL = "https://github.com/syuuga101/phonecam"
 GUIDE_URL = "https://github.com/syuuga101/phonecam/wiki"
-TRANSLATE_URL = "https://crowdin.com/project/phonecam"  # 仮 (Crowdin プロジェクト作成後に差し替える)
+TRANSLATE_URL = ""  # Crowdin プロジェクト作成後に URL を入れる (空のあいだは翻訳協力の行を出さない)
 ISSUES_URL = REPO_URL + "/issues"
 LICENSE_TEXT = "GPL-2.0-or-later"
 
@@ -118,7 +118,8 @@ def build(app, parent):
     ttk.Label(r, text=AUTHOR).pack(side="right")
     _link_row(card, "download", t("settings.about.repo"), "GitHub", REPO_URL)
     _link_row(card, "document", t("settings.about.guide"), t("settings.about.guide.link"), GUIDE_URL)
-    _link_row(card, "heart", t("settings.about.translate"), "Crowdin", TRANSLATE_URL)
+    if TRANSLATE_URL:
+        _link_row(card, "heart", t("settings.about.translate"), "Crowdin", TRANSLATE_URL)
     r = row(card, "document", t("settings.about.license"))
     ttk.Label(r, text=LICENSE_TEXT).pack(side="right")
     _link_row(card, "info", t("settings.about.issues"), "GitHub Issues", ISSUES_URL)

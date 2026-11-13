@@ -38,7 +38,7 @@ from phonecam.qt.widgets import (
 RATIO_MIN = 1.0 / 3.0
 RATIO_MAX = 1.0
 RATIO_DEFAULT = 2.0 / 3.0
-TICK_MS = 66          # 約15fps で描画 (プレビューは軽く)
+TICK_MS = 66          # 既定。実際の間隔は設定 preview_fps (15/30/60) から決める
 MIN_W = 240           # プレビュー幅の下限 (論理px)
 MAX_H_FRAC = 0.45     # ウィンドウの高さに対する上限
 GRIP = 18             # つまみの当たり判定 (論理px)
@@ -90,7 +90,8 @@ class PreviewView(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(int(MIN_W * 9 / 16))
         self._timer = QTimer(self)
-        self._timer.setInterval(TICK_MS)
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._apply_fps(ctrl.get("preview_fps", 30))
         self._timer.timeout.connect(self._tick)
         self._timer.start()
         ctrl.settings_changed.connect(self._setting)
@@ -125,7 +126,19 @@ class PreviewView(QWidget):
         super().resizeEvent(e)
         self._relayout()
 
+    def _apply_fps(self, fps):
+        try:
+            fps = int(fps)
+        except Exception:
+            fps = 30
+        if fps not in (15, 30, 60):
+            fps = 30
+        self._timer.setInterval(max(1, int(round(1000.0 / fps))))   # 15->67ms 30->33ms 60->17ms (UI 用 50ms tick とは別)
+
     def _setting(self, key, value):
+        if key == "preview_fps":
+            self._apply_fps(value)
+            return
         if key == "preview_width_ratio" and not self._drag:
             self.ratio = clamp_ratio(value)
             self._relayout()

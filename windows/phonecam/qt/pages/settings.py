@@ -4,10 +4,12 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QLabel
 
+from phonecam.core.settings import PREVIEW_FPS_CHOICES
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, bound_combo, bound_switch, button
 
 _REPO = "https://github.com/syuuga101/phonecam"
+_TRANSLATE_URL = ""  # Crowdin プロジェクト作成後に URL を入れる (空のあいだは翻訳協力の行を出さない)
 
 
 def build(ctrl):
@@ -20,6 +22,9 @@ def build(ctrl):
         items = [(value, t(f"settings.{key}.{value}")) for value in choices]
         general.add_row(icon, t(f"settings.{key}.label"), hint).addControl(
             bound_combo(ctrl, key, items, setter=setter))
+
+    general.add_row("gauge", t("settings.preview_fps.label"), t("settings.preview_fps.hint")).addControl(
+        bound_combo(ctrl, "preview_fps", [(v, f"{v} fps") for v in PREVIEW_FPS_CHOICES]))
 
     updates = page.add_section(t("update.section"))
     updates.add_row("info", t("update.version.label")).addControl(QLabel(ctrl.version_text()))
@@ -51,9 +56,11 @@ def build(ctrl):
     for icon, name, label, url in (
         ("download", "repo", "GitHub", _REPO),
         ("document", "guide", t("settings.about.guide.link"), _REPO + "/wiki"),
-        ("heart", "translate", "Crowdin", "https://crowdin.com/project/phonecam"),
+        ("heart", "translate", "Crowdin", _TRANSLATE_URL),
         ("info", "issues", "GitHub Issues", _REPO + "/issues"),
     ):
+        if not url:
+            continue
         link = button(label)
         link.clicked.connect(lambda _, target=url: QDesktopServices.openUrl(QUrl(target)))
         about.add_row(icon, t(f"settings.about.{name}")).addControl(link)

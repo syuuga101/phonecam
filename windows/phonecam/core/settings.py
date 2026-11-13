@@ -111,6 +111,7 @@ DEFAULT_SETTINGS = {
     "run_mode": "auto",
     "theme": "system",           # "system" / "light" / "dark"
     "language": "system",        # "system" / "ja" / "en" ...
+    "preview_fps": 30,           # アプリ内プレビューの更新fps (15/30/60)。仮想カメラ出力には影響しない
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
     "idle_stop_sec": 10,
     "window_maximized": True,    # Qt UI: 最大化で起動する
@@ -195,6 +196,8 @@ IDLE_STOP_VALUES = (10, 30, 60)
 
 
 # 整数の設定 (キー: (最小, 最大))
+PREVIEW_FPS_CHOICES = (15, 30, 60)
+
 INT_RANGES = {
     "bitrate": (2, 50),         # 配信のビットレート (Mbps)。設定ファイルの壊れた値・過大な値で iPhone/デコーダーを詰まらせない
     "rec_bitrate": (10, 100),
@@ -356,6 +359,13 @@ def sanitize_settings(s):
             raise ValueError
     except Exception:
         ratio = DEFAULT_SETTINGS["preview_width_ratio"]
+    try:
+        fps = int(round(float(s.get("preview_fps"))))
+    except Exception:
+        fps = DEFAULT_SETTINGS["preview_fps"]
+    if fps not in PREVIEW_FPS_CHOICES:
+        fps = min(PREVIEW_FPS_CHOICES, key=lambda c: abs(c - fps)) if 0 < fps < 10000 else DEFAULT_SETTINGS["preview_fps"]
+    s["preview_fps"] = fps
     s["preview_width_ratio"] = min(1.0, max(1.0 / 3.0, ratio))
     s["window_maximized"] = bool(s.get("window_maximized", True))
     if not isinstance(s.get("window_geometry"), str) or len(s["window_geometry"]) > 4096:

@@ -212,6 +212,8 @@
  "settings.language.ja": "日本語",
  "settings.language.label": "言語",
  "settings.language.system": "システムに合わせる",
+ "settings.preview_fps.hint": "アプリ内プレビューの滑らかさ。上げるとPCの負荷が少し増えます。OBSなどに出る映像には影響しません",
+ "settings.preview_fps.label": "プレビューのfps",
  "settings.setup.launch_error": "セットアップを開けませんでした（{error}）",
  "settings.setup.open.button": "開く",
  "settings.setup.open.label": "初期セットアップ",
