@@ -19,7 +19,6 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
     QApplication,
-    QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -106,10 +105,6 @@ def error_color(palette):
 
 def ok_color(palette):
     return QColor("#6ccb5f") if is_dark(palette) else QColor("#0f7b0f")
-
-
-def app_palette():
-    return QApplication.palette()
 
 
 _THEME_EVENTS = tuple(x for x in (getattr(QEvent.Type, n, None) for n in
@@ -753,10 +748,6 @@ class Page(QScrollArea):
         self.column.addWidget(widget)
         return widget
 
-    def add_layout(self, layout):
-        self.column.addLayout(layout)
-        return layout
-
     def add_section(self, title=""):
         return self.add(Section(title))
 
@@ -1029,28 +1020,6 @@ def bound_switch(ctrl, key, group=None, on_change=None, invert=False, setter=Non
     sw.toggled.connect(toggled)
     _listen(ctrl, key, show)
     return sw
-
-
-def bound_check(ctrl, key, text="", group=None, on_change=None):
-    """設定 key (bool) に結び付いたチェックボックス。"""
-    cb = QCheckBox(text)
-
-    def show(v):
-        if cb.isChecked() != bool(v):
-            cb.blockSignals(True)
-            cb.setChecked(bool(v))
-            cb.blockSignals(False)
-
-    show(ctrl.get(key))
-
-    def toggled(on):
-        ctrl.changed(key, bool(on), group)
-        if on_change:
-            on_change(bool(on))
-
-    cb.toggled.connect(toggled)
-    _listen(ctrl, key, show)
-    return cb
 
 
 def bound_line(ctrl, key, width=160, placeholder="", on_change=None):

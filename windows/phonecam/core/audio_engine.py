@@ -198,10 +198,6 @@ VBCABLE_LATENCY_HINT = ("VB-CABLEのコントロールパネルで \"Max Latency
                         "（音が途切れる場合は戻してください）。管理者として開きます。変更の反映にはPCの再起動が必要なことがあります")
 
 
-OBS_AUDIO_TIP = ("OBSで「CABLE Output」の音声ソースのプロパティを開き、「デバイスのタイムスタンプを使用」を"
-                 "オフにすると遅延が減ることがあります")
-
-
 VBCABLE_PANEL_MISSING = "VB-CABLEのコントロールパネルが見つかりません（VB-CABLEが入っていないか、別の場所にあります）"
 
 

@@ -47,10 +47,6 @@ def restored_message(names):
 # 判断ロジック (Windows に依存しない。API は差し替え可能)
 # ---------------------------------------------------------------------------
 
-def empty_defaults():
-    return {f: {r: None for r in ROLES} for f in FLOWS}
-
-
 def make_backup(api):
     """現在の既定を {render:{role:id}, capture:{...}, names:{id:name}} にする。取得できなければ None。"""
     cur = api.get_defaults()

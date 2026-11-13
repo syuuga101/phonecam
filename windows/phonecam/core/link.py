@@ -47,7 +47,7 @@ from phonecam.core.settings import (
     valid_pair_code,
 )
 from phonecam.core.stats import LatencyTracker
-from phonecam.core.usbmux import usbmux_available, usbmux_connect, usbmux_devices, wifi_connect
+from phonecam.core.usbmux import usbmux_available, usbmux_connect, wifi_connect
 from phonecam.core.wireless import discover, local_ipv4, merge_devices, read_device
 from phonecam.core.vcam import VirtualCamOutput
 

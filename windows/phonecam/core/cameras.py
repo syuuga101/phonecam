@@ -199,10 +199,6 @@ class CameraGroup:
     def can_add(self):
         return len(self.cameras) < len(CAMERA_SLOTS)
 
-    def next_slot(self):
-        used = {camera.get("camera_slot", 1) for camera in self.cameras}
-        return next((number for number in CAMERA_SLOTS if number not in used), None)
-
     @staticmethod
     def slot_of(camera):
         return camera.get("camera_slot", 1)
@@ -272,15 +268,6 @@ class CameraGroup:
                 camera.set_mode("auto")
         self.changed.emit()
         return True
-
-    def unassign(self, camera):
-        if camera.wanted:
-            camera.toggle_connect()
-        for key in ("target_device", "usb_serial"):
-            camera.changed(key, "")
-        camera.set_ip("")
-        camera.set_pair_code("")
-        self.changed.emit()
 
     def remove(self, camera, unregister=False):
         """2 台目以降のカメラを取り除く。unregister なら OBS 用の仮想カメラの登録も解除する (管理者権限・非同期)。"""

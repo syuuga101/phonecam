@@ -8,8 +8,8 @@ import sys
 import threading
 import webbrowser
 
-from PySide6.QtCore import QByteArray, QEvent, QRect, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtCore import QByteArray, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import QFont, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QApplication,

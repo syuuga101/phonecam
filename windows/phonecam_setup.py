@@ -1284,7 +1284,6 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
 # 自動 (無人) でも確実なものだけを自動にする: VC++ ランタイム / PhoneCamカメラの登録 (と Store 版の削除)。
 # iTunes / iCloud / AltServer / VB-CABLE は、公式のインストーラーを普通のウィンドウで開き、手順を画面に出す。
 
-AUTO_IDS = ("vcredist", "camera")
 GUIDED_IDS = ("itunes", "icloud", "altserver", "vbcable")
 SLOW_SECONDS = 180          # インストーラーがこれより長く動いているとき、隠れていないか確認を促す
 AUTO_CHECK_SECONDS = 5.0    # インストーラーの実行中に、導入済みになったか裏で確かめる間隔
@@ -2929,9 +2928,6 @@ class SetupPanel:
 
     def pack(self, **kw):
         self.frame.pack(**kw)
-
-    def set_results(self, results):
-        self.results = results or {}
 
     def render(self):
         for w in list(self.frame.winfo_children()):
