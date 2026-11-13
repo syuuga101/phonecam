@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """接続ページ (Tk の ui/pages/connection_video.build_connection + ui/pages/preview.py の移植)
 
-状態 (点 + 文言 + iPhone 名/つなぎ方) と 開始/一時停止・接続/切断 → プレビュー → 数値の行
+状態 (点 + 文言 + iPhone 名/つなぎ方の1行) → プレビュー → 接続/切断・開始/一時停止 → 数値の行
 → 接続方法 → Wi-Fi → iPhone のカメラの動作。Controller と qt.widgets だけを使う。
 """
 
-from PySide6.QtCore import QPointF, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
         QGridLayout,
@@ -79,6 +79,8 @@ class PreviewView(QWidget):
     """ライブプレビュー。内容列の幅 x ratio (既定 2/3) の 16:9 を左上に描き、右下のつまみで拡縮する。
     ratio は設定 preview_width_ratio に保存 (つまみを離したとき)。"""
 
+    rect_width_changed = Signal(int)   # 描く枠の幅 (論理px)。直下のボタンの行をこの幅に合わせる
+
     def __init__(self, ctrl):
         super().__init__()
         self.ctrl = ctrl
@@ -120,6 +122,7 @@ class PreviewView(QWidget):
         if h != self.height():
             self.setFixedHeight(h)
         self._seq = -1   # 次の tick で今の大きさに合わせて描き直す
+        self.rect_width_changed.emit(w)
         self.update()
 
     def resizeEvent(self, e):
@@ -261,7 +264,7 @@ class ConnectionPage(Page):
         super().__init__()
         self.ctrl = ctrl
         self._build_header()
-        self.preview = self.add(PreviewView(ctrl))
+        self._build_preview()
         self._build_numbers()
         self._build_wifi()
         self._build_run()
@@ -300,18 +303,37 @@ class ConnectionPage(Page):
         self.error_label = ErrorLabel("")
         left.addWidget(self.error_label)
         lay.addLayout(left, 1)
-        btns = QHBoxLayout()
-        btns.setSpacing(8)
-        self.start_btn = button(t("connection.button.start"))
+        card.layout().addWidget(box)
+        self.add(card)
+
+    # -- プレビューと、その直下の操作ボタン (つなぐ/切断 + 一時停止/開始) -------------------------
+    def _build_preview(self):
+        box = QWidget()
+        col = QVBoxLayout(box)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
+        self.preview = PreviewView(self.ctrl)
+        col.addWidget(self.preview)
+        self.btn_row = QWidget()
+        self.btn_row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        row = QHBoxLayout(self.btn_row)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        self.start_btn = button(t("connection.button.start"), primary=True)
         self.start_btn.clicked.connect(self.ctrl.start_pause)
         self.connect_btn = button(t("connection.button.connect"), primary=True)
         self.connect_btn.setMinimumWidth(104)
         self.connect_btn.clicked.connect(lambda: self.ctrl.toggle_connect())
-        btns.addWidget(self.start_btn)
-        btns.addWidget(self.connect_btn)
-        lay.addLayout(btns, 0)
-        card.layout().addWidget(box)
-        self.add(card)
+        row.addWidget(self.connect_btn)
+        row.addWidget(self.start_btn)
+        row.addStretch(1)
+        col.addWidget(self.btn_row, 0, Qt.AlignmentFlag.AlignLeft)
+        self.preview.rect_width_changed.connect(self._fit_btn_row)
+        self._fit_btn_row(self.preview._rect_size()[0])
+        self.add(box)
+
+    def _fit_btn_row(self, w):
+        self.btn_row.setFixedWidth(max(w, self.btn_row.minimumSizeHint().width()))
 
     def _card_text(self, s):
         """上のカードの (見出し, 補足, ✓ を出すか)。方式を選ばせない (auto) ときは 3 つの状態だけを出す。"""
@@ -372,6 +394,15 @@ class ConnectionPage(Page):
         self.camera_row.addControl(self.camera_value)
 
     # -- status の反映 --------------------------------------------------------------------
+    @staticmethod
+    def _set_primary(b, on):
+        if b.isDefault() != bool(on):
+            b.setDefault(bool(on))
+            b.setAutoDefault(bool(on))
+            b.style().unpolish(b)
+            b.style().polish(b)
+            b.update()
+
     def update_status(self, s):
         if not s:
             return
@@ -388,6 +419,9 @@ class ConnectionPage(Page):
         hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in ("failed", "refused")
         self.error_label.setText("" if hide_error else s.error_text)
         self.start_btn.setText(t("connection.button.pause") if s.start_is_pause else t("connection.button.start"))
+        # 主ボタン (accent) は「つなぐ」「開始」。切断・一時停止は通常色
+        self._set_primary(self.start_btn, not s.start_is_pause)
+        self._set_primary(self.connect_btn, not s.wanted)
         self.start_btn.setEnabled(bool(s.start_enabled))
         self.start_btn.setVisible(bool(s.start_enabled))   # つないでいる間だけ (主ボタンは「つなぐ / 切断」の1つ)
         self.connect_btn.setText(t("connection.button.disconnect") if s.wanted else t("connection.button.connect"))
