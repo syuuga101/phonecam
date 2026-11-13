@@ -151,6 +151,9 @@ jobs:
     continue-on-error: true
     permissions:
       contents: write
+    concurrency:
+      group: qt-screens
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -204,4 +207,9 @@ jobs:
           echo "${GITHUB_SHA}" > SOURCE_SHA.txt
           git add -A
           git commit -q -m "Qt screenshots for ${GITHUB_SHA}"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" qt-screens
+          for i in 1 2 3; do
+            git push -q -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" qt-screens && exit 0
+            sleep 5
+          done
+          echo "::warning::スクショのブランチへの保存に失敗しました（他の実行と重なった可能性）"
+          exit 0
