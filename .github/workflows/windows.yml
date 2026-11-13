@@ -108,6 +108,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller に失敗しました" }
           if (-not (Test-Path dist/PhoneCamReceiver.exe)) { throw "PhoneCamReceiver.exe が作成されませんでした" }
 
+      # exe に何が何MB入っているかをログに出す (軽量化の確認用。失敗してもビルドは止めない)
+      - name: List bundled files
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python .github/scripts/list_bundle.py windows/build/PhoneCamReceiver 70
+          $exe = Get-Item windows/dist/PhoneCamReceiver.exe
+          Write-Host ("PhoneCamReceiver.exe: {0:N2} MB" -f ($exe.Length / 1MB))
+
       - name: Upload exe
         uses: actions/upload-artifact@v4
         with:
