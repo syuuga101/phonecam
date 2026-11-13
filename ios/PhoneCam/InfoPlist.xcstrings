@@ -75,68 +75,68 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Used to connect to your PC over Wi-Fi."
+            "state" : "new",
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Wi-Fi経由でPCと接続するために使用します"
+            "value" : "Wi-Fi経由でPCの検出と接続を行うために使用します"
           }
         }
       }
