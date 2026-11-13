@@ -9,61 +9,13 @@
             "value" : "QRコードを読み取る"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "QRコードを読み取る"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "QRコードを読み取る"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "QRコードを読み取る"
@@ -79,61 +31,13 @@
             "value" : "PC に表示された PhoneCam の QR コードを映してください。"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PC に表示された PhoneCam の QR コードを映してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に表示された PhoneCam の QR コードを映してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PC に表示された PhoneCam の QR コードを映してください。"
@@ -149,61 +53,13 @@
             "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "カメラを開けません。カメラのアクセス許可を確認してください。"
@@ -219,61 +75,13 @@
             "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
@@ -289,61 +97,13 @@
             "value" : "ペアリングする"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ペアリングする"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ペアリングする"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "ペアリングする"
@@ -359,61 +119,13 @@
             "value" : "もう一度読み取る"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "もう一度読み取る"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "もう一度読み取る"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "もう一度読み取る"
@@ -429,61 +141,13 @@
             "value" : "閉じる"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "閉じる"
@@ -499,61 +163,13 @@
             "value" : "PhoneCam のペアリング用 QR コードではありません。"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PhoneCam のペアリング用 QR コードではありません。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PhoneCam のペアリング用 QR コードではありません。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PhoneCam のペアリング用 QR コードではありません。"
@@ -569,61 +185,13 @@
             "value" : "PC に接続しています…"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PC に接続しています…"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続しています…"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PC に接続しています…"
@@ -639,61 +207,13 @@
             "value" : "PC とペアリングしました"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PC とペアリングしました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC とペアリングしました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PC とペアリングしました"
@@ -709,61 +229,13 @@
             "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
@@ -779,61 +251,13 @@
             "value" : "Settings"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "設定"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "設定"
@@ -849,61 +273,13 @@
             "value" : "General"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "一般"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "一般"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "一般"
@@ -919,61 +295,13 @@
             "value" : "Language"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "言語"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "言語"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "言語"
@@ -989,61 +317,13 @@
             "value" : "Help translate"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻訳に参加する"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "翻訳に参加する"
@@ -1059,61 +339,13 @@
             "value" : "Display"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "画面"
@@ -1129,61 +361,13 @@
             "value" : "Dim screen"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面を暗くする"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を暗くする"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "画面を暗くする"
@@ -1199,61 +383,13 @@
             "value" : "Black out screen"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面を真っ黒にする"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "画面を真っ黒にする"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "画面を真っ黒にする"
@@ -1269,61 +405,13 @@
             "value" : "Off"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "しない"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "しない"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "しない"
@@ -1339,61 +427,13 @@
             "value" : "10 sec"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "10秒"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "10秒"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "10秒"
@@ -1409,61 +449,13 @@
             "value" : "30 sec"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "30秒"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "30秒"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "30秒"
@@ -1479,61 +471,13 @@
             "value" : "60 sec"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "60秒"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "60秒"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "60秒"
@@ -1549,61 +493,13 @@
             "value" : "Auto black-out"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動で黒くする"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "自動で黒くする"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "自動で黒くする"
@@ -1619,61 +515,13 @@
             "value" : "Vibrate on connect"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "接続時に振動"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続時に振動"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "接続時に振動"
@@ -1689,61 +537,13 @@
             "value" : "Grid"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "グリッド"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "グリッド"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "グリッド"
@@ -1759,61 +559,13 @@
             "value" : "Level meter"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "水平メーター"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平メーター"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "水平メーター"
@@ -1829,61 +581,13 @@
             "value" : "Allow Wi-Fi connections"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wi-Fiからの接続を許可"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fiからの接続を許可"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Wi-Fiからの接続を許可"
@@ -1899,61 +603,13 @@
             "value" : "Change code"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "コードを変更"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "コードを変更"
@@ -1969,61 +625,13 @@
             "value" : "Connection"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "接続"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "接続"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "接続"
@@ -2039,61 +647,13 @@
             "value" : "Enter this in the \"Pairing code\" field on your PC. Not needed for USB."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
@@ -2109,61 +669,13 @@
             "value" : "About"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリについて"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリについて"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "アプリについて"
@@ -2179,61 +691,13 @@
             "value" : "Author"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "作成者"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "作成者"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "作成者"
@@ -2249,61 +713,13 @@
             "value" : "Download"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "配布場所"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配布場所"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "配布場所"
@@ -2319,61 +735,13 @@
             "value" : "Translation"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻訳"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "翻訳"
@@ -2389,61 +757,13 @@
             "value" : "License"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライセンス"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ライセンス"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "ライセンス"
@@ -2459,61 +779,13 @@
             "value" : "Version"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "バージョン"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バージョン"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "バージョン"
@@ -2529,61 +801,13 @@
             "value" : "User guide"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "使い方ガイド"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使い方ガイド"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "使い方ガイド"
@@ -2599,61 +823,13 @@
             "value" : "GPL-2.0 or later"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GPL-2.0以降"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "GPL-2.0以降"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "GPL-2.0以降"
@@ -2669,61 +845,13 @@
             "value" : "Match system"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "システムに合わせる"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "システムに合わせる"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "システムに合わせる"
@@ -2739,61 +867,13 @@
             "value" : "日本語"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "日本語"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "日本語"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "日本語"
@@ -2809,61 +889,13 @@
             "value" : "English"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "English"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "English"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "English"
@@ -2879,61 +911,13 @@
             "value" : "Restart the app to apply."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを再起動すると反映されます"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリを再起動すると反映されます"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "アプリを再起動すると反映されます"
@@ -2949,61 +933,13 @@
             "value" : "Muted"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ミュート中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ミュート中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "ミュート中"
@@ -3019,61 +955,13 @@
             "value" : "Wi-Fi address"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wi-Fi アドレス"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Wi-Fi アドレス"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Wi-Fi アドレス"
@@ -3089,61 +977,13 @@
             "value" : "Video"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "映像"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "映像"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "映像"
@@ -3159,61 +999,13 @@
             "value" : "Bitrate"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ビットレート"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ビットレート"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "ビットレート"
@@ -3229,61 +1021,13 @@
             "value" : "Sent fps"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "送信 fps"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "送信 fps"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "送信 fps"
@@ -3299,61 +1043,13 @@
             "value" : "Thermal state"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "温度状態"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "温度状態"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "温度状態"
@@ -3369,61 +1065,13 @@
             "value" : "Battery"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "バッテリー"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "バッテリー"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "バッテリー"
@@ -3439,61 +1087,13 @@
             "value" : "Stream info"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "配信情報"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信情報"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "配信情報"
@@ -3509,61 +1109,13 @@
             "value" : "Record"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画"
@@ -3579,61 +1131,13 @@
             "value" : "Stop"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "停止"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "停止"
@@ -3649,61 +1153,13 @@
             "value" : "Start recording"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画開始"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画開始"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画開始"
@@ -3719,61 +1175,13 @@
             "value" : "Mic: %@"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイク: %@"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク: %@"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "マイク: %@"
@@ -3789,61 +1197,13 @@
             "value" : "Keep the app in the foreground."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリは前面に表示したままにしてください"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "アプリは前面に表示したままにしてください"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "アプリは前面に表示したままにしてください"
@@ -3859,61 +1219,13 @@
             "value" : "Preview is off"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プレビューはオフです"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューはオフです"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "プレビューはオフです"
@@ -3929,61 +1241,13 @@
             "value" : "Resize preview height"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プレビューの高さを変更"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの高さを変更"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "プレビューの高さを変更"
@@ -3999,61 +1263,13 @@
             "value" : "Resize preview width"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プレビューの幅を変更"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューの幅を変更"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "プレビューの幅を変更"
@@ -4069,61 +1285,13 @@
             "value" : "Lens"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "レンズ"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "レンズ"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "レンズ"
@@ -4139,61 +1307,13 @@
             "value" : "Microphone (mute)"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイク（ミュート）"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "マイク（ミュート）"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "マイク（ミュート）"
@@ -4209,61 +1329,13 @@
             "value" : "Audio & recording"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声と録画"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "音声と録画"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "音声と録画"
@@ -4279,61 +1351,13 @@
             "value" : "Preview"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プレビュー"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビュー"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "プレビュー"
@@ -4349,61 +1373,13 @@
             "value" : "View"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "表示"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "表示"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "表示"
@@ -4419,61 +1395,13 @@
             "value" : "Turn on Preview to check the framing."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プレビューをオンにすると映る範囲を確認できます"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "プレビューをオンにすると映る範囲を確認できます"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "プレビューをオンにすると映る範囲を確認できます"
@@ -4489,61 +1417,13 @@
             "value" : "Lying face up"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "上向きに置かれています"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "上向きに置かれています"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "上向きに置かれています"
@@ -4559,61 +1439,13 @@
             "value" : "Level"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "水平"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "水平"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "水平"
@@ -4629,61 +1461,13 @@
             "value" : "Landscape"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "横向き"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "横向き"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "横向き"
@@ -4699,61 +1483,13 @@
             "value" : "Portrait"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "縦向き"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "縦向き"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "縦向き"
@@ -4769,61 +1505,13 @@
             "value" : "Streaming in %@"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@で配信中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@で配信中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "%@で配信中"
@@ -4839,61 +1527,13 @@
             "value" : "%@ · Standby"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · 待機中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ · 待機中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "%@ · 待機中"
@@ -4909,61 +1549,13 @@
             "value" : "Not connected"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "未接続"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "未接続"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "未接続"
@@ -4979,61 +1571,13 @@
             "value" : "Off"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフ"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オフ"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "オフ"
@@ -5049,61 +1593,13 @@
             "value" : "On"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "オン"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "オン"
@@ -5119,61 +1615,13 @@
             "value" : "On (not permitted)"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "オン (許可されていません)"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "オン (許可されていません)"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "オン (許可されていません)"
@@ -5189,61 +1637,13 @@
             "value" : "Normal"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "正常"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "正常"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "正常"
@@ -5259,61 +1659,13 @@
             "value" : "Fair"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "やや高い"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "やや高い"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "やや高い"
@@ -5329,61 +1681,13 @@
             "value" : "Serious"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "高い"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "高い"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "高い"
@@ -5399,61 +1703,13 @@
             "value" : "Critical"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "危険"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "危険"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "危険"
@@ -5469,61 +1725,13 @@
             "value" : "Connected to PC (%@)"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PCとつながりました（%@）"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとつながりました（%@）"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PCとつながりました（%@）"
@@ -5539,61 +1747,13 @@
             "value" : "Disconnected from PC"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PCとの接続が切れました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCとの接続が切れました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PCとの接続が切れました"
@@ -5609,61 +1769,13 @@
             "value" : "Streaming"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "配信中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "配信中"
@@ -5679,61 +1791,13 @@
             "value" : "Recording"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画中"
@@ -5749,61 +1813,13 @@
             "value" : "Standby"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "待機中"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "待機中"
@@ -5819,61 +1835,13 @@
             "value" : "Streaming · %@"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "配信中 · %@"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "配信中 · %@"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "配信中 · %@"
@@ -5889,61 +1857,13 @@
             "value" : "Standby (camera off) · %@"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "待機中（カメラ停止）· %@"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "待機中（カメラ停止）· %@"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "待機中（カメラ停止）· %@"
@@ -5959,61 +1879,13 @@
             "value" : "Front"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "前面"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "前面"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "前面"
@@ -6029,61 +1901,13 @@
             "value" : "Version v%@ is available"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しいバージョン v%@ があります"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "新しいバージョン v%@ があります"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "新しいバージョン v%@ があります"
@@ -6099,61 +1923,13 @@
             "value" : "Close"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "閉じる"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "閉じる"
@@ -6169,61 +1945,13 @@
             "value" : "Update with AltStore"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "AltStoreで更新"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AltStoreで更新"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "AltStoreで更新"
@@ -6239,61 +1967,13 @@
             "value" : "What's new"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新内容"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "更新内容"
@@ -6309,61 +1989,13 @@
             "value" : "Skip this version"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "このバージョンを通知しない"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "このバージョンを通知しない"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "このバージョンを通知しない"
@@ -6379,61 +2011,13 @@
             "value" : "No release notes."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新内容の記載はありません。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "更新内容の記載はありません。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "更新内容の記載はありません。"
@@ -6449,61 +2033,13 @@
             "value" : "Recording stopped: not enough storage space."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "空き容量が足りないため録画を停止しました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "空き容量が足りないため録画を停止しました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "空き容量が足りないため録画を停止しました"
@@ -6519,61 +2055,13 @@
             "value" : "Recording failed."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画に失敗しました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画に失敗しました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画に失敗しました"
@@ -6589,61 +2077,13 @@
             "value" : "Couldn't start recording."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画を開始できませんでした"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画を開始できませんでした"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画を開始できませんでした"
@@ -6659,61 +2099,13 @@
             "value" : "Couldn't save the recording file."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画ファイルの保存に失敗しました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "録画ファイルの保存に失敗しました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "録画ファイルの保存に失敗しました"
@@ -6729,61 +2121,13 @@
             "value" : "Saving to Photos is not allowed."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "写真への保存が許可されていません"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存が許可されていません"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "写真への保存が許可されていません"
@@ -6799,61 +2143,13 @@
             "value" : "Couldn't save to Photos."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "写真への保存に失敗しました"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "写真への保存に失敗しました"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "写真への保存に失敗しました"
@@ -6869,61 +2165,13 @@
             "value" : "Camera access is not allowed. Enable the camera for PhoneCam in the Settings app."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "カメラへのアクセスが許可されていません。設定アプリでPhoneCamのカメラを許可してください。"
@@ -6939,61 +2187,13 @@
             "value" : "No usable camera found."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用できるカメラが見つかりません。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラが見つかりません。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "使用できるカメラが見つかりません。"
@@ -7009,61 +2209,13 @@
             "value" : "No usable camera format found."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用できるカメラフォーマットが見つかりません。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "使用できるカメラフォーマットが見つかりません。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "使用できるカメラフォーマットが見つかりません。"
@@ -7079,61 +2231,13 @@
             "value" : "Couldn't add the camera input."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラ入力を追加できませんでした。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラ入力を追加できませんでした。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "カメラ入力を追加できませんでした。"
@@ -7149,61 +2253,13 @@
             "value" : "Couldn't open the camera. Check that no other app is using it."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "カメラを開けませんでした。他のアプリがカメラを使用していないか確認してください。"
@@ -7219,61 +2275,13 @@
             "value" : "Couldn't change the camera settings."
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラの設定を変更できませんでした。"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "カメラの設定を変更できませんでした。"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "カメラの設定を変更できませんでした。"
@@ -7289,61 +2297,13 @@
             "value" : "この端末の名前"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末の名前"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "この端末の名前"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "この端末の名前"
@@ -7359,61 +2319,13 @@
             "value" : "PCの接続先の一覧に表示されます"
           }
         },
-        "es" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "PCの接続先の一覧に表示されます"
           }
         },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの接続先の一覧に表示されます"
-          }
-        },
-        "zh-Hant" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "PCの接続先の一覧に表示されます"
