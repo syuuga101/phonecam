@@ -15,12 +15,10 @@ struct OutputCanvas: Equatable {
 // MARK: - AppModel (カメラ・エンコーダ・サーバをつなぐ)
 
 final class AppModel: ObservableObject {
+    /// 速く変わる値 (水平メーター / 配信情報 / 録画の経過時間)。ContentView 全体を再描画させないよう別オブジェクトにしてある。
+    let metrics = LiveMetrics()
     @Published var isConnected = false
     @Published var connectionKind = ""
-    @Published var wifiAddress = String(localized: "未接続")
-    @Published var formatText = "-"
-    @Published var bitrateText = "-"
-    @Published var sentFps = 0
     @Published var previewEnabled = false {
         didSet {
             stateLock.lock()
@@ -33,12 +31,9 @@ final class AppModel: ObservableObject {
     @Published var dimScreen = false
     @Published var errorText: String?
     @Published var rotationAngle = 0
-    @Published var thermalText = String(localized: "正常")
-    @Published var batteryText = "-"
     @Published var screenBlack = false
     @Published var autoBlackSeconds = 0
     @Published var recActive = false
-    @Published var recSeconds = 0.0
     @Published var recError = ""
     @Published var micText = String(localized: "オフ")
     @Published var wifiAllowed = false
@@ -58,8 +53,6 @@ final class AppModel: ObservableObject {
     @Published var cameraSize = CGSize(width: 1920, height: 1080)   // カメラ素の向き (横長) のサイズ
     @Published var previewAngle = 90                                 // プレビュー接続の回転角 (0/90/180/270)
     @Published var previewDevice: AVCaptureDevice?
-    @Published var levelDeg = 0.0
-    @Published var levelFlat = false
     @Published var toast: String?
     @Published var vibrateOnConnect = (UserDefaults.standard.object(forKey: "vibrateOnConnect") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(vibrateOnConnect, forKey: "vibrateOnConnect") }
@@ -261,8 +254,8 @@ final class AppModel: ObservableObject {
         levelMonitor.onUpdate = { [weak self] deg, flat in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if self.levelDeg != deg { self.levelDeg = deg }
-                if self.levelFlat != flat { self.levelFlat = flat }
+                if self.metrics.levelDeg != deg { self.metrics.levelDeg = deg }
+                if self.metrics.levelFlat != flat { self.metrics.levelFlat = flat }
             }
         }
         camera.onStreamSettings = { [weak self] width, height, fps, bitrate in
@@ -270,7 +263,8 @@ final class AppModel: ObservableObject {
             self.configureStreamRate(fps: fps, ceiling: bitrate)
             DispatchQueue.main.async {
                 if width > 0 && height > 0 {
-                    self.formatText = "\(width)×\(height) \(fps)fps"
+                    let format = "\(width)×\(height) \(fps)fps"
+                    if self.metrics.formatText != format { self.metrics.formatText = format }
                     let size = CGSize(width: width, height: height)
                     if self.cameraSize != size { self.cameraSize = size }
                 }
@@ -342,7 +336,7 @@ final class AppModel: ObservableObject {
                 self.connectionKind = ""
                 self.outputCanvas = nil
                 self.showToast(String(localized: "PCとの接続が切れました"), haptic: .warning)
-                self.sentFps = 0
+                if self.metrics.sentFps != 0 { self.metrics.sentFps = 0 }
                 // 切断したら省電力を解除する (保存値は残す)
                 self.setScreenBlack(false, persist: false)
             }
@@ -487,7 +481,10 @@ final class AppModel: ObservableObject {
     }
 
     private func updateBitrateText(_ target: Int) {
-        DispatchQueue.main.async { [weak self] in self?.bitrateText = "\(target) Mbps" }
+        DispatchQueue.main.async { [weak self] in
+            let text = "\(target) Mbps"
+            if self?.metrics.bitrateText != text { self?.metrics.bitrateText = text }
+        }
     }
 
     private func startTimer() {
@@ -517,9 +514,9 @@ final class AppModel: ObservableObject {
             let ip = wifiOn ? AppModel.wifiIPv4() : nil
             DispatchQueue.main.async {
                 let fps = max(0, delta)
-                if self.sentFps != fps { self.sentFps = fps }
+                if self.metrics.sentFps != fps { self.metrics.sentFps = fps }
                 let address = wifiOn ? (ip.map { "\($0):5555" } ?? String(localized: "未接続")) : String(localized: "オフ")
-                if self.wifiAddress != address { self.wifiAddress = address }
+                if self.metrics.wifiAddress != address { self.metrics.wifiAddress = address }
             }
         }
         t.resume()
@@ -567,9 +564,9 @@ final class AppModel: ObservableObject {
 
         // @Published は同じ値を代入しても購読している View (ContentView 全体) を再評価させるため、変わったときだけ代入する
         let thermal = AppModel.thermalLabel(ProcessInfo.processInfo.thermalState)
-        if thermalText != thermal { thermalText = thermal }
+        if metrics.thermalText != thermal { metrics.thermalText = thermal }
         let battery = lvl >= 0 ? "\(Int((lvl * 100).rounded()))%" : "-"
-        if batteryText != battery { batteryText = battery }
+        if metrics.batteryText != battery { metrics.batteryText = battery }
     }
 
     private func withExtras(_ base: [String: Any]) -> [String: Any] {
@@ -754,7 +751,8 @@ final class AppModel: ObservableObject {
         wifiAllowed = on
         server.refreshAdvertisement()
         if !on {
-            wifiAddress = String(localized: "オフ")
+            let off = String(localized: "オフ")
+            if metrics.wifiAddress != off { metrics.wifiAddress = off }
             server.disconnectNonLoopback()
             audioServer.disconnectNonLoopback()
         }
@@ -926,7 +924,7 @@ final class AppModel: ObservableObject {
         let st = recorder.uiState()
         DispatchQueue.main.async {
             if self.recActive != st.active { self.recActive = st.active }
-            if self.recSeconds != st.seconds { self.recSeconds = st.seconds }
+            if self.metrics.recSeconds != st.seconds { self.metrics.recSeconds = st.seconds }
             if self.recError != st.error { self.recError = st.error }
         }
     }

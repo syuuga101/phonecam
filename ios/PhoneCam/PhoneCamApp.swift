@@ -56,6 +56,7 @@ struct PhoneCamApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(model.metrics)
                 .onAppear {
                     model.start()
                     OrientationLock.apply()

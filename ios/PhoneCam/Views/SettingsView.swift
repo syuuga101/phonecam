@@ -62,9 +62,6 @@ struct SettingsView: View {
             } label: {
                 SettingsLabel("言語", symbol: "globe")
             }
-            Link(destination: AppInfo.translateURL) {
-                SettingsLabel("翻訳に参加する", symbol: "character.bubble")
-            }
         } header: {
             Text("一般")
         } footer: {

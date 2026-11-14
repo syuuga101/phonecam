@@ -177,19 +177,19 @@ private struct RecordPressStyle: ButtonStyle {
 
 /// 録画中に録画ボタンの上へ出す、赤い背景の経過時間。録画していないときは場所だけ確保する。
 struct RecordTimerPill: View {
-    let recording: Bool
-    let seconds: Double
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var metrics: LiveMetrics
 
     var body: some View {
-        Text(ContentView.timeText(seconds))
+        Text(ContentView.timeText(metrics.recSeconds))
             .font(.system(size: 13, weight: .semibold).monospacedDigit())
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .background(Color.red)
             .clipShape(Capsule())
-            .opacity(recording ? 1 : 0)
-            .accessibilityHidden(!recording)
+            .opacity(model.recActive ? 1 : 0)
+            .accessibilityHidden(!model.recActive)
     }
 }
 
@@ -200,7 +200,7 @@ struct PreviewStage: View {
     let size: CGSize
     let showGrid: Bool
     let showLevel: Bool
-    /// 縦画面では右上にライトと目のボタンを重ねる。横画面は右側の操作列にあるので出さない。
+    /// 縦画面では右上に目 (プレビューの表示 / 非表示) のボタンだけを重ねる。ライトは操作バー (縦) / 操作列 (横) にある。横画面は右側の操作列にあるので出さない。
     let cornerButtons: Bool
 
     @State private var pinchBase: Double?
@@ -232,10 +232,7 @@ struct PreviewStage: View {
                     StatusPill()
                     Spacer(minLength: 8)
                     if cornerButtons {
-                        HStack(spacing: 8) {
-                            PreviewToggleButton(style: .overlay)
-                            TorchButton(style: .overlay)
-                        }
+                        PreviewToggleButton(style: .overlay)
                     }
                 }
                 Spacer(minLength: 0)
