@@ -3,10 +3,9 @@
 
 必要なソフト (Apple USBドライバ / iCloud / AltServer / VB-CABLE / VC++ ランタイム / PhoneCam カメラ) の
 検出・ダウンロード・インストール・管理者ヘルパ (--setup)・手順つきインストールの状態機械 (GuidedFlow)・
-診断の評価を提供します。このモジュールは tkinter を読み込みません (画面は phonecam/qt/setup_wizard.py の Qt 版。
-旧 Tk 版の画面は phonecam_setup_tk.py に残してあり、属性としてアクセスされたときだけ遅延して読み込みます)。
+診断の評価を提供します。このモジュールは tkinter を読み込みません (画面は phonecam/qt/setup_wizard.py)。
 
-受信アプリ本体 (phonecam_receiver.py) とは bind() で関数を受け渡して連携します
+受信アプリ本体 (phonecam_qt.py) とは bind() で関数を受け渡して連携します
 (本体を __main__ として実行しても二重 import にならないようにするため)。
 """
 
@@ -2580,7 +2579,7 @@ class SetupController:
 
 
 # ---------------------------------------------------------------------------
-# 画面に依存しない補助 (Qt 版・旧 Tk 版の両方が使う)
+# 画面に依存しない補助 (Qt の画面が使う)
 # ---------------------------------------------------------------------------
 
 # 画面ページの番号: 0 ようこそ / 1 確認 / 2 インストール / 3〜9 iPhone の手順 (7つ)
@@ -2631,17 +2630,3 @@ def _startfile(path):
         os.startfile(path)  # type: ignore[attr-defined]
     except Exception:
         pass
-
-
-# 旧 Tk 版の画面 (phonecam_setup_tk.py)。名前でアクセスされたときだけ読み込む (通常の起動では tkinter を読まない)
-_TK_NAMES = frozenset((
-    "SetupWizard", "DiagnosticsDialog", "SetupPanel", "ThinProgress", "ScrollFrame", "open_diagnostics", "set_scale",
-    "px", "detect_scale", "make_button", "make_link", "wrapped_label", "text_section", "collapsible", "work_area",
-    "tk", "ttk"))
-
-
-def __getattr__(name):
-    if name in _TK_NAMES:
-        import importlib
-        return getattr(importlib.import_module("phonecam_setup_tk"), name)
-    raise AttributeError(name)

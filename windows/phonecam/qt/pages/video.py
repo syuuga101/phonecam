@@ -2,7 +2,7 @@
 
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, StatusValue, bound_combo, bound_slider, bound_switch, button
-from phonecam.ui.labels import (
+from phonecam.labels import (
     BACKEND_LABELS, CANVAS_LABELS, CODEC_LABELS, DECODER_LABELS, FIT_LABELS,
     FPS_LABELS, LENS_LABELS, ORIENT_LABELS, OUTPUT_SIZE_LABELS, RES_LABELS, SCREEN_AUTO_LABELS,
 )

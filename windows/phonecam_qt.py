@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """PhoneCam Windows 受信アプリ (Qt UI の入口)
 
-phonecam_receiver.py (Tk 版) は全ページの移植が終わるまで配布の入口のまま。
---register / --unregister / --setup のヘルパ起動は Tk 版と同じ (phonecam.core.softcam_reg.helper_main)。
+--register / --unregister / --setup <job> / --camera-slot N の管理者ヘルパ起動は phonecam.core.softcam_reg.helper_main が処理する。
 """
 
 import sys

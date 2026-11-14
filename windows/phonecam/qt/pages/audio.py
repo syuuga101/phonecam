@@ -8,7 +8,7 @@ from phonecam.core.audio_engine import SYSTEM_DEFAULT_KEY, find_vbcable_control_
 from phonecam.core.settings import AUDIO_AVAILABLE
 from phonecam.i18n import t
 from phonecam.qt.widgets import Card, Combo, Page, Row, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
-from phonecam.ui.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
+from phonecam.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
 
 
 class _Meter(QWidget):

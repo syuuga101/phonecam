@@ -2,7 +2,7 @@
 
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, bound_combo, bound_slider, bound_switch
-from phonecam.ui.labels import MODE3_LABELS, SHUTTER_VALUES
+from phonecam.labels import MODE3_LABELS, SHUTTER_VALUES
 
 
 def build(ctrl):

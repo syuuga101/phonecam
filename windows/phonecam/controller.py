@@ -50,7 +50,7 @@ from phonecam.core.stats import ThermalLog
 from phonecam.core.stream import StreamController, camera_state_text
 from phonecam.core.vcam import CAM_RELEASE_HOLD_SEC
 from phonecam.i18n import set_language, t
-from phonecam.ui.labels import (
+from phonecam.labels import (
     LENS_LABELS,
     METER_MIN_DB,
     PHONE_NOTE_SECONDS,

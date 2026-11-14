@@ -481,13 +481,37 @@ def centered(widget, max_width):
 # ボタン・レイアウト・ウィンドウ
 # ---------------------------------------------------------------------------
 
+class _LinkButton(QPushButton):
+    """背景も枠もない文字だけのボタン。ホバーのときは下線を引く。
+    windows11 スタイルは setFlat(True) でも少し浮いた見た目を残すので、スタイルシートで完全に平らにする。"""
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setFlat(True)
+        self.setAutoDefault(False)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimumHeight(30)
+        self.setStyleSheet(
+            "QPushButton { background: transparent; border: none; padding: 2px 4px; }"
+            "QPushButton:hover, QPushButton:pressed { background: transparent; border: none; }")
+
+    def _underline(self, on):
+        f = self.font()
+        f.setUnderline(bool(on))
+        self.setFont(f)
+
+    def enterEvent(self, event):
+        self._underline(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._underline(False)
+        super().leaveEvent(event)
+
+
 def link_button(text, callback=None, parent=None):
-    """枠のない文字だけのボタン (補助の操作)。"""
-    b = QPushButton(text, parent)
-    b.setFlat(True)
-    b.setAutoDefault(False)
-    b.setCursor(Qt.CursorShape.PointingHandCursor)
-    b.setMinimumHeight(30)
+    """枠のない文字だけのボタン (補助の操作)。背景・枠なしの完全なフラット。ホバー時は下線。"""
+    b = _LinkButton(text, parent)
     if callback is not None:
         b.clicked.connect(lambda _checked=False: callback())
     return b

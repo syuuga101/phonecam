@@ -2,7 +2,7 @@
 """Qt UI の起動: QApplication の設定 (スタイル・フォント・ライト/ダーク) と main()。
 
     python windows/phonecam_qt.py [--setup-wizard | --setup-diagnose]
-セットアップ (ウィザード・診断) も Qt 版。Tk 版 (phonecam_receiver.py) はもう配布の入口ではない。
+セットアップ (ウィザード・診断) も Qt 版。
 """
 
 import os

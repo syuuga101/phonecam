@@ -2,7 +2,7 @@
 """依存なしの小さな QR コード生成 (バイトモード・バージョン1〜10・誤り訂正 L/M)。
 
 画像ライブラリ (PIL など) は使わず、モジュール (黒/白のマス) の2次元配列を返します。
-画面への描画は tk.Canvas に四角を並べるだけです (draw_on_canvas)。
+画面への描画は phonecam/qt/setup_common.py の QrView が行います。
 """
 
 # バージョンごとの (誤り訂正コード語数/ブロック, [(ブロック数, データ語数/ブロック), ...])
@@ -285,25 +285,3 @@ def make_qr(text, level="M", mask=None):
         if best is None or sc < best[0]:
             best = (sc, k, g.m)
     return best[2]
-
-
-def draw_on_canvas(canvas, modules, cell=4, quiet=3, fg="#000000", bg="#ffffff"):
-    """tk.Canvas に QR を描く。描いた1辺のピクセル数を返す。"""
-    n = len(modules)
-    total = (n + quiet * 2) * cell
-    canvas.delete("all")
-    canvas.configure(width=total, height=total, bg=bg)
-    canvas.create_rectangle(0, 0, total, total, fill=bg, width=0)
-    for y, row in enumerate(modules):
-        x = 0
-        while x < n:
-            if row[x]:
-                x2 = x
-                while x2 + 1 < n and row[x2 + 1]:
-                    x2 += 1
-                canvas.create_rectangle((x + quiet) * cell, (y + quiet) * cell, (x2 + 1 + quiet) * cell,
-                                        (y + 1 + quiet) * cell, fill=fg, width=0)
-                x = x2 + 1
-            else:
-                x += 1
-    return total

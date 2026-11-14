@@ -7,7 +7,7 @@ from phonecam.core.settings import REC_AUDIO_KBPS, rec_effective_resolution, rec
 from phonecam.core.stats import format_bytes, format_mmss
 from phonecam.i18n import t
 from phonecam.qt.widgets import ErrorLabel, Hint, Page, bound_combo, bound_slider, bound_switch, button
-from phonecam.ui.labels import REC_CONTAINER_LABELS, REC_PRESET_LABELS, REC_RES_LABELS
+from phonecam.labels import REC_CONTAINER_LABELS, REC_PRESET_LABELS, REC_RES_LABELS
 
 
 def build(ctrl):
