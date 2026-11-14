@@ -141,6 +141,7 @@ def dynamic_families():
         "f'labels.sec.{auto}'": [f"labels.sec.{v}" for v in c["screen_auto"]],
         "'connection.thermal.' + thermal": [f"connection.thermal.{v}" for v in c["levels"]],
         "'connection.state.' + key": [f"connection.state.{v}" for v in ("live", "idle", "paused", "off")],
+        "'compact.sum.run.' + mode": [f"compact.sum.run.{m}" for m in ("auto", "always", "manual")],
         "'labels.runmode.' + v": [f"labels.runmode.{v}" for v in c["run_modes"]],
         "'labels.sec.%d' % v": [f"labels.sec.{v}" for v in c["idle"] + c["screen_auto"]],
         "'labels.watch.' + k": [f"labels.watch.{v}" for v in c["watch"]],
