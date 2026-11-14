@@ -10,6 +10,7 @@ struct ContentView: View {
     @AppStorage("showLevel") private var showLevel = true
     @State private var showRecordings = false
     @State private var showLandscapeSettings = false
+    @State private var pinchBase: Double?
 
     /// 横画面の右側の操作列の幅
     private let controlColumnWidth: CGFloat = 96
@@ -20,7 +21,9 @@ struct ContentView: View {
                 GeometryReader { geo in
                     let landscape = geo.size.width > geo.size.height
                     Group {
-                        if landscape {
+                        if model.previewFullscreen {
+                            FullscreenPreview(showGrid: showGrid, showLevel: showLevel)
+                        } else if landscape {
                             landscapeLayout(geo.size)
                         } else {
                             portraitLayout(geo.size)
@@ -28,17 +31,19 @@ struct ContentView: View {
                     }
                     .frame(width: geo.size.width, height: geo.size.height)
                 }
-                .background(Color(.systemGroupedBackground).ignoresSafeArea())
+                .background((model.previewFullscreen ? Color.black : Color(.systemGroupedBackground)).ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
             }
 
+            ZoomHUD()
             blackOverlay
         }
         .overlay(alignment: .top) {
             toastOverlay
         }
         .animation(.easeOut(duration: 0.2), value: model.toast)
-        .statusBarHidden(model.screenBlack)
+        .statusBarHidden(model.screenBlack || model.previewFullscreen)
+        .persistentSystemOverlays(model.previewFullscreen ? .hidden : .automatic)
         .onAppear {
             updater.checkIfNeeded()
             recordings.refresh()
@@ -80,6 +85,26 @@ struct ContentView: View {
         .simultaneousGesture(
             DragGesture(minimumDistance: 0).onChanged { _ in model.noteTouch() }
         )
+        // メイン画面のどこでも 2 本指のピンチでズームする (1 本指のスクロール / タップは邪魔しない)
+        .simultaneousGesture(pinch)
+    }
+
+    private var pinch: some Gesture {
+        MagnifyGesture()
+            .onChanged { v in
+                if pinchBase == nil {
+                    pinchBase = model.zoom
+                    model.zoomGestureActive = true
+                }
+                model.holdZoomHUD()
+                model.setZoom((pinchBase ?? 1.0) * Double(v.magnification), final: false)
+            }
+            .onEnded { v in
+                model.setZoom((pinchBase ?? model.zoom) * Double(v.magnification), final: true)
+                pinchBase = nil
+                model.zoomGestureActive = false
+                model.flashZoomHUD()
+            }
     }
 
     // MARK: レイアウト
