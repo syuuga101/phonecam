@@ -70,7 +70,7 @@ def test_video_and_canvas_controls():
         "outputCanvas": {"width": 640, "height": 480, "fit": "pad"},
     }
     full = canvas.build_control(config, "all")
-    assert full["micMuted"] is True
+    assert "micMuted" not in full   # PC のミュートは PC の中で止める。iPhone へは頼まない
     assert full["codec"] == "hevc"
     assert "keyframe" not in full
 

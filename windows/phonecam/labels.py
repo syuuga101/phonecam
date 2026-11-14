@@ -150,3 +150,10 @@ def format_battery(level, state):
 
 def is_thermal_warning(thermal):
     return thermal in ("serious", "critical")
+
+
+def phone_mic_text(connected, phone_muted):
+    """音声ページの「iPhone のマイク」行 (読み取り専用)。未接続は「-」。"""
+    if not connected:
+        return "-"
+    return t("audio.phonemic.muted" if phone_muted else "audio.phonemic.on")
