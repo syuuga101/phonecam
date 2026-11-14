@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""AltStore のソース (altstore-source.json) を作る。
+"""SideStore / AltStore 共通のソース JSON を作る。
+
+SideStore は AltStore の派生で、同じ形式のソースを読む。そのため同じ内容のファイルを
+altstore-source.json (従来の URL。AltStore で入れた人のため残す) と
+sidestore-source.json (SideStore 向けの名前) の2つで出す。違うのは sourceURL だけ。
 
 使い方:
-  make_altstore_source.py --repo OWNER/NAME --version 1.3.0 --build 42 --ipa out/PhoneCam.ipa --out out/altstore-source.json
+  make_altstore_source.py --repo OWNER/NAME --version 1.3.0 --build 42 --ipa out/PhoneCam.ipa \
+      --out out/altstore-source.json --also-out out/sidestore-source.json
 
 downloadURL は、そのタグの Release に添付した PhoneCam.ipa の URL にする。
 ソース自体は releases/latest/download/altstore-source.json から配る (常に最新のリリースを指す)。
@@ -18,6 +23,7 @@ import sys
 BUNDLE_ID = "com.example.phonecam"  # ios/project.yml の PRODUCT_BUNDLE_IDENTIFIER と同じ
 SOURCE_ID = "io.github.syuuga101.phonecam"
 MIN_OS = "17.0"
+TINT = "#000000"
 DESCRIPTION = ("iPhoneを、WindowsのOBSで使える低遅延のワイヤレス／USBカメラにするアプリです。"
                "カメラの映像をH.264/HEVCでPCへ送ります。PCの受信アプリ（PhoneCamReceiver）と一緒に使います。")
 # Info.plist の利用目的 (ios/project.yml と同じ文言)。AltStore はソースに権限の一覧を求める
@@ -29,7 +35,12 @@ PRIVACY = {
 }
 
 
-def build_source(repo, version, build, ipa_size, date=None, tag=None, ipa_name="PhoneCam.ipa"):
+def source_url(repo, filename):
+    return "https://github.com/%s/releases/latest/download/%s" % (repo, filename)
+
+
+def build_source(repo, version, build, ipa_size, date=None, tag=None, ipa_name="PhoneCam.ipa",
+                 filename="altstore-source.json"):
     owner = repo.split("/")[0]
     tag = tag or "v%s" % version
     date = date or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -43,7 +54,7 @@ def build_source(repo, version, build, ipa_size, date=None, tag=None, ipa_name="
         "subtitle": "iPhoneをOBSのカメラにする",
         "localizedDescription": DESCRIPTION,
         "iconURL": icon,
-        "tintColor": "000000",
+        "tintColor": TINT,
         "category": "photo-video",
         "screenshots": [],
         "appPermissions": {"entitlements": ["get-task-allow"], "privacy": dict(PRIVACY)},
@@ -71,10 +82,21 @@ def build_source(repo, version, build, ipa_size, date=None, tag=None, ipa_name="
         "description": DESCRIPTION,
         "iconURL": icon,
         "website": "https://github.com/%s" % repo,
-        "tintColor": "000000",
+        "sourceURL": source_url(repo, filename),
+        "tintColor": TINT,
         "nsfw": False,
         "apps": [app],
-        "news": [],
+        "featuredApps": [BUNDLE_ID],
+        "news": [{
+            "identifier": "release-%s" % version,
+            "title": "PhoneCam v%s" % version,
+            "caption": "新しいバージョンを公開しました",
+            "date": date,
+            "tintColor": TINT,
+            "notify": False,
+            "url": "https://github.com/%s/releases/tag/%s" % (repo, tag),
+            "appID": BUNDLE_ID,
+        }],
         "userInfo": {},
     }
 
@@ -86,6 +108,7 @@ def main(argv=None):
     ap.add_argument("--build", required=True, help="IPA の CFBundleVersion (CURRENT_PROJECT_VERSION)")
     ap.add_argument("--ipa", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--also-out", default=None, help="同じ内容をもう1つ書く (sidestore-source.json)")
     ap.add_argument("--date", default=None)
     ap.add_argument("--tag", default=None)
     a = ap.parse_args(argv)
@@ -94,12 +117,15 @@ def main(argv=None):
     size = os.path.getsize(a.ipa)
     if size <= 0:
         ap.error("IPA が空です")
-    data = build_source(a.repo, a.version.strip(), a.build, size, a.date, a.tag, os.path.basename(a.ipa))
-    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
-    with open(a.out, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-    print("wrote %s (%s v%s, %d bytes)" % (a.out, a.repo, a.version, size))
+    date = a.date or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for path in [p for p in (a.out, a.also_out) if p]:
+        data = build_source(a.repo, a.version.strip(), a.build, size, date, a.tag,
+                            os.path.basename(a.ipa), os.path.basename(path))
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        print("wrote %s (%s v%s, %d bytes)" % (path, a.repo, a.version, size))
     return 0
 
 

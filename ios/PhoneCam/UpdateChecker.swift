@@ -122,15 +122,29 @@ final class UpdateChecker: ObservableObject {
 
     // MARK: 操作
 
-    func openAltStore() {
+    /// SideStore に配布元を追加する URL (すでに追加済みなら、その配布元のページが開く)
+    private var sourceURLString: String {
+        "https://github.com/\(repo)/releases/latest/download/sidestore-source.json"
+    }
+
+    /// SideStore を開く。なければ AltStore、それも無ければ GitHub のリリースページを開く。
+    func openSideStore() {
         guard let rel = available ?? notesLatest else { return }
-        let fallback = rel.htmlURL
-        guard let alt = URL(string: "altstore://") else { return }
-        UIApplication.shared.open(alt, options: [:]) { ok in
-            if !ok, let u = URL(string: fallback) {
-                UIApplication.shared.open(u, options: [:], completionHandler: nil)
+        let encoded = sourceURLString.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? sourceURLString
+        let candidates = ["sidestore://source?url=\(encoded)", "altstore://source?url=\(encoded)"].compactMap { URL(string: $0) }
+        let fallback = URL(string: rel.htmlURL) ?? releasesPageURL
+        let app = UIApplication.shared
+        func openNext(_ list: [URL]) {
+            guard let u = list.first else {
+                if let f = fallback { app.open(f, options: [:], completionHandler: nil) }
+                return
+            }
+            guard app.canOpenURL(u) else { openNext(Array(list.dropFirst())); return }
+            app.open(u, options: [:]) { ok in
+                if !ok { openNext(Array(list.dropFirst())) }
             }
         }
+        openNext(candidates)
     }
 
     var releasesPageURL: URL? {
@@ -232,8 +246,8 @@ struct UpdateBanner: View {
                 }
             }
             HStack(spacing: 10) {
-                Button(action: { checker.openAltStore() }) {
-                    Text("AltStoreで更新")
+                Button(action: { checker.openSideStore() }) {
+                    Text("SideStoreで更新")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
@@ -392,8 +406,8 @@ struct UpdateNotesSheet: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    Button(action: { checker.openAltStore() }) {
-                        Text("AltStoreで更新")
+                    Button(action: { checker.openSideStore() }) {
+                        Text("SideStoreで更新")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
