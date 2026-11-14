@@ -36,6 +36,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import time
+
+from phonecam.core.profiling import PROFILE
 from phonecam.core.usbmux import usbmux_devices
 from phonecam.core.wireless import discover, merge_devices
 from phonecam.i18n import t
@@ -282,6 +285,8 @@ class CameraTile(QWidget):
         self._seq = seq
         dpr = self.devicePixelRatioF()
         pw, ph = max(2, int(self.width() * dpr)), max(2, int(self.height() * dpr))
+        if PROFILE is not None:
+            started = time.perf_counter()
         qi = frame_to_image(img, fmt, pw, ph)
         if qi is None:
             return
@@ -292,6 +297,8 @@ class CameraTile(QWidget):
         pm = QPixmap.fromImage(qi)
         pm.setDevicePixelRatio(dpr)
         self._pix = pm
+        if PROFILE is not None:
+            PROFILE.add(self.camera.link.vcam.slot, "preview", (time.perf_counter() - started) * 1000)
         self.update()
 
     # -- 配置 ----------------------------------------------------------------

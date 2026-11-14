@@ -90,3 +90,23 @@ Python 3.12 が必要です（「Add python.exe to PATH」と「py launcher」�
 - iOS: 実機で、起動・カメラ許可・USB 接続・Wi-Fi 接続（許可して 6 桁コード）・録画
 - Windows: exe でセットアップウィザード、OBS / Discord に「PhoneCam」が出て映像が流れる、切断→再接続
 - プロトコルを変えるときは、古い iPhone アプリ・古い PC アプリとも動くこと（未知の種別・キーは無視する）を確認してください。詳しくは [PROTOCOL.md](PROTOCOL.md)。
+
+## Windows の FPS 計測
+
+PowerShell で PHONECAM_PROFILE を 1 に設定し、同じシェルから受信アプリを起動します。
+接続前に普段使っている受信アプリを切断し、iPhone を USB でつないで 1080p / 60fps に設定します。
+
+```powershell
+$env:PHONECAM_PROFILE = "1"
+python windows/phonecam_qt.py
+```
+
+ログは %APPDATA%/PhoneCam/profile.log に1秒ごとの JSON 行で追記されます。PID と出力スロットで対象を区別できます。
+各段階の時間はミリ秒で、サンプル数・平均・p95・最大が出ます。
+receive_wait はパケットの読み込み開始から完了までで、待機時間を含みます。
+decode は PyAV の呼び出し全体で、d3d11va から CPU への転送が PyAV 内部で発生する場合はそれも含まれます。
+receive_to_output はパケット受信完了から出力処理開始までで、デコード時間も含みます。
+convert_fit は色変換・拡縮・キャンバスへの配置を含み、flip・softcam_send・preview・GUI tick は別に記録します。
+softcam_frames は待機用の黒フレームを除く送信回数です。実測 FPS は計測区間の合計をその秒数で割ります。
+guard_skipped と mailbox_overwritten はその区間で増えた数です（項目がなければゼロ）。
+GIL の待ち時間は個別に計測していません。

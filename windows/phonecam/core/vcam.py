@@ -6,6 +6,7 @@ import ctypes
 import os
 import threading
 import time
+from phonecam.core.profiling import PROFILE
 from phonecam.core.deps import np, pyvirtualcam
 from phonecam.core.paths import _is_frozen
 from phonecam.core.protocol import PhoneCamError
@@ -67,6 +68,7 @@ CAM_RELEASE_HOLD_SEC = 1.5  # カメラを作り直す間、共有メモリの�
 class VirtualCamOutput:
     def __init__(self, settings, state, slot=1):
         self.slot = slot
+        self.profile_video_send = False
         self.settings = settings
         self.state = state
         self.cam = None
@@ -192,7 +194,11 @@ class VirtualCamOutput:
     def send(self, img, fps):
         with self._lock:
             self.last_frame_t = time.monotonic()
-            self._send_locked(img, fps)
+            self.profile_video_send = PROFILE is not None
+            try:
+                self._send_locked(img, fps)
+            finally:
+                self.profile_video_send = False
 
     def _send_locked(self, img, fps):
         self.apply_pending_reset()
@@ -261,7 +267,14 @@ class VirtualCamOutput:
             if self.state.snapshot()["error_text"] == SIZE_CHANGED_NOTICE:
                 self.state.update(error_text="")
         try:
-            self.cam.send(img)
+            if PROFILE is not None and backend == "phonecam":
+                start = time.perf_counter()
+                self.cam.send(img)
+                PROFILE.add(self.slot, "softcam_send", (time.perf_counter() - start) * 1000)
+                if self.profile_video_send:
+                    PROFILE.count(self.slot, "softcam_frames")
+            else:
+                self.cam.send(img)
         except Exception as e:
             self.state.update(error_text="仮想カメラへの出力に失敗しました: %s" % e)
             self.close()

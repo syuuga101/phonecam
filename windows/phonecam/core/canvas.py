@@ -139,12 +139,24 @@ def fit_geometry(fw, fh, cw, ch, fit):
     return sw, sh, (cw - sw) // 2, (ch - sh) // 2
 
 
+def packed_image(frame):
+    """Expose a packed RGB/BGR plane without copying its pixels.
+
+    NumPy retains the VideoPlane, which owns a reference to the AV frame.
+    The stride can include FFmpeg alignment padding; the output path makes
+    the array contiguous only if the eventual consumer needs it.
+    """
+    if frame.format.name not in ("bgr24", "rgb24"):
+        return frame.to_ndarray()
+    plane = frame.planes[0]
+    if plane.line_size < frame.width * 3:
+        return frame.to_ndarray()
+    return np.ndarray((frame.height, frame.width, 3), dtype=np.uint8, buffer=plane,
+                      strides=(plane.line_size, 3, 1))
+
+
 class CanvasFitter:
     """フレームを固定サイズのキャンバスに収める。PyAV の reformat で拡縮するので numpy では拡縮しない。"""
-
-    def __init__(self):
-        self._buf = None
-        self._key = None
 
     def process(self, frame, fmt, canvas, fit, pad_color):
         """frame: av.VideoFrame, canvas: (幅, 高さ), pad_color: (v0, v1, v2) ※0/255のみ使うので RGB/BGR 共通。
@@ -152,20 +164,18 @@ class CanvasFitter:
         cw, ch = canvas
         sw, sh, ox, oy = fit_geometry(frame.width, frame.height, cw, ch, fit)
         # 縮小・形式変換は reformat の1回で済ませる (4K → 1080 でも余計なコピーをしない)
-        arr = frame.reformat(width=sw, height=sh, format=fmt).to_ndarray()
+        arr = packed_image(frame.reformat(width=sw, height=sh, format=fmt))
         if (sw, sh) == (cw, ch):
             return arr
         if fit == "crop":
             return arr[oy:oy + ch, ox:ox + cw]
-        key = (cw, ch, tuple(pad_color), sw, sh)
-        if self._buf is None or self._key != key:
-            # 余白の色・キャンバス・貼り付け範囲が変わったときだけ塗り直す
-            if self._buf is None or self._buf.shape != (ch, cw, 3):
-                self._buf = np.empty((ch, cw, 3), dtype=np.uint8)
-            self._buf[:, :] = pad_color
-            self._key = key
-        self._buf[oy:oy + sh, ox:ox + sw] = arr
-        return self._buf
+        result = np.empty((ch, cw, 3), dtype=np.uint8)
+        result[:oy] = pad_color
+        result[oy + sh:] = pad_color
+        result[oy:oy + sh, :ox] = pad_color
+        result[oy:oy + sh, ox + sw:] = pad_color
+        result[oy:oy + sh, ox:ox + sw] = arr
+        return result
 
 
 def pad_color_for(settings):
