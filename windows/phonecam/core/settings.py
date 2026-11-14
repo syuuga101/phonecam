@@ -12,6 +12,7 @@ from phonecam.core.deps import np, phonecam_audio, phonecam_hotkeys, sd
 from phonecam.core.paths import _app_dir, _appdata_dir
 from phonecam.core.softcam_reg import softcam_path
 from phonecam.core.wireless import device_id, read_device
+from phonecam.i18n import t
 
 
 CAMERA_DROP_LABELS = [("late", "遅延"), ("outOfBuffers", "バッファ不足"), ("discontinuity", "不連続")]
@@ -239,11 +240,12 @@ def build_auth_control(settings):
     return {"auth": {"code": normalize_pair_code(settings.get("pair_code"))}}
 
 
-AUTH_FAIL_TEXT = "ペアリングコードが違います。iPhoneの画面に表示されている6桁のコードを入力してください"
+def auth_fail_text():
+    return t("core.auth.wrong_code")
 
 
-AUTH_REFUSED_TEXT = ("iPhoneに接続を断られました。iPhoneアプリで「Wi-Fiからの接続を許可」がオンになっているか確認してください"
-                     "（コードを何度も間違えた場合は1分ほど待ってください）")
+def auth_refused_text():
+    return t("core.auth.refused")
 
 
 def auth_status_effect(st):

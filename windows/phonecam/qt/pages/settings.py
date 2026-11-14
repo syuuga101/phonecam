@@ -16,7 +16,7 @@ def build(ctrl):
     page = Page()
     general = page.add_section(t("settings.general.title"))
     for icon, key, choices, setter, hint in (
-        ("globe", "language", ("system", "ja", "en"), ctrl.set_language, t("settings.language.hint")),
+        ("globe", "language", ("system", "ja", "en"), ctrl.set_language, None),
         ("palette", "theme", ("system", "light", "dark"), ctrl.set_theme, None),
     ):
         items = [(value, t(f"settings.{key}.{value}")) for value in choices]

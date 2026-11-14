@@ -1,12 +1,9 @@
 """iPhone recording controls and storage estimates."""
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel
-
 from phonecam.core.settings import REC_AUDIO_KBPS, rec_effective_resolution, rec_mb_per_min, rec_video_mbps
 from phonecam.core.stats import format_bytes, format_mmss
-from phonecam.i18n import t
-from phonecam.qt.widgets import ErrorLabel, Hint, Page, bound_combo, bound_slider, bound_switch, button
+from phonecam.i18n import NO_VALUE, t
+from phonecam.qt.widgets import ErrorLabel, Hint, Page, StatusValue, bound_combo, bound_slider, bound_switch, button
 from phonecam.labels import REC_CONTAINER_LABELS, REC_PRESET_LABELS, REC_RES_LABELS
 
 
@@ -18,10 +15,7 @@ def build(ctrl):
     start_row.addControl(start)
     values = {}
     for key, icon in (("state", "info"), ("file", "document"), ("size", "download"), ("free", "folder")):
-        label = QLabel("-")
-        label.setWordWrap(True)
-        label.setMaximumWidth(320)
-        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        label = StatusValue(NO_VALUE, wrap=key == "file")   # 値は折り返さない (ファイル名だけは長いので折り返す)
         control.add_row(icon, t(f"recording.{key}.label")).addControl(label)
         values[key] = label
     error = ErrorLabel("")
@@ -74,9 +68,9 @@ def build(ctrl):
             state = (t("shell.sync.rec_active", time=format_mmss(rec.get("seconds", 0)))
                      if status.rec_active else t("shell.sync.rec_stopped"))
         values["state"].setText(state)
-        values["file"].setText(rec.get("fileName") or "-")
-        values["size"].setText(format_bytes(rec.get("bytes")) if status.rec_active or rec.get("bytes") else "-")
-        values["free"].setText(format_bytes(rec.get("freeBytes")) if rec.get("freeBytes") else "-")
+        values["file"].setText(rec.get("fileName") or NO_VALUE)
+        values["size"].setText(format_bytes(rec.get("bytes")) if status.rec_active or rec.get("bytes") else NO_VALUE)
+        values["free"].setText(format_bytes(rec.get("freeBytes")) if rec.get("freeBytes") else NO_VALUE)
         error.setText(rec.get("error") or "")
 
     def toggle():

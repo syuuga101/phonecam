@@ -11,6 +11,8 @@ import json
 import os
 import sys
 
+NO_VALUE = "—"   # 値がないときの表示 (言語に依らない記号。画面の「-」はすべてこれに統一する)
+
 _LOCALES = {}
 _LANG = None
 

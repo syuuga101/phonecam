@@ -1,6 +1,6 @@
 """Video input, output and power settings."""
 
-from phonecam.i18n import t
+from phonecam.i18n import NO_VALUE, t
 from phonecam.qt.widgets import Hint, Page, StatusValue, bound_combo, bound_slider, bound_switch, button
 from phonecam.labels import (
     BACKEND_LABELS, CANVAS_LABELS, CODEC_LABELS, DECODER_LABELS, FIT_LABELS,
@@ -81,8 +81,8 @@ def build(ctrl):
     def refresh(status):
         snapshot = ctrl.state.snapshot()
         codec_id = snapshot["codec_in_use"] or status.phone.get("codec") if status.connected else None
-        codec_now.setText(t("status.pc.now", v=dict(CODEC_LABELS).get(codec_id, "-")))
-        decoder_name = DECODER_LABELS.get(snapshot["decoder"], "-") if status.connected else "-"
+        codec_now.setText(t("status.pc.now", v=dict(CODEC_LABELS).get(codec_id, NO_VALUE)))
+        decoder_name = DECODER_LABELS.get(snapshot["decoder"], NO_VALUE) if status.connected else NO_VALUE
         decoder_now.setText(t("status.pc.now", v=decoder_name))
         screen = ctrl.screen_state_text()
         black.setHint(t("video.power.hint_with_screen", hint=t("video.power.hint"), screen=screen) if screen else t("video.power.hint"))

@@ -32,9 +32,11 @@ from PySide6.QtWidgets import (
 )
 
 from phonecam.core.paths import WINDOWS_DIR
+from phonecam.core.callbacks import CallbackList
 from phonecam.core.cameras import CameraGroup
 from phonecam.i18n import t
 from phonecam.qt import icons
+from phonecam.qt.language_dialog import LanguageConfirmDialog
 from phonecam.qt.multicam import AddCameraWizard, ElidedLabel, Segmented
 from phonecam.qt.widgets import (
     _THEME_EVENTS, MAX_CONTENT_W, PAGE_PAD_X, Hint, Page, blend, button, ref_palette, text_color,
@@ -66,6 +68,13 @@ def window_icon():
             if not ic.isNull():
                 return ic
     return QIcon()
+
+
+def _set_scroll(bar, value):
+    try:
+        bar.setValue(value)
+    except RuntimeError:    # 作り直しが続いてページが消えた
+        pass
 
 
 class NavDelegate(QStyledItemDelegate):
@@ -257,6 +266,8 @@ class MainWindow(QMainWindow):
 
         self.pages = []
         self.page_errors = []   # [(キー, エラー文)]: build に失敗したページ (CI のスモークテストが見る)
+        self._language_dialog = None
+        self._retranslate_pending = False
         for key, _icon in NAV_ITEMS:
             self.stack.addWidget(self._load_page(key))
 
@@ -275,10 +286,7 @@ class MainWindow(QMainWindow):
         self.nav.currentRowChanged.connect(self._page_selected)
         self._cameras_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "cameras")
         self._first_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "connection")
-        page = self.stack.widget(self._cameras_row)
-        if hasattr(page, "camera_chosen"):
-            page.camera_chosen.connect(self._camera_chosen)
-            page.add_requested.connect(self.add_camera)
+        self._wire_cameras_page()
         self.cameras.changed.connect(self._cameras_changed)
         self.cameras.audio_changed.connect(self._audio_changed)
         self._sync_cameras()
@@ -290,6 +298,8 @@ class MainWindow(QMainWindow):
         ctrl.status_changed.connect(lambda s: self._camera_status(ctrl, s))
         ctrl.update_changed.connect(self._update_banner)
         ctrl.update_action.connect(self._update_action)
+        ctrl.language_changed.connect(self._language_changed)
+        ctrl.language_trial.connect(self._language_trial)
         self._status(ctrl.status)
         self._update_banner(ctrl.update_banner)
 
@@ -402,6 +412,14 @@ class MainWindow(QMainWindow):
 
     def _load_page(self, key, ctrl=None):
         ctrl = self.ctrl if ctrl is None else ctrl
+        scope = object()
+        CallbackList.scope = scope   # このページが ctrl などに繋いだ受け手に目印を付ける (作り直すとき外すため)
+        try:
+            return self._build_page(key, ctrl, scope)
+        finally:
+            CallbackList.scope = None
+
+    def _build_page(self, key, ctrl, scope):
         try:
             mod = importlib.import_module("phonecam.qt.pages." + key)
             page = mod.build(ctrl)
@@ -416,11 +434,99 @@ class MainWindow(QMainWindow):
             sec = page.add_section(t("nav." + key))
             sec.add_padded(Hint(t("shell.page_error", name=t("nav." + key), err=e)))
             page.finish()
+        page.callback_scope = scope
         self.pages.append(page)
         bar = page.verticalScrollBar() if hasattr(page, "verticalScrollBar") else None
         if bar is not None:
             bar.rangeChanged.connect(self._sync_scrollbar)
         return page
+
+    def _wire_cameras_page(self):
+        page = self.stack.widget(self._cameras_row)
+        if hasattr(page, "camera_chosen"):
+            page.camera_chosen.connect(self._camera_chosen)
+            page.add_requested.connect(self.add_camera)
+
+    # -- 言語の切り替え ---------------------------------------------------------------------
+    def _language_changed(self, *_):
+        """表示言語が変わった: 押した操作の途中で画面を作り直さないよう、イベントループに戻ってから 1 回だけ作り直す。"""
+        if not self._retranslate_pending:
+            self._retranslate_pending = True
+            QTimer.singleShot(0, self.retranslate)
+
+    def retranslate(self):
+        """全ページ・ナビ・見出し・通知を今の言語で作り直す。選んでいるカメラ・ページ・スクロール位置・折りたたみ・接続は保つ。"""
+        self._retranslate_pending = False
+        try:
+            self._rebuild_pages()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        for row, (key, _icon) in enumerate(NAV_ITEMS):
+            self.nav.item(row).setText(t("nav." + key))
+        self.nav.viewport().update()
+        self._sync_cameras()
+        self._status(self.ctrl.status)
+        self._update_banner(self.ctrl.update_banner)
+        self.page_header.updateGeometry()
+        setup = sys.modules.get("phonecam_setup")
+        if setup is not None and hasattr(setup, "localize"):
+            setup.localize()     # セットアップの画面の文言 (import 時に作る表) も今の言語で入れ直す
+
+    def _rebuild_pages(self):
+        row = self.nav.currentRow()
+        current = self.stack.currentWidget()
+        scroll = {}
+        replaced = []    # (古いページ, 新しいページ)
+
+        def swap(old, key, camera, position):
+            bar = old.verticalScrollBar() if hasattr(old, "verticalScrollBar") else None
+            value = bar.value() if bar is not None else 0
+            new = self._load_page(key, camera)
+            CallbackList.drop_scope(getattr(old, "callback_scope", None))
+            if old in self.pages:
+                self.pages.remove(old)
+            self.stack.removeWidget(old)
+            old.hide()
+            old.deleteLater()
+            if position is None:
+                self.stack.addWidget(new)
+            else:
+                self.stack.insertWidget(position, new)
+            scroll[new] = value
+            replaced.append((old, new))
+            return new
+
+        for index, (key, _icon) in enumerate(NAV_ITEMS):
+            swap(self.stack.widget(index), key, self.ctrl, index)
+        for (camera, key), old in list(self.camera_pages.items()):
+            self.camera_pages[camera, key] = swap(old, key, camera, None)
+        self._wire_cameras_page()
+        if row >= 0:
+            self._page_selected(row)
+        for page, value in scroll.items():
+            bar = page.verticalScrollBar() if hasattr(page, "verticalScrollBar") else None
+            if bar is not None and value:
+                for delay in (0, 80, 250):     # 中身の高さが決まってから戻す
+                    QTimer.singleShot(delay, lambda b=bar, v=value: _set_scroll(b, v))
+
+    def _language_trial(self, new, old_language):
+        """言語を選んだ直後: 新しい言語で「保存 / 元に戻す」を出す。決まらなければ (10 秒) 元の言語に戻す。"""
+        QTimer.singleShot(0, lambda: self.ask_language(old_language))
+
+    def ask_language(self, old_language, dialog=None):
+        if not self.ctrl.language_trial_active or self._language_dialog is not None:
+            return
+        dialog = dialog or LanguageConfirmDialog(self, old_language)
+        self._language_dialog = dialog
+        try:
+            keep = dialog.exec() == QDialog.DialogCode.Accepted
+        finally:
+            self._language_dialog = None
+        if keep:
+            self.ctrl.keep_language()
+        else:
+            self.ctrl.revert_language()
 
     def select(self, index):
         self.nav.setCurrentRow(max(0, min(len(NAV_ITEMS) - 1, int(index))))

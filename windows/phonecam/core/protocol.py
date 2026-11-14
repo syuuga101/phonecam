@@ -6,6 +6,7 @@ import json
 import socket
 import struct
 from phonecam.core.deps import np
+from phonecam.i18n import t
 
 
 PHONE_PORT = 5555
@@ -78,7 +79,7 @@ def read_exact(sock, n, stop_event=None):
                 raise ConnectionAbortedError("stopped")
             continue
         if r == 0:
-            raise ConnectionError("接続が閉じられました")
+            raise ConnectionError(t("core.protocol.closed"))
         got += r
     return bytes(buf)
 
@@ -87,7 +88,7 @@ def read_msg(sock, stop_event=None):
     header = read_exact(sock, 5, stop_event)
     msg_type, length = struct.unpack(">BI", header)
     if length > 64 * 1024 * 1024:
-        raise ConnectionError("不正なメッセージ長です")
+        raise ConnectionError(t("core.protocol.bad_length"))
     payload = read_exact(sock, length, stop_event) if length else b""
     return msg_type, payload
 

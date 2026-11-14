@@ -4,6 +4,7 @@
 
 import threading
 from phonecam.core.settings import DEFAULT_SETTINGS, IDLE_STOP_VALUES, RUN_MODES
+from phonecam.i18n import NO_VALUE, t
 
 DEFAULT_IDLE_SEC = DEFAULT_SETTINGS["idle_stop_sec"]
 
@@ -124,26 +125,26 @@ class StreamController:
     # -- 表示 ------------------------------------------------------------
     def state_text(self, connected, st, now):
         if not connected:
-            return "-"
+            return NO_VALUE
         with self._lock:
             want = self._desired_locked(True, now)
             manual = self.mode() == "manual"
             paused = self.user_paused
         if want:
             if st.get("cameraRunning") is False or st.get("streamActive") is False:
-                return "起動中…"
-            return "配信中"
+                return t("connection.stream.starting")
+            return t("connection.stream.live")
         if manual:
-            return "待機中（開始を押すと動きます）"
+            return t("connection.stream.waiting_manual")
         if paused:
             if self.mode() == "auto":
-                return "一時停止中（「開始」を押すか、アプリでカメラを開き直すと再開）"
-            return "一時停止中（「開始」を押すと再開）"
-        return "待機中（使っているアプリなし）"
+                return t("connection.stream.paused_auto")
+            return t("connection.stream.paused")
+        return t("connection.stream.idle")
 
 
 def camera_state_text(connected, st):
     """iPhone の状態から「カメラ: 動作中/停止」。"""
     if not connected or "cameraRunning" not in st:
-        return "-"
-    return "動作中" if st.get("cameraRunning") else "停止"
+        return NO_VALUE
+    return t("connection.camera.running") if st.get("cameraRunning") else t("connection.camera.stopped")

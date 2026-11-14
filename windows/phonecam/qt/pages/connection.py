@@ -20,8 +20,8 @@ import time
 
 from phonecam.core.profiling import PROFILE
 from phonecam.core.deps import np
-from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
-from phonecam.i18n import t
+from phonecam.labels import IDLE_STOP_LABELS, RUN_MODE_LABELS
+from phonecam.i18n import NO_VALUE, t
 from phonecam.qt import icons
 from phonecam.qt.wireless import WirelessOptions
 from phonecam.qt.widgets import (
@@ -389,7 +389,7 @@ class ConnectionPage(Page):
         for i, key in enumerate(("res", "latency", "thermal", "battery")):
             grid.setColumnStretch(i, 1)
             cap = Hint(t("connection.num.%s" % key), wrap=False)
-            val = QLabel("-")
+            val = QLabel(NO_VALUE)
             f = val.font()
             f.setPointSizeF(11.0)
             val.setFont(f)
@@ -539,11 +539,10 @@ class ConnectionPage(Page):
         row = sec.add_row("play", t("connection.run.mode"), t("connection.run.mode_hint"))
         row.addControl(bound_combo(self.ctrl, "run_mode", RUN_MODE_LABELS, setter=self.ctrl.set_run_mode, width=200))
         row = sec.add_row("clock", t("connection.run.idle"), t("connection.run.idle_hint"))
-        IDLE_LABELS = [(v, t("labels.sec.%d" % v)) for v, _ in _IDLE_STOP_LABELS]
-        self.idle_combo = bound_combo(self.ctrl, "idle_stop_sec", IDLE_LABELS, width=110)
+        self.idle_combo = bound_combo(self.ctrl, "idle_stop_sec", IDLE_STOP_LABELS, width=110)
         row.addControl(self.idle_combo)
         self.camera_row = sec.add_row("camera", t("connection.run.camera"))
-        self.camera_value = QLabel("-")
+        self.camera_value = QLabel(NO_VALUE)
         self.camera_row.addControl(self.camera_value)
 
     # -- status の反映 --------------------------------------------------------------------

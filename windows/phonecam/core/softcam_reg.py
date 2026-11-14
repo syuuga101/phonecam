@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from phonecam.core.paths import _app_dir, _is_frozen
+from phonecam.i18n import t
 
 
 # 専用仮想カメラ (softcam)。CLSID は build-slots.ps1 と同一
@@ -224,8 +225,8 @@ def softcam_load_path(slot=1):
 def register_hint():
     """登録が必要なときの案内文。"""
     if _is_frozen():
-        return "「接続・映像」タブの「登録する（更新）」ボタンを押してください"
-    return "register.bat を実行してください（管理者権限が必要です）"
+        return t("core.reg.hint_exe")
+    return t("core.reg.hint_src")
 
 
 _CREATE_NO_WINDOW = 0x08000000
@@ -355,12 +356,12 @@ def helper_main(argv):
             bind_setup_host()  # register_camera などのホスト関数 
             return phonecam_setup.run_job(job, expected_sha=sha)
         except Exception as e:
-            _error_box("セットアップの実行に失敗しました。\n\n詳細: %s" % e)
+            _error_box(t("core.reg.setup_failed", error=e))
             return 1
     if "--register" in args:
-        action, fn, msg = "register", helper_register, "専用カメラ「PhoneCam」の登録に失敗しました。"
+        action, fn, msg = "register", helper_register, t("core.reg.register_failed")
     elif "--unregister" in args:
-        action, fn, msg = "unregister", helper_unregister, "専用カメラ「PhoneCam」の登録解除に失敗しました。"
+        action, fn, msg = "unregister", helper_unregister, t("core.reg.unregister_failed")
     else:
         return None
     try:
@@ -369,7 +370,7 @@ def helper_main(argv):
             return 1
         ok = fn(slot)
     except Exception as e:
-        _error_box("%s\n\n詳細: %s" % (msg, e))
+        _error_box(t("core.reg.details", message=msg, error=e))
         return 1
     if not ok:
         _error_box(msg)

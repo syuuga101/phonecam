@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget
 
 from phonecam.core.audio_engine import SYSTEM_DEFAULT_KEY, find_vbcable_control_panel, list_output_devices
 from phonecam.core.settings import AUDIO_AVAILABLE
-from phonecam.i18n import t
+from phonecam.i18n import NO_VALUE, t
 from phonecam.qt.widgets import Card, Combo, Page, Row, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
 from phonecam.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
 
@@ -145,15 +145,15 @@ def build(ctrl):
             error = t("audio.error.nolib")
         elif on and status.connected and mic.get("available") is False:
             error = error or t("shell.sync.mic_unavailable")
-        path = AUDIO_PATH_LABELS.get(snapshot.get("audio_path"), "-") if status.connected else "-"
-        mic_path = MIC_PATH_LABELS.get(status.phone.get("micPath") or mic.get("micPath"), "-") if on else "-"
+        path = AUDIO_PATH_LABELS.get(snapshot.get("audio_path"), NO_VALUE) if status.connected else NO_VALUE
+        mic_path = MIC_PATH_LABELS.get(status.phone.get("micPath") or mic.get("micPath"), NO_VALUE) if on else NO_VALUE
         mode = t("shell.sync.excl" if audio.mode == "exclusive" else "shell.sync.shared",
                  d=audio.mode_detail) if audio.running else ""
         latency = audio.latency_ms() if audio.running and status.connected else None
-        latency_text = f"{latency:.0f} ms" if latency is not None else "-"
+        latency_text = f"{latency:.0f} ms" if latency is not None else NO_VALUE
         under = t("shell.sync.underruns", n=audio.underruns) if audio.running else ""
         for key, value in dict(info=info, error=error, path=path, micpath=mic_path,
-                               mode="\n".join(filter(None, (audio.notice, mode))) or "-",
+                               mode="\n".join(filter(None, (audio.notice, mode))) or NO_VALUE,
                                latency=t("audio.latency.value_with_hint", latency=latency_text, hint=t("audio.latency.hint")), under=under).items():
             rows[key].setHint(value)
             if key in ("info", "error", "under"):

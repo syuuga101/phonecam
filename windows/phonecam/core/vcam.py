@@ -7,6 +7,7 @@ import os
 import threading
 import time
 from phonecam.core.profiling import PROFILE
+from phonecam.i18n import t
 from phonecam.core.deps import np, pyvirtualcam
 from phonecam.core.paths import _is_frozen
 from phonecam.core.protocol import PhoneCamError
@@ -46,7 +47,7 @@ class SoftcamSender:
         # framerate=0: 受け取ったフレームを待たずに即送る (低遅延)
         h = self._lib.scCreateCamera(int(width), int(height), 0.0)
         if not h:
-            raise RuntimeError("scCreateCamera が失敗しました（別のアプリがPhoneCamカメラを使用中の可能性があります）")
+            raise RuntimeError(t("core.vcam.create_failed"))
         self._handle = h
 
     def send(self, img):
@@ -59,7 +60,8 @@ class SoftcamSender:
             self._lib.scDeleteCamera(h)  # 同一プロセスでは1台のみ。作り直す前に必ず削除
 
 
-SIZE_CHANGED_NOTICE = "出力サイズが変わりました。OBSはソースを非表示→表示、Discordはカメラを一度オフ→オンにしてください"
+def size_changed_notice():
+    return t("core.vcam.size_changed")
 
 
 CAM_RELEASE_HOLD_SEC = 1.5  # カメラを作り直す間、共有メモリの監視を止める時間
@@ -153,12 +155,8 @@ class VirtualCamOutput:
         path = softcam_load_path(self.slot)
         if not os.path.isfile(path):
             if _is_frozen():
-                raise PhoneCamError(
-                    "exe に内蔵された softcam.dll が見つかりません。PhoneCamReceiver.exe をダウンロードし直してください。"
-                    "OBS Virtual Camera など他の出力先も選べます")
-            raise PhoneCamError(
-                "softcam.dll が見つかりません。ソース実行では windows フォルダに softcam.dll を置き、"
-                "register.bat を実行してください。OBS Virtual Camera など他の出力先も選べます")
+                raise PhoneCamError(t("core.vcam.dll_missing_exe"))
+            raise PhoneCamError(t("core.vcam.dll_missing_src"))
         if self._softcam is not None and self._softcam_path != path:
             # 登録(更新)で読み込み元が変わった: 古い方のカメラを閉じて新しい DLL を使う
             self._softcam.close()
@@ -168,7 +166,7 @@ class VirtualCamOutput:
                 self._softcam = SoftcamSender(path)
                 self._softcam_path = path
             except OSError as e:
-                raise PhoneCamError("softcam.dll を読み込めません: %s" % e)
+                raise PhoneCamError(t("core.vcam.dll_load_failed", error=e))
         sender = self._softcam
         self._release_watchers()
         sender.close()
@@ -176,17 +174,17 @@ class VirtualCamOutput:
         if _is_frozen():
             st = registration_status(self.slot)
             if st == "missing":
-                self.state.update(error_text="PhoneCamカメラが未登録です。%s" % register_hint())
+                self.state.update(error_text=t("core.vcam.unregistered", hint=register_hint()))
             elif st == "outdated":
-                self.state.update(error_text="PhoneCamカメラの更新が必要です。%s" % register_hint())
+                self.state.update(error_text=t("core.vcam.needs_update", hint=register_hint()))
             else:
                 self.state.update(error_text="")
             return sender
         reg = softcam_registered_path(self.slot)
         if reg is None:
-            self.state.update(error_text="PhoneCamカメラが未登録です。%s" % register_hint())
+            self.state.update(error_text=t("core.vcam.unregistered", hint=register_hint()))
         elif not _same_path(reg, path):
-            self.state.update(error_text="PhoneCamカメラの登録先が別のフォルダです。フォルダを移動した場合は register.bat をもう一度実行してください")
+            self.state.update(error_text=t("core.vcam.other_folder"))
         else:
             self.state.update(error_text="")
         return sender
@@ -233,11 +231,11 @@ class VirtualCamOutput:
                 except Exception as e:
                     self.cam = None
                     self.fail_until = now + 1.5
-                    self.state.update(error_text="PhoneCamカメラを開始できません。登録済みか確認してください（%s）。詳細: %s" % (register_hint(), e))
+                    self.state.update(error_text=t("core.vcam.start_failed", hint=register_hint(), error=e))
                     return
             else:
                 if pyvirtualcam is None:
-                    self.state.update(error_text="pyvirtualcam がインストールされていません。install.bat を実行してください")
+                    self.state.update(error_text=t("core.vcam.need_pyvirtualcam"))
                     return
                 pv_backend = "unitycapture" if backend == "unitycapture" else "obs"
                 try:
@@ -252,19 +250,17 @@ class VirtualCamOutput:
                     self.cam = None
                     self.fail_until = now + 3.0
                     if pv_backend == "obs":
-                        msg = ("仮想カメラ(OBS Virtual Camera)を開始できません。OBS Studio 30以上をインストールし、"
-                               "OBSの「仮想カメラ開始」を使用中の場合は停止してください。詳細: %s" % e)
+                        msg = t("core.vcam.obs_failed", error=e)
                     else:
-                        msg = ("仮想カメラ(Unity Capture)を開始できません。Unity Captureドライバーを"
-                               "インストールしてください。詳細: %s" % e)
+                        msg = t("core.vcam.unity_failed", error=e)
                     self.state.update(error_text=msg)
                     return
             if size_changed:
                 self._notice_until = time.time() + 10.0
-                self.state.update(error_text=SIZE_CHANGED_NOTICE)
+                self.state.update(error_text=size_changed_notice())
         if self._notice_until and time.time() >= self._notice_until:
             self._notice_until = 0.0
-            if self.state.snapshot()["error_text"] == SIZE_CHANGED_NOTICE:
+            if self.state.snapshot()["error_text"] == size_changed_notice():
                 self.state.update(error_text="")
         try:
             if PROFILE is not None and backend == "phonecam":
@@ -276,5 +272,5 @@ class VirtualCamOutput:
             else:
                 self.cam.send(img)
         except Exception as e:
-            self.state.update(error_text="仮想カメラへの出力に失敗しました: %s" % e)
+            self.state.update(error_text=t("core.vcam.output_failed", error=e))
             self.close()

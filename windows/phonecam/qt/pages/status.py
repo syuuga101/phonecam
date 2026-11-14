@@ -11,11 +11,11 @@ from phonecam.core.decoder import THIN_NOTICE_SEC
 from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph_window, range_label
 from phonecam.i18n import t
 from phonecam.qt.widgets import NO_VALUE, Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
-from phonecam.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
+from phonecam.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, thin_text
 
 
 def _number(value, spec):
-    return format(value, spec) if isinstance(value, (int, float)) and not isinstance(value, bool) else "-"
+    return format(value, spec) if isinstance(value, (int, float)) and not isinstance(value, bool) else NO_VALUE
 
 
 class _History(QWidget):
@@ -214,7 +214,7 @@ def build(ctrl):
     def refresh(status):
         phone = status.phone
         thinning = status.connected and status.thin_total and time.monotonic() - status.thin_last < THIN_NOTICE_SEC
-        thin.setText(t("status.pc.thin", text=THIN_TEXT, n=status.thin_total) if thinning else "")
+        thin.setText(t("status.pc.thin", text=thin_text(), n=status.thin_total) if thinning else "")
         thin.setVisible(bool(thinning))
         version_note.setText(ctrl.phone_version_note())
         version_note.setVisible(bool(version_note.text()))
@@ -222,12 +222,12 @@ def build(ctrl):
         rec = phone.get("recording")
         cam, net = phone.get("cameraDroppedFrames"), phone.get("networkDroppedFrames")
         dropped = (t("status.video.dropped_fmt", cam=cam, net=net)
-                   if isinstance(cam, int) and isinstance(net, int) else "-")
+                   if isinstance(cam, int) and isinstance(net, int) else NO_VALUE)
         dropped_total = _dropped_total(status)
         dropped_warn = _drop_trend.update(dropped_total, time.monotonic())
         reasons = phone.get("cameraDropReasons")
         reasons = reasons if isinstance(reasons, dict) else {}
-        drops = " / ".join(str(reasons.get(key, "-")) for key in ("late", "outOfBuffers", "discontinuity")) if reasons else "-"
+        drops = " / ".join(str(reasons.get(key, NO_VALUE)) for key in ("late", "outOfBuffers", "discontinuity")) if reasons else NO_VALUE
         sent = phone.get("sentFps")
         if status.connected and isinstance(sent, (int, float)) and not isinstance(sent, bool):
             fps_text = t("status.video.fps_fmt", sent=f"{sent:.0f}", rx=f"{snap.get('rx_fps', 0.0):.0f}",
@@ -236,26 +236,26 @@ def build(ctrl):
             fps_text = _number(sent, ".1f")
         pressure = phone.get("pressureLevel")
         pressure_text = (t("status.iphone.pressure_shutdown") if pressure == "shutdown"
-                         else THERMAL_LABELS.get(pressure, "-"))
+                         else THERMAL_LABELS.get(pressure, NO_VALUE))
         factors = phone.get("pressureFactors")
         factor_names = {"systemTemperature", "peakPower", "depthModuleTemperature", "cameraTemperature"}
         factor_text = t("common.list_separator").join(t(f"status.iphone.factor.{f}") if f in factor_names else f
                                 for f in factors if isinstance(f, str)) if pressure and isinstance(factors, list) else ""
         low = phone.get("lowPowerMode")
         codec = snap["codec_in_use"] or phone.get("codec")
-        decoder = DECODER_LABELS.get(snap["decoder"], "-") if status.connected else "-"
+        decoder = DECODER_LABELS.get(snap["decoder"], NO_VALUE) if status.connected else NO_VALUE
         if status.connected and snap.get("decoder_note"):
             decoder = t("status.pc.decoder_note", decoder=decoder, note=snap["decoder_note"])
         size = canvas_size(ctrl.settings)
         output = f"{size[0]}×{size[1]}" if size else t("status.pc.out_native")
         def bitrate(field):
-            value = _number(phone.get(field), ".1f") if status.connected else "-"
-            return f"{value} Mbps" if value != "-" else "-"
+            value = _number(phone.get(field), ".1f") if status.connected else NO_VALUE
+            return f"{value} Mbps" if value != NO_VALUE else NO_VALUE
 
         adaptive = phone.get("adaptiveBitrateEnabled")
         reduced = phone.get("adaptiveBitrateReduced") is True
         if not status.connected:
-            adaptive_text = "-"
+            adaptive_text = NO_VALUE
         elif type(adaptive) is not bool:
             adaptive_text = t("status.video.adaptive_unsupported")
         elif adaptive:
@@ -263,15 +263,15 @@ def build(ctrl):
         else:
             adaptive_text = t("status.video.adaptive_off")
         data = {
-            "iphone": (status.thermal_text, pressure_text, factor_text or "-",
-                       format_mmss(ctrl.thermal_log.hot_seconds) if status.connected else "-", status.battery_text,
-                       "-" if low is None else t("status.iphone.on" if low else "status.iphone.off")),
+            "iphone": (status.thermal_text, pressure_text, factor_text or NO_VALUE,
+                       format_mmss(ctrl.thermal_log.hot_seconds) if status.connected else NO_VALUE, status.battery_text,
+                       NO_VALUE if low is None else t("status.iphone.on" if low else "status.iphone.off")),
             "video": (fps_text, dropped, drops,
-                      _number(rec.get("droppedFrames"), "d") if isinstance(rec, dict) and isinstance(rec.get("droppedFrames"), int) else "-",
-                      _number(phone.get("encodeMs"), ".1f") + " ms" if isinstance(phone.get("encodeMs"), (float, int)) else "-",
-                      _number(phone.get("processingMs"), ".1f") + " ms" if isinstance(phone.get("processingMs"), (float, int)) else "-",
+                      _number(rec.get("droppedFrames"), "d") if isinstance(rec, dict) and isinstance(rec.get("droppedFrames"), int) else NO_VALUE,
+                      _number(phone.get("encodeMs"), ".1f") + " ms" if isinstance(phone.get("encodeMs"), (float, int)) else NO_VALUE,
+                      _number(phone.get("processingMs"), ".1f") + " ms" if isinstance(phone.get("processingMs"), (float, int)) else NO_VALUE,
                       bitrate("bitrateSentMbps"), bitrate("bitrateTargetMbps"), adaptive_text),
-            "pc": (dict(CODEC_LABELS).get(codec, "-") if status.connected else "-", decoder, output, status.watch_text,
+            "pc": (dict(CODEC_LABELS).get(codec, NO_VALUE) if status.connected else NO_VALUE, decoder, output, status.watch_text,
                    status.dshow_text),
         }
         levels = {}
@@ -292,7 +292,7 @@ def build(ctrl):
                 levels["video", "sentfps"] = "ok" if phone["sentFps"] > 0 else "warning"
         for section, specs in sections[:-1]:
             for (key, _), value in zip(specs, data[section]):
-                values[section, key].set_status(value if value and value != "-" else NO_VALUE,
+                values[section, key].set_status(value if value and value != NO_VALUE else NO_VALUE,
                                                 levels.get((section, key)),
                                                 {("video", "dropped"): t("status.video.dropped_tip"),
                                                  ("video", "dropreasons"): t("status.video.dropreasons_tip"),
@@ -300,9 +300,9 @@ def build(ctrl):
         latency = ctrl.link.latency.averages() if status.connected else {}
         for key, _ in sections[-1][1]:
             value = latency.get(key)
-            text = status.latency_text if key == "total" else f"{value:.1f} ms" if value is not None else "-"
-            values["latency", key].set_status(text if text != "-" else NO_VALUE)
-        current.setHint(t("status.graph.current", level=status.thermal_text or "-",
+            text = status.latency_text if key == "total" else f"{value:.1f} ms" if value is not None else NO_VALUE
+            values["latency", key].set_status(text if text != NO_VALUE else NO_VALUE)
+        current.setHint(t("status.graph.current", level=status.thermal_text or NO_VALUE,
                           hot=format_mmss(ctrl.thermal_log.hot_seconds)))
 
     dirty = [False]

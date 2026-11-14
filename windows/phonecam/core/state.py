@@ -4,6 +4,8 @@
 
 import threading
 
+from phonecam.i18n import t
+
 
 # ---------------------------------------------------------------------------
 # 共有状態 (スレッド間)
@@ -12,7 +14,7 @@ import threading
 class SharedState:
     def __init__(self):
         self._lock = threading.Lock()
-        self.status_text = "停止中"
+        self.status_text = t("core.link.stopped")
         self.error_text = ""
         self.recv_fps = 0.0
         self.rx_fps = 0.0            # PCに届いた映像パケットの毎秒数 (間引き・デコード前。recv_fps は出力まで終えた数)
