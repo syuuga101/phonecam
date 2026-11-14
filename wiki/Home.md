@@ -20,7 +20,7 @@ Welcome to the phonecam wiki!
 上から順に読むと、セットアップから使いこなしまで分かります。
 
 1. [[はじめに（セットアップ）]]
-2. [[iPhoneアプリの入れ方（AltStore）]]
+2. [[iPhoneアプリの入れ方（SideStore）]]
 3. [[OBSで使う]]
 4. [[Discordで使う]]
 5. [[音声（iPhoneのマイク）を使う]]

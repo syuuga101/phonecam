@@ -1,7 +1,7 @@
 **[[Home]]**
 
 - [[はじめに（セットアップ）]]
-- [[iPhoneアプリの入れ方（AltStore）]]
+- [[iPhoneアプリの入れ方（SideStore）]]
 - [[OBSで使う]]
 - [[Discordで使う]]
 - [[音声（iPhoneのマイク）を使う]]
