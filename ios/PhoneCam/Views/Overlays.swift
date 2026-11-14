@@ -47,7 +47,7 @@ extension ContentView {
                         .onTapGesture { model.setScreenBlack(false) }
                     LiveStatusPill(text: blackPillText,
                                    live: model.isConnected || model.recActive,
-                                   muted: model.micEnabled && model.micMuted)
+                                   muted: model.micMuted)
                         .padding(.top, 8)
                         .allowsHitTesting(false)
                 }

@@ -23,7 +23,7 @@ struct StatusPill: View {
             Text(text)
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
-            if model.micEnabled && model.micMuted {
+            if model.micMuted {
                 Image(systemName: "mic.slash.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.red)
@@ -314,6 +314,30 @@ struct TorchButton: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             model.toggleTorch()
         }
+    }
+}
+
+/// マイクのミュート。音声がつながっていなくても常に操作できる (ミュート中は赤)。
+struct MuteButton: View {
+    @EnvironmentObject var model: AppModel
+    var size: CGFloat = 48
+
+    var body: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            model.toggleMute()
+        } label: {
+            Image(systemName: model.micMuted ? "mic.slash.fill" : "mic.fill")
+                .font(.system(size: size * 0.42, weight: .semibold))
+                .foregroundColor(model.micMuted ? .white : .primary)
+                .frame(width: size, height: size)
+                .background(model.micMuted ? Color.red : Color(.tertiarySystemFill))
+                .clipShape(Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("マイク（ミュート）"))
+        .accessibilityValue(model.micMuted ? Text("ミュート中") : Text(""))
     }
 }
 

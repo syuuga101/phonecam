@@ -137,18 +137,21 @@ struct ContentView: View {
         VStack(spacing: 6) {
             RecordTimerPill()
             HStack(spacing: 0) {
-                LastRecordingButton(store: recordings) { showRecordings = true }
-                    .frame(width: 64, alignment: .leading)
+                HStack(spacing: 10) {
+                    LastRecordingButton(store: recordings) { showRecordings = true }
+                    MuteButton(size: 44)
+                }
+                .frame(width: 112, alignment: .leading)
                 Spacer(minLength: 0)
                 RecordButton(recording: model.recActive) { model.toggleRecording() }
                 Spacer(minLength: 0)
                 TorchButton(style: .bar, size: 52)
-                    .frame(width: 64, alignment: .trailing)
+                    .frame(width: 112, alignment: .trailing)
             }
         }
     }
 
-    /// 横画面の操作列 (アイコンだけ): 上からライト、録画 (中央)、プレビュー、設定
+    /// 横画面の操作列 (アイコンだけ): 上からライト、録画 (中央)、ミュート、プレビュー、設定
     private var landscapeColumn: some View {
         VStack(spacing: 0) {
             TorchButton(style: .bar, size: 48)
@@ -158,6 +161,8 @@ struct ContentView: View {
                 RecordButton(recording: model.recActive) { model.toggleRecording() }
             }
             Spacer(minLength: 8)
+            MuteButton(size: 48)
+                .padding(.bottom, 10)
             PreviewToggleButton(style: .bar, size: 48)
             RoundIconButton(symbol: "gearshape", size: 48, style: .bar, label: "設定") {
                 showLandscapeSettings = true
@@ -180,15 +185,6 @@ struct ContentView: View {
             }
 
             Section {
-                if model.micEnabled {
-                    HStack(spacing: 12) {
-                        RowIcon(symbol: model.micMuted ? "mic.slash" : "mic")
-                        Toggle("マイク（ミュート）", isOn: Binding(
-                            get: { model.micMuted },
-                            set: { _ in model.toggleMute() }
-                        ))
-                    }
-                }
                 NavigationLink {
                     SettingsView(model: model)
                 } label: {

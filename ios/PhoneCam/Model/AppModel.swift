@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     @Published var torchAvailable = false
     /// ピンチ中は、遅れて届くステータスの zoom で画面の値を戻さない
     var zoomGestureActive = false
-    @Published var micMuted = false
+    @Published var micMuted = UserDefaults.standard.bool(forKey: "micMuted")   // iPhone で設定した値を覚えている
     @Published var outputCanvas: OutputCanvas?
     @Published var cameraSize = CGSize(width: 1920, height: 1080)   // カメラ素の向き (横長) のサイズ
     @Published var previewAngle = 90                                 // プレビュー接続の回転角 (0/90/180/270)
@@ -304,6 +304,7 @@ final class AppModel: ObservableObject {
             self.encoder.requestKeyframe()
             self.updateCameraRunning()
             self.sendFullStatus()
+            self.camera.announceMuteIfNeeded()   // iPhone でミュート中なら PC に知らせる
             self.camera.requestPublish()   // 最新のカメラ状態は sessionQueue で作って onApplied で届く
             DispatchQueue.main.async {
                 self.streamActiveUI = true
