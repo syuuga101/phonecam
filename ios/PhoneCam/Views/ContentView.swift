@@ -64,7 +64,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $updater.showNotes) {
-            UpdateNotesSheet(release: updater.available) { updater.showNotes = false }
+            UpdateNotesSheet(checker: updater) { updater.showNotes = false }
         }
         .sheet(isPresented: $showRecordings) {
             NavigationStack {

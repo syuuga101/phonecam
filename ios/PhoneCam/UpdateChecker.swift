@@ -14,6 +14,11 @@ final class UpdateChecker: ObservableObject {
     /// 表示中の更新 (nil なら何も出さない)
     @Published var available: Release?
     @Published var showNotes = false
+    /// 更新内容シート用 (バナーが消えても、シートの中身は変わらないよう控えておく)
+    @Published var notesLatest: Release?
+    @Published var notesReleases: [Release] = []
+    @Published var notesLoading = false
+    @Published var notesFailed = false
 
     private let defaults = UserDefaults.standard
     private let interval: TimeInterval = 6 * 3600
@@ -118,13 +123,65 @@ final class UpdateChecker: ObservableObject {
     // MARK: 操作
 
     func openAltStore() {
-        guard let rel = available else { return }
+        guard let rel = available ?? notesLatest else { return }
         let fallback = rel.htmlURL
         guard let alt = URL(string: "altstore://") else { return }
         UIApplication.shared.open(alt, options: [:]) { ok in
             if !ok, let u = URL(string: fallback) {
                 UIApplication.shared.open(u, options: [:], completionHandler: nil)
             }
+        }
+    }
+
+    var releasesPageURL: URL? {
+        if let u = notesLatest?.htmlURL, let url = URL(string: u), !u.isEmpty { return url }
+        return URL(string: "https://github.com/\(repo)/releases")
+    }
+
+    /// 更新内容を開く。保存済みの本文をすぐ出しつつ、現在のバージョンより新しいリリースを全部取得し直す。
+    func openNotes() {
+        guard let latest = available ?? notesLatest else { return }
+        notesLatest = latest
+        notesReleases = latest.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : [latest]
+        notesFailed = false
+        notesLoading = true
+        showNotes = true
+        let repo = self.repo
+        Task { [weak self] in
+            let list = await UpdateChecker.fetchAll(repo: repo)
+            await MainActor.run {
+                guard let self = self else { return }
+                self.notesLoading = false
+                guard let list = list else {
+                    self.notesFailed = self.notesReleases.isEmpty
+                    return
+                }
+                let current = UpdateChecker.currentVersion
+                var newer = list.filter { UpdateChecker.isNewer($0.version, than: current) }
+                if newer.isEmpty { newer = list.filter { $0.tag == latest.tag } }
+                newer.sort { UpdateChecker.isNewer($0.version, than: $1.version) }
+                if newer.isEmpty { self.notesFailed = self.notesReleases.isEmpty } else { self.notesReleases = newer }
+            }
+        }
+    }
+
+    private static func fetchAll(repo: String) async -> [Release]? {
+        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=30") else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 10
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("PhoneCam-iOS", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200,
+                  let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
+            return arr.compactMap { o in
+                guard (o["draft"] as? Bool) != true, (o["prerelease"] as? Bool) != true,
+                      let tag = o["tag_name"] as? String, !tag.isEmpty else { return nil }
+                return Release(tag: tag, htmlURL: (o["html_url"] as? String) ?? "", body: (o["body"] as? String) ?? "")
+            }
+        } catch {
+            return nil
         }
     }
 
@@ -184,7 +241,7 @@ struct UpdateBanner: View {
                         .background(Color.blue)
                         .clipShape(Capsule())
                 }
-                Button(action: { checker.showNotes = true }) {
+                Button(action: { checker.openNotes() }) {
                     Text("更新内容")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.blue)
@@ -205,41 +262,179 @@ struct UpdateBanner: View {
     }
 }
 
+/// リリースノートの Markdown を、見出し・箇条書き・段落に分けたもの
+struct NotesSection: Identifiable {
+    enum Block: Identifiable {
+        case bullet(Int, String)
+        case paragraph(Int, String)
+        var id: Int { switch self { case .bullet(let i, _), .paragraph(let i, _): return i } }
+    }
+    let id: Int
+    let title: String?
+    var blocks: [Block]
+    var isWindows: Bool { (title ?? "").lowercased().contains("windows") }
+
+    /// 「---」以降 (インストール案内) と、自動生成の "What's Changed" 以降は省く
+    static func parse(_ md: String) -> [NotesSection] {
+        var sections: [NotesSection] = []
+        var title: String?
+        var blocks: [Block] = []
+        var n = 0
+        func flush() {
+            if title != nil || !blocks.isEmpty { sections.append(NotesSection(id: sections.count, title: title, blocks: blocks)) }
+            blocks = []
+        }
+        let lines = md.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { continue }
+            if line.hasPrefix("---") || line.lowercased().hasPrefix("## what's changed") || line.hasPrefix("**Full Changelog") { break }
+            n += 1
+            if line.hasPrefix("#") {
+                let t = line.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces)
+                if line.hasPrefix("###") { flush(); title = t }
+                else if sections.isEmpty && blocks.isEmpty && title == nil { continue } // 先頭の「## vX の変更点」は省く
+                else { blocks.append(.paragraph(n, t)) }
+            } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
+                blocks.append(.bullet(n, String(line.dropFirst(2))))
+            } else {
+                blocks.append(.paragraph(n, line))
+            }
+        }
+        flush()
+        // iPhone に関係する節を先に、Windows の節を後ろに回す
+        return sections.filter { !$0.isWindows } + sections.filter { $0.isWindows }
+    }
+}
+
+private func inlineMarkdown(_ s: String) -> AttributedString {
+    let opt = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    return (try? AttributedString(markdown: s, options: opt)) ?? AttributedString(s)
+}
+
+private struct NotesBlockView: View {
+    let block: NotesSection.Block
+    var body: some View {
+        switch block {
+        case .bullet(_, let t):
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("•").foregroundColor(Color(white: 0.55))
+                Text(inlineMarkdown(t)).fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.system(size: 15)).foregroundColor(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .paragraph(_, let t):
+            Text(inlineMarkdown(t))
+                .font(.system(size: 15)).foregroundColor(.white)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct NotesReleaseView: View {
+    let release: UpdateChecker.Release
+    let showVersion: Bool
+    @State private var windowsOpen = false
+
+    var body: some View {
+        let sections = NotesSection.parse(release.body)
+        VStack(alignment: .leading, spacing: 14) {
+            if showVersion {
+                Text("v\(release.version)")
+                    .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+            }
+            if sections.isEmpty {
+                Text("更新内容の記載はありません。")
+                    .font(.system(size: 15)).foregroundColor(Color(white: 0.55))
+            }
+            ForEach(sections) { sec in
+                if sec.isWindows {
+                    DisclosureGroup(isExpanded: $windowsOpen) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(sec.blocks) { NotesBlockView(block: $0) }
+                        }
+                        .padding(.top, 8)
+                    } label: {
+                        Text("Windows 向けの変更")
+                            .font(.system(size: 15, weight: .semibold)).foregroundColor(Color(white: 0.7))
+                    }
+                    .tint(Color(white: 0.7))
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let t = sec.title {
+                            Text(t).font(.system(size: 17, weight: .semibold)).foregroundColor(.white)
+                        }
+                        ForEach(sec.blocks) { NotesBlockView(block: $0) }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// 更新内容 (リリースノート) のシート
 struct UpdateNotesSheet: View {
-    let release: UpdateChecker.Release?
+    @ObservedObject var checker: UpdateChecker
     let onClose: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("更新内容")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    Spacer()
-                    Button(action: onClose) {
-                        Text("閉じる")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.blue)
+        NavigationStack {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.ignoresSafeArea())
+                .navigationTitle("更新内容")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("閉じる", action: onClose)
                     }
                 }
-                if let r = release {
-                    Text("v\(r.version)")
-                        .font(.system(size: 15))
-                        .foregroundColor(Color(white: 0.55))
-                    ScrollView {
-                        let text = UpdateChecker.plainText(r.body)
-                        Text(text.isEmpty ? String(localized: "更新内容の記載はありません。") : text)
-                            .font(.system(size: 15))
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Button(action: { checker.openAltStore() }) {
+                        Text("AltStoreで更新")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+                    .background(Color.black)
+                }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder private var content: some View {
+        if !checker.notesReleases.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    ForEach(checker.notesReleases, id: \.tag) { r in
+                        NotesReleaseView(release: r, showVersion: true)
+                    }
+                    if checker.notesLoading {
+                        ProgressView().frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(20)
+            }
+        } else if checker.notesLoading {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("読み込んでいます…").font(.system(size: 15)).foregroundColor(Color(white: 0.6))
+            }
+        } else {
+            VStack(spacing: 14) {
+                Text(checker.notesFailed ? "更新内容を取得できませんでした" : "更新内容の記載はありません。")
+                    .font(.system(size: 16)).foregroundColor(Color(white: 0.7))
+                if let url = checker.releasesPageURL {
+                    Link("リリースページを開く", destination: url).font(.system(size: 16, weight: .medium))
                 }
             }
             .padding(20)
         }
-        .preferredColorScheme(.dark)
     }
 }
