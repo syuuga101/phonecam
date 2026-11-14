@@ -226,6 +226,22 @@ _JA = {
     "setup.wizard.run_diagnostics_44": "Windowsセキュリティ > ファイアウォールとネットワーク保護 > ファイアウォールによるアプリケーションの許可 で、AltServer の「プライベート」にチェックを入れてください",
     "setup.wizard.run_diagnostics_45": "AltServer を許可するルールが見つかりません",
     "setup.wizard.run_diagnostics_46": "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します",
+    "setup.wizard.run_diagnostics_fw_bonjour_block": "Bonjour（mDNS）をブロックするルールがあります",
+    "setup.wizard.run_diagnostics_fw_bonjour_fix": "Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 で、Bonjour サービスの「プライベート」にチェックを入れてください（UDP 5353 を使います）",
+    "setup.wizard.run_diagnostics_fw_bonjour_label": "ファイアウォールがBonjour（mDNS・UDP 5353）を許可している",
+    "setup.wizard.run_diagnostics_fw_bonjour_none": "Bonjour（mDNS・UDP 5353）を許可するルールが見つかりません",
+    "setup.wizard.run_diagnostics_fw_act_allow": "許可",
+    "setup.wizard.run_diagnostics_fw_act_block": "ブロック",
+    "setup.wizard.run_diagnostics_fw_dir_in": "受信",
+    "setup.wizard.run_diagnostics_fw_dir_out": "送信",
+    "setup.wizard.run_diagnostics_fw_disabled": "無効",
+    "setup.wizard.run_diagnostics_fw_fix_partial": "Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 で、{app} の「{missing}」にチェックを入れてください",
+    "setup.wizard.run_diagnostics_fw_partial": "{app} の許可ルールはありますが、今のネットワークの種類（{current}）が含まれていません。足りないプロファイル: {missing}",
+    "setup.wizard.run_diagnostics_fw_profile_domain": "ドメイン",
+    "setup.wizard.run_diagnostics_fw_profile_private": "プライベート",
+    "setup.wizard.run_diagnostics_fw_profile_public": "パブリック",
+    "setup.wizard.run_diagnostics_fw_rule_item": "{name}［{profiles} / {kind}］",
+    "setup.wizard.run_diagnostics_fw_rules_suffix": "（見つかったルール: {rules}）",
     "setup.wizard.diagnostics_summary_1": "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。",
     "setup.wizard.setupengine__prepare_1": "{name} をインストール",
     "setup.wizard.setupengine__prepare_2": "zipの中にインストーラーが見つかりませんでした",
@@ -1709,7 +1725,7 @@ def run_text(cmd, timeout=20):
         r = subprocess.run(list(cmd), **kw)
         raw = r.stdout or b""
         text = None
-        for enc in (("utf-8",) if cmd and str(cmd[0]).lower().startswith("powershell") else ()) + ("oem", "mbcs", "cp932", "utf-8"):
+        for enc in ("utf-8", "oem", "mbcs", "cp932"):  # cp932 の日本語は UTF-8 としては通らないので、まず UTF-8 を試す
             try:
                 text = raw.decode(enc)
                 break
@@ -1784,28 +1800,246 @@ def find_vpn_adapters(adapters):
     return out
 
 
+# --- ファイアウォール判定 ---------------------------------------------------------------
+# 言語に依存しない PowerShell (Get-NetFirewall*) の JSON を主にして、失敗したときだけ netsh の出力を読む。
+# どちらも同じ形のルール dict に直してから _eval_firewall で判定する:
+#   {name, display, enabled(bool), direction("in"/"out"/""), action("allow"/"block"/""), profiles(bit 1=Domain 2=Private 4=Public),
+#    program, protocol, lport}
+FW_DOMAIN, FW_PRIVATE, FW_PUBLIC, FW_ALL = 1, 2, 4, 7
+_FW_CAT_BIT = {NET_DOMAIN: FW_DOMAIN, NET_PRIVATE: FW_PRIVATE, NET_PUBLIC: FW_PUBLIC}
+
+_FW_SCRIPT = (
+    "$ErrorActionPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+    "$global:rows=@{}; "
+    "function Add-Rule($r,$prog,$proto,$lport){ if($r -and -not $global:rows.ContainsKey($r.Name)){ "
+    "$global:rows[$r.Name]=@{name=[string]$r.Name; display=[string]$r.DisplayName; en=[string][int]$r.Enabled; dir=[string][int]$r.Direction; "
+    "act=[string][int]$r.Action; prof=[string][int]$r.Profile; prog=[string]$prog; proto=[string]$proto; lport=((@($lport) | ForEach-Object { [string]$_ }) -join ',')} } }; "
+    "$pat='(?i)(^|[\\\\/])(altserver|mdnsresponder)\\.exe$'; "
+    "foreach($f in @(Get-NetFirewallApplicationFilter | Where-Object { $_.Program -match $pat })){ "
+    "foreach($r in @(Get-NetFirewallRule -AssociatedNetFirewallApplicationFilter $f)){ Add-Rule $r $f.Program '' '' } }; "
+    "foreach($r in @(Get-NetFirewallRule | Where-Object { $_.DisplayName -match '(?i)altserver|bonjour|mdns' -or $_.Name -match '(?i)altserver|bonjour|mdns' })){ "
+    "$af=Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $r; $pf=Get-NetFirewallPortFilter -AssociatedNetFirewallRule $r; "
+    "Add-Rule $r $af.Program $pf.Protocol $pf.LocalPort }; "
+    "foreach($f in @(Get-NetFirewallPortFilter | Where-Object { [string]$_.Protocol -eq 'UDP' -and (@($_.LocalPort) -contains '5353') })){ "
+    "foreach($r in @(Get-NetFirewallRule -AssociatedNetFirewallPortFilter $f)){ "
+    "$af=Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $r; Add-Rule $r $af.Program $f.Protocol $f.LocalPort } }; "
+    "@{rules=@($global:rows.Values)} | ConvertTo-Json -Compress -Depth 4")
+
+
+def _fw_enabled(v):
+    s = str(v if v is not None else "").strip().lower()
+    if s in ("1", "true", "yes", "y", "はい", "有効"):
+        return True
+    return False
+
+
+def _fw_direction(v):
+    s = str(v if v is not None else "").strip().lower()
+    if not s:
+        return ""
+    if s == "1" or s.startswith(("in", "入", "受信", "内向", "インバウンド")):
+        return "in"
+    if s == "2" or s.startswith(("out", "出", "送信", "外向", "アウトバウンド")):
+        return "out"
+    return ""
+
+
+def _fw_action(v):
+    s = str(v if v is not None else "").strip().lower()
+    if s == "2" or s.startswith(("allow", "許可", "bypass", "セキュリティで保護されている場合")):
+        return "allow"
+    if s == "4" or s.startswith(("block", "ブロック", "拒否", "遮断", "ブロック")):
+        return "block"
+    return ""
+
+
+def _fw_profiles(v):
+    """プロファイルの値 → ビット (Domain=1 Private=2 Public=4)。数値 / 英語名 / 日本語名のどれでも読む。空は全部。"""
+    s = str(v if v is not None else "").strip().lower()
+    if not s:
+        return FW_ALL
+    if s.lstrip("-").isdigit():
+        n = int(s) & FW_ALL
+        return n or FW_ALL
+    bits = 0
+    for tok in re.split(r"[,、，;\s/]+", s):
+        if not tok:
+            continue
+        if tok.startswith(("any", "all", "任意", "すべて", "全て")):
+            return FW_ALL
+        if tok.startswith(("domain", "ドメイン")):
+            bits |= FW_DOMAIN
+        elif tok.startswith(("private", "プライベート", "非公開")):
+            bits |= FW_PRIVATE
+        elif tok.startswith(("public", "パブリック", "公開")):
+            bits |= FW_PUBLIC
+    return bits or FW_ALL
+
+
+def _fw_rule(name="", display="", enabled=False, direction="", action="", profiles=FW_ALL, program="", protocol="", lport=""):
+    return {"name": name, "display": display or name, "enabled": enabled, "direction": direction, "action": action,
+            "profiles": profiles, "program": program, "protocol": str(protocol or "").lower(), "lport": str(lport or "")}
+
+
+def parse_firewall_json(stdout):
+    """_FW_SCRIPT の JSON → ルール dict のリスト。JSON として読めなければ None (netsh に戻る合図)。"""
+    text = (stdout or "").strip()
+    i, j = text.find("{"), text.rfind("}")
+    if i < 0 or j <= i:
+        return None
+    try:
+        data = json.loads(text[i:j + 1])
+    except Exception:
+        return None
+    if not isinstance(data, dict) or "rules" not in data:
+        return None
+    return [_fw_rule(str(r.get("name") or ""), str(r.get("display") or ""), _fw_enabled(r.get("en")), _fw_direction(r.get("dir")),
+                     _fw_action(r.get("act")), _fw_profiles(r.get("prof")), str(r.get("prog") or ""), r.get("proto"), r.get("lport"))
+            for r in _as_list(data.get("rules")) if isinstance(r, dict)]
+
+
+# netsh の項目名 (英語/日本語、空白除去・小文字化したもの) → フィールド
+_NETSH_KEYS = {
+    "rulename": "name", "規則名": "name", "ルール名": "name",
+    "enabled": "enabled", "有効": "enabled",
+    "direction": "direction", "方向": "direction",
+    "profiles": "profiles", "profile": "profiles", "プロファイル": "profiles",
+    "program": "program", "プログラム": "program",
+    "action": "action", "操作": "action", "アクション": "action",
+    "protocol": "protocol", "プロトコル": "protocol",
+    "localport": "lport", "ローカルポート": "lport",
+}
+
+
+def parse_firewall_netsh(stdout):
+    """netsh advfirewall firewall show rule name=all の出力 → ルール dict のリスト。
+    「規則名:」/「Rule Name:」の行で新しいルールが始まる (空行の有無には頼らない)。値は日本語・英語どちらでも読む。"""
+    rules, cur = [], None
+
+    def flush():
+        if cur is not None:
+            rules.append(_fw_rule(cur.get("name", ""), "", _fw_enabled(cur.get("enabled")), _fw_direction(cur.get("direction")),
+                                  _fw_action(cur.get("action")), _fw_profiles(cur.get("profiles")), cur.get("program", ""),
+                                  cur.get("protocol", ""), cur.get("lport", "")))
+
+    for line in (stdout or "").splitlines():
+        m = re.match(r"^\s*([^:：]+?)\s*[:：]\s*(.*?)\s*$", line.replace("　", " "))
+        if not m:
+            continue
+        key = re.sub(r"\s+", "", m.group(1)).lower()
+        field = _NETSH_KEYS.get(key)
+        if not field:
+            continue
+        if field == "name":
+            flush()
+            cur = {}
+        if cur is None:
+            continue
+        cur.setdefault(field, m.group(2))
+    flush()
+    return rules
+
+
 def parse_firewall(stdout, keyword="altserver"):
-    """netsh advfirewall firewall show rule name=all の出力から、keyword を含むルールを調べる。
-    戻り値: {"found": 件数, "allow_in": 有効な受信許可があるか, "block": 有効なブロックがあるか}。
-    項目名は英語/日本語の両方を読む。ルールは空行で区切られる。"""
+    """互換用: netsh の出力から keyword を含む (名前かプログラム) ルールを調べる。
+    戻り値: {"found": 件数, "allow_in": 有効な受信許可があるか, "block": 有効なブロックがあるか}"""
     res = {"found": 0, "allow_in": False, "block": False}
-    for block in re.split(r"\r?\n\s*\r?\n", stdout or ""):
-        if keyword.lower() not in block.lower():
+    for r in parse_firewall_netsh(stdout):
+        if keyword.lower() not in ("%s %s" % (r["name"], r["program"])).lower():
             continue
         res["found"] += 1
-        enabled = re.search(r"(?:Enabled|有効)\s*:\s*(\S+)", block)
-        action = re.search(r"(?:Action|操作)\s*:\s*(\S+)", block)
-        direction = re.search(r"(?:Direction|方向)\s*:\s*(\S+)", block)
-        if enabled and enabled.group(1).lower() not in ("yes", "はい"):
+        if not r["enabled"]:
             continue
-        a = (action.group(1).lower() if action else "")
-        d = (direction.group(1).lower() if direction else "in")
-        if a in ("allow", "許可"):
-            if d in ("in", "入", "受信"):
-                res["allow_in"] = True
-        elif a in ("block", "ブロック"):
+        if r["action"] == "allow" and r["direction"] in ("in", ""):
+            res["allow_in"] = True
+        elif r["action"] == "block":
             res["block"] = True
     return res
+
+
+def _fw_basename(path):
+    return re.split(r"[\\/]", str(path or "").strip().strip('"'))[-1].lower()
+
+
+def fw_is_altserver(r):
+    return _fw_basename(r["program"]) == "altserver.exe" or "altserver" in ("%s %s" % (r["name"], r["display"])).lower()
+
+
+def fw_is_bonjour(r):
+    if _fw_basename(r["program"]) == "mdnsresponder.exe" or re.search(r"bonjour|mdns", "%s %s" % (r["name"], r["display"]), re.I):
+        return True
+    return r["protocol"] in ("udp", "17") and "5353" in re.split(r"[,\s]+", r["lport"])
+
+
+def fw_active_bits(net):
+    """今つながっているネットワークの種類 → プロファイルのビット。わからなければ 0。"""
+    bits = 0
+    for p in (net or {}).get("profiles", []):
+        bits |= _FW_CAT_BIT.get(p.get("category"), 0)
+    return bits
+
+
+def _fw_profile_names(bits):
+    names = []
+    for bit, key in ((FW_DOMAIN, "setup.wizard.run_diagnostics_fw_profile_domain"),
+                     (FW_PRIVATE, "setup.wizard.run_diagnostics_fw_profile_private"),
+                     (FW_PUBLIC, "setup.wizard.run_diagnostics_fw_profile_public")):
+        if bits & bit:
+            names.append(t(key))
+    return t("common.list_separator").join(names)
+
+
+def fw_describe_rule(r):
+    """ユーザーが画面と見比べられるように「名前（プロファイル / 受信・許可 / 無効）」の形にする。"""
+    kind = []
+    if r["direction"] == "in":
+        kind.append(t("setup.wizard.run_diagnostics_fw_dir_in"))
+    elif r["direction"] == "out":
+        kind.append(t("setup.wizard.run_diagnostics_fw_dir_out"))
+    if r["action"] == "allow":
+        kind.append(t("setup.wizard.run_diagnostics_fw_act_allow"))
+    elif r["action"] == "block":
+        kind.append(t("setup.wizard.run_diagnostics_fw_act_block"))
+    if not r["enabled"]:
+        kind.append(t("setup.wizard.run_diagnostics_fw_disabled"))
+    return t("setup.wizard.run_diagnostics_fw_rule_item", name=r["display"] or r["name"] or r["program"],
+             profiles=_fw_profile_names(r["profiles"]), kind="・".join(kind))
+
+
+def evaluate_firewall(rules, matcher, active_bits=0):
+    """matcher に合うルールを調べる。戻り値 {"state": "ok"/"block"/"partial"/"none", "missing": 足りないビット, "found": [rule...], "blockers": [rule...]}。
+    有効な受信ブロックが今のネットワークに効いていれば block (ブロックが優先)。許可があっても今のネットワークの
+    プロファイルを含まなければ partial。active_bits=0 はネットワーク不明 (どれか1つでも許可があれば ok)。"""
+    found = [r for r in rules if matcher(r)]
+    live = [r for r in found if r["enabled"] and r["direction"] in ("in", "")]
+    act = active_bits or FW_ALL
+    blockers = [r for r in live if r["action"] == "block" and r["profiles"] & act]
+    allows = [r for r in live if r["action"] == "allow"]
+    covered = 0
+    for r in allows:
+        covered |= r["profiles"]
+    missing = (active_bits & ~covered) if active_bits else 0
+    if blockers:
+        state = "block"
+    elif allows and not missing:
+        state = "ok"
+    elif allows:
+        state = "partial"
+    else:
+        state = "none"
+    return {"state": state, "missing": missing, "found": found, "blockers": blockers}
+
+
+def get_firewall_rules(run):
+    """PowerShell (言語に依存しない) で取得。失敗したときだけ netsh の解析に戻る。取れなければ None。"""
+    rc, txt = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _FW_SCRIPT], 60)
+    rules = parse_firewall_json(txt) if rc is not None else None
+    if rules is not None:
+        return rules
+    rc, txt = run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], 40)
+    if rc is None:
+        return None
+    return parse_firewall_netsh(txt)
 
 
 _NET_SCRIPT = (
@@ -1925,22 +2159,51 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
         else:
             out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_OK))
 
-    # 8. ファイアウォール
+    # 8. ファイアウォール (AltServer) / 9. ファイアウォール (Bonjour)
     note(t("setup.wizard.run_diagnostics_40"))
-    rc, txt = run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], 40)
-    if rc is None:
-        out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"),
-                         t("setup.wizard.run_diagnostics_42")))
+    rules = get_firewall_rules(run)
+    active = fw_active_bits(net)
+    current = _fw_profile_names(active)
+    lbl_alt, lbl_bj = t("setup.wizard.run_diagnostics_41"), t("setup.wizard.run_diagnostics_fw_bonjour_label")
+    if rules is None:
+        out.append(_diag("firewall", lbl_alt, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_42")))
+        out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_42")))
     else:
-        fw = parse_firewall(txt, "altserver")
-        if fw["allow_in"] and not fw["block"]:
-            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_OK))
-        elif fw["block"]:
-            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_NG, t("setup.wizard.run_diagnostics_43"),
+        def suffix(res, only=None):
+            shown = only if only is not None else res["found"]
+            if not shown:
+                return ""
+            return t("setup.wizard.run_diagnostics_fw_rules_suffix", rules=t("common.list_separator").join(fw_describe_rule(r) for r in shown))
+
+        def fix_partial(app, res):
+            return t("setup.wizard.run_diagnostics_fw_fix_partial", app=app, missing=_fw_profile_names(res["missing"]))
+
+        res = evaluate_firewall(rules, fw_is_altserver, active)
+        if res["state"] == "ok":
+            out.append(_diag("firewall", lbl_alt, DIAG_OK))
+        elif res["state"] == "block":
+            out.append(_diag("firewall", lbl_alt, DIAG_NG, t("setup.wizard.run_diagnostics_43") + suffix(res, res["blockers"]),
                              t("setup.wizard.run_diagnostics_44")))
+        elif res["state"] == "partial":
+            out.append(_diag("firewall", lbl_alt, DIAG_WARN,
+                             t("setup.wizard.run_diagnostics_fw_partial", app="AltServer", current=current, missing=_fw_profile_names(res["missing"])) + suffix(res),
+                             fix_partial("AltServer", res)))
         else:
-            out.append(_diag("firewall", t("setup.wizard.run_diagnostics_41"), DIAG_NG, t("setup.wizard.run_diagnostics_45"),
-                             t("setup.wizard.run_diagnostics_46")))
+            out.append(_diag("firewall", lbl_alt, DIAG_NG, t("setup.wizard.run_diagnostics_45") + suffix(res), t("setup.wizard.run_diagnostics_46")))
+
+        res = evaluate_firewall(rules, fw_is_bonjour, active)
+        if res["state"] == "ok":
+            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_OK))
+        elif res["state"] == "block":
+            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_NG, t("setup.wizard.run_diagnostics_fw_bonjour_block") + suffix(res, res["blockers"]),
+                             t("setup.wizard.run_diagnostics_fw_bonjour_fix")))
+        elif res["state"] == "partial":
+            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN,
+                             t("setup.wizard.run_diagnostics_fw_partial", app="Bonjour", current=current, missing=_fw_profile_names(res["missing"])) + suffix(res),
+                             fix_partial("Bonjour", res)))
+        else:
+            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN, t("setup.wizard.run_diagnostics_fw_bonjour_none") + suffix(res),
+                             t("setup.wizard.run_diagnostics_fw_bonjour_fix")))
     note("")
     return out
 
