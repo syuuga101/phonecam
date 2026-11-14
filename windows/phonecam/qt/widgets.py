@@ -14,7 +14,7 @@
 色は直書きしない (パレットから計算)。パレットが変わると自動で描き直す。
 """
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, QTimer, Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QPointF, QRect, QRectF, QSize, QTimer, QVariantAnimation, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractButton,
@@ -429,13 +429,89 @@ class _ExpanderHeader(QPushButton):
             painter.drawRoundedRect(self.rect().adjusted(3, 3, -4, -4), 3, 3)
 
 
-class Expander(Card):
-    """折りたたみ状態を設定に保存するカード。"""
+class ElidedHint(Hint):
+    """1行で、入りきらないときは末尾を「…」で切る二次色の文。幅が足りなくても最小幅は小さいままなので、
+    横に並んだ他の部品を押し出さない (優先して見せたい側は sizeHint の幅で場所を取る)。"""
 
-    def __init__(self, ctrl, key, icon_name, title, summary, parent=None):
+    def __init__(self, text="", align=Qt.AlignmentFlag.AlignLeft, max_chars=0, parent=None):
+        super().__init__("", False, parent)
+        self._full = ""
+        self._max_chars = max_chars
+        self.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored if not max_chars else QSizePolicy.Policy.Preferred,
+                           QSizePolicy.Policy.Preferred)
+        self.setText(text)
+
+    def text_full(self):
+        return self._full
+
+    def setText(self, text):
+        self._full = text
+        super().setText(text)
+        self.updateGeometry()
+        self.update()
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        if self._max_chars:
+            hint.setWidth(min(hint.width(), self.fontMetrics().horizontalAdvance("0") * self._max_chars))
+        return hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setWidth(min(hint.width(), self.fontMetrics().horizontalAdvance("0") * 6))
+        return hint
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        rect = self.contentsRect()
+        text = self.fontMetrics().elidedText(self._full, Qt.TextElideMode.ElideRight, rect.width())
+        painter.drawText(rect, int(self.alignment()), text)
+
+
+class _Curtain(QWidget):
+    """開閉アニメーションのあいだだけ、中身の写真 (QPixmap) を見せる。本物の中身は隠したままなので、
+    毎フレームの再レイアウト (折り返しラベルの高さ計算など) が起きない。高さだけを動かす。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.pixmap = None
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.hide()
+
+    def paintEvent(self, event):
+        if self.pixmap is not None:
+            QPainter(self).drawPixmap(0, 0, self.pixmap)
+
+
+# 開閉アニメーション中の折りたたみ。動いているあいだ、ページ全体の測り直し (refit / FitBox) は止めて、終わってからまとめて行う。
+_running = set()
+_deferred = []
+ANIMATION_MS = 170
+
+
+def _flush_deferred():
+    if _running:
+        return
+    pending = list(_deferred)
+    _deferred.clear()
+    for widget in pending:
+        try:
+            refit(widget)
+        except RuntimeError:
+            pass   # 破棄されたウィジェット
+
+
+class Expander(Card):
+    """折りたたみ。左にアイコン、中央に題名 (太字) と「中で何が分かるか・何ができるか」の説明、
+    右 (∨ の左) に今の値の要約。開閉の状態は設定に保存する。"""
+
+    def __init__(self, ctrl, key, icon_name, title, description="", summary="", parent=None):
         super().__init__(parent)
         self.ctrl, self.key = ctrl, key
         self.expanded = False
+        self._title, self._description, self._summary = title, description, summary
         self.header = _ExpanderHeader()
         self.header.installEventFilter(self)
         self.header.setCheckable(True)
@@ -452,12 +528,17 @@ class Expander(Card):
         font.setWeight(QFont.Weight.DemiBold)
         self.title_label.setFont(font)
         self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.summary_label = Hint(summary, wrap=False)
-        self.summary_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.summary_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.description_label = ElidedHint(description)
+        self.description_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         labels.addWidget(self.title_label)
-        labels.addWidget(self.summary_label)
+        labels.addWidget(self.description_label)
+        self.description_label.setVisible(bool(description))
         header_layout.addLayout(labels, 1)
+        # 要約は説明より優先して場所を取る (説明が先に「…」になる)
+        self.summary_label = ElidedHint(summary, Qt.AlignmentFlag.AlignRight, max_chars=30)
+        self.summary_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        header_layout.addWidget(self.summary_label)
+        self.summary_label.setVisible(bool(summary))
         self.controls = QHBoxLayout()
         header_layout.addLayout(self.controls)
         self.arrow = IconLabel("chevron_down")
@@ -469,10 +550,16 @@ class Expander(Card):
         content_layout.setContentsMargins(1, 0, 1, 1)
         content_layout.setSpacing(0)
         self.layout().addWidget(self.content)
-        self.animation = QPropertyAnimation(self.content, b"maximumHeight", self)
-        self.animation.setDuration(160)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self.animation.finished.connect(self._animation_finished)
+        self.curtain = _Curtain()
+        self.layout().addWidget(self.curtain)
+        self._anim = QVariantAnimation(self)
+        self._anim.setDuration(ANIMATION_MS)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.valueChanged.connect(self._animation_step)
+        self._anim.finished.connect(self._animation_finished)
+        key_id = id(self)
+        self.destroyed.connect(lambda *_: _running.discard(key_id))
+        self._refresh_header_text()
         self.header.clicked.connect(lambda: self.set_expanded(not self.expanded))
         ctrl.settings_changed.connect(self._settings_changed)
         self.set_expanded(self._saved_state(ctrl.get("ui_expanded", {})), animate=False, save=False)
@@ -486,10 +573,30 @@ class Expander(Card):
         return widget
 
     def set_summary(self, text):
-        if text != self.summary_label.text():
+        if text != self._summary:
+            self._summary = text
             self.summary_label.setText(text)
-        self.header.setToolTip(text)
-        self.header.setAccessibleDescription(text)
+            self.summary_label.setVisible(bool(text))
+            self._refresh_header_text()
+
+    def set_description(self, text):
+        if text != self._description:
+            self._description = text
+            self.description_label.setText(text)
+            self.description_label.setVisible(bool(text))
+            self._refresh_header_text()
+
+    def _refresh_header_text(self):
+        # 幅が足りなくて「…」になっても、全文はマウスを乗せると読める / 読み上げにも渡る
+        full = "\n".join(part for part in (self._description, self._summary) if part)
+        self.header.setToolTip(full)
+        self.header.setAccessibleDescription(full.replace("\n", " "))
+
+    def _panel(self):
+        """今、折りたたみの中身として見えているもの (アニメーション中は写真)。"""
+        if self.curtain.isVisible():
+            return self.curtain
+        return self.content if self.content.isVisible() else None
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -505,19 +612,20 @@ class Expander(Card):
             painter.fillRect(self.header.geometry(), blend(card_color(palette), text_color(self), 0.065))
             painter.restore()
 
-        if self.content.isVisible() and self.content.height() > 0:
+        panel = self._panel()
+        if panel is not None and panel.height() > 0:
             painter.save()
             painter.setClipPath(shape)
-            painter.fillRect(self.content.geometry(), blend(card_color(palette), QColor("black"),
-                                                           0.22 if is_dark(palette) else 0.045))
+            painter.fillRect(panel.geometry(), blend(card_color(palette), QColor("black"),
+                                                     0.22 if is_dark(palette) else 0.045))
             painter.setPen(QPen(separator_color(palette), 1))
-            top = self.content.y()
+            top = panel.y()
             painter.drawLine(1, top, self.width() - 2, top)
             layout = self.content.layout()
             for i in range(layout.count()):
                 child = layout.itemAt(i).widget()
                 y = top + child.y()
-                if child.isVisible() and top < y < top + self.content.height():
+                if not child.isHidden() and top < y < top + panel.height():
                     painter.drawLine(1, y, self.width() - 2, y)
             painter.restore()
         painter.setPen(QPen(border_color(palette), 1))
@@ -543,37 +651,107 @@ class Expander(Card):
         self.expanded = expanded
         self.header.setChecked(expanded)
         self.arrow.set_icon("chevron_up" if expanded else "chevron_down")
-        self.animation.stop()
-        self.content.setMinimumHeight(0)   # 前回測った高さを外す (アニメーション中は上限で高さを決める)
-        if animate and self.isVisible():
-            start = self.content.height() if self.content.isVisible() else 0
-            self.content.show()
-            self.content.layout().activate()
-            target = self.content.sizeHint().height() if expanded else 0
-            self.animation.setStartValue(start)
-            self.animation.setEndValue(target)
-            self.animation.start()
+        if animate and self.isVisible() and self.width() > 0:
+            self._animate(expanded)
         else:
+            self._stop_animation()
+            self.content.setMinimumHeight(0)
             self.content.setVisible(expanded)
-            self.content.setMaximumHeight(16777215 if expanded else 0)
+            if expanded:
+                self.content.fit()
         if save:
             saved = self.ctrl.get("ui_expanded", {})
             states = dict(saved) if isinstance(saved, dict) else {}
             states[self.key] = expanded
             self.ctrl.changed("ui_expanded", states)
 
+    # -- 開閉アニメーション ------------------------------------------------------
+    # 閉じる/開くたびに、中身を 1 回だけ測って写真に撮り、写真の見える高さだけを動かす。
+    # 中身 (スライダーや折り返しラベル) は動いている間ずっと隠れているので、フレームごとの再計算が起きない。
+
+    def _measure(self, width):
+        layout = self.content.layout()
+        layout.invalidate()
+        height = layout.sizeHint().height()
+        if layout.hasHeightForWidth():
+            height = max(height, layout.totalHeightForWidth(width))
+        else:
+            height = max(height, layout.minimumSize().height())
+        return height
+
+    def _animate(self, expanded):
+        running = self._anim.state() == QVariantAnimation.State.Running
+        start = self.curtain.height() if running else (self.content.height() if self.content.isVisible() else 0)
+        self._anim.blockSignals(True)
+        self._anim.stop()
+        self._anim.blockSignals(False)
+        width = self.width()
+        # 全開の大きさで一度だけ並べて写真を撮る (まだ画面には描かれない)。一度出してから測る (出す前は大きさが当てにならない)
+        self.content.setMinimumHeight(0)
+        self.content.show()
+        full = self._measure(width)
+        self.content.setGeometry(0, self.header.height(), width, full)
+        self.content.layout().activate()
+        self.curtain.pixmap = self.content.grab()
+        self.content.hide()
+        target = full if expanded else 0
+        start = min(start, full)
+        if start == target:
+            self._begin(start, target, full, instant=True)
+            return
+        self._begin(start, target, full)
+
+    def _begin(self, start, target, full, instant=False):
+        _running.add(id(self))
+        # 開くときは、親の FitBox (ページ) の高さを先に増やしておく。止めている間に中身が押しつぶされないように。
+        extra = target - start
+        node = self.parentWidget()
+        while extra > 0 and node is not None:
+            if isinstance(node, FitBox):
+                node.setMinimumHeight(node.minimumHeight() + extra)
+            node = node.parentWidget()
+        self.curtain.setFixedHeight(start)
+        self.curtain.show()
+        self.update()
+        if instant:
+            self._animation_finished()
+            return
+        self._anim.setStartValue(start)
+        self._anim.setEndValue(target)
+        self._anim.start()
+
+    def _animation_step(self, value):
+        self.curtain.setFixedHeight(int(value))
+
     def _animation_finished(self):
+        if id(self) not in _running:
+            return
+        self.curtain.hide()
+        self.curtain.pixmap = None
+        self.curtain.setMinimumHeight(0)
+        self.curtain.setMaximumHeight(16777215)
+        self.content.setMinimumHeight(0)
         self.content.setVisible(self.expanded)
-        if self.expanded:
-            self.content.setMaximumHeight(16777215)
-            self.content.fit()
+        _running.discard(id(self))
+        refit(self)
+        _flush_deferred()
+        self.update()
+
+    def _stop_animation(self):
+        if id(self) in _running:
+            self._anim.blockSignals(True)
+            self._anim.stop()
+            self._anim.blockSignals(False)
+            self.curtain.hide()
+            self.curtain.pixmap = None
+            _running.discard(id(self))
+            _flush_deferred()
 
     def fit_content(self):
-        """中身が変わったとき、開閉アニメーションで固定した高さを外して中身の高さに合わせ直す。"""
-        if self.animation.state() == QPropertyAnimation.State.Running:
-            self.animation.stop()
+        """中身が変わったとき、中身の高さに合わせ直す。開閉アニメーション中は終わるまで待つ。"""
+        if id(self) in _running:
+            return
         self.content.setVisible(self.expanded)
-        self.content.setMaximumHeight(16777215 if self.expanded else 0)
         self.content.fit()
         self.content.layout().invalidate()
         self.content.layout().activate()
@@ -586,11 +764,17 @@ def refit(widget):
     """中身 (行の追加・削除、表示の出し入れ、文言の変更) が変わったあとに呼ぶ。
     widget から親をたどり、各レイアウトを測り直して、折りたたみ (Expander) の高さも中身に合わせる。
     折り返しラベルの高さは幅が決まってから確定するので、1 周後にもう一度測り直す。"""
+    if _running:
+        _deferred.append(widget)   # 開閉アニメーション中は、終わってからまとめて測り直す
+        return
     _refit_chain(widget)
     QTimer.singleShot(0, lambda: _refit_chain(widget))
 
 
 def _refit_chain(widget, settle=True):
+    if _running:
+        _deferred.append(widget)
+        return
     try:
         node = widget
         while node is not None:
@@ -636,6 +820,8 @@ class FitBox(QWidget):
         return max(self._base_height, hfw)
 
     def _fit(self):
+        if _running:
+            return   # 開閉アニメーション中は測らない (終わったあと、折りたたみが親をたどって測り直す)
         need = self._need()
         if need is None or need == self.minimumHeight() or self._queued:
             return
@@ -655,12 +841,7 @@ class FitBox(QWidget):
 
 
 class _ExpanderContent(FitBox):
-    """Expander の中身。開いているあいだだけ必要な高さを minimumHeight にする (アニメーション中・閉じている間は固定しない)。"""
-
-    def _need(self):
-        if self.maximumHeight() < 16777215:
-            return 0
-        return super()._need()
+    """Expander の中身。開いているあいだ、必要な高さを minimumHeight にする。"""
 
     def fit(self):
         self._fit()
