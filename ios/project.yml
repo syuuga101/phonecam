@@ -26,6 +26,7 @@ targets:
         NSLocalNetworkUsageDescription: Wi-Fi経由でPCの検出と接続を行うために使用します
         NSMicrophoneUsageDescription: iPhoneのマイク音声をPCへ送るため、録画に音声を入れるために使用します
         NSPhotoLibraryAddUsageDescription: 録画した動画を写真アプリに保存するために使用します
+        LSApplicationQueriesSchemes: [sidestore, altstore]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UILaunchScreen: {}

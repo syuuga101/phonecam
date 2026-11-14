@@ -1297,18 +1297,18 @@
         }
       }
     },
-    "AltStoreで更新": {
+    "SideStoreで更新": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "AltStoreで更新"
+            "value": "SideStoreで更新"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update with AltStore"
+            "value": "Update with SideStore"
           }
         }
       }

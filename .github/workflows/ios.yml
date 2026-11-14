@@ -56,8 +56,8 @@ jobs:
           rm -rf Payload PhoneCam.ipa
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/PhoneCam.app Payload/PhoneCam.app
-          # 署名なしのままだと AltStore/AltServer が読み込めないことがあるため、
-          # アドホック署名 (仮署名) とエンタイトルメントを付けておく。実際の署名は AltStore 側でやり直される
+          # 署名なしのままだと SideStore / AltStore が読み込めないことがあるため、
+          # アドホック署名 (仮署名) とエンタイトルメントを付けておく。実際の署名は SideStore (AltStore) 側でやり直される
           cat > ent.plist <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

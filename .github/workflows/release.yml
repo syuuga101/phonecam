@@ -43,15 +43,20 @@ jobs:
           name: PhoneCamReceiver
           path: out
 
-      # AltStore のソース。releases/latest/download/altstore-source.json が常に最新のリリースを指す
-      - name: Generate AltStore source
+      # SideStore / AltStore 共通のソース。releases/latest/download/sidestore-source.json (と従来の altstore-source.json) が
+      # 常に最新のリリースを指す。2つは sourceURL 以外同じ内容
+      - name: Generate SideStore / AltStore source
         run: |
           python3 .github/scripts/make_altstore_source.py \
             --repo "${{ github.repository }}" \
             --version "${{ steps.ver.outputs.version }}" \
             --build "${{ github.run_number }}" \
             --ipa out/PhoneCam.ipa \
-            --out out/altstore-source.json
+            --out out/altstore-source.json \
+            --also-out out/sidestore-source.json
+
+      - name: Validate source JSON
+        run: python3 .github/scripts/check_source.py out/altstore-source.json out/sidestore-source.json
 
       # CHANGELOG.md から今回のバージョンの項目（"## v<ver>" から次の "## " の手前まで）を取り出す。
       # 見つからないときは既定の文章にする（リリース自体は止めない）
@@ -82,7 +87,7 @@ jobs:
             echo "### インストール・アップデート"
             echo
             echo "- **Windows**: \`PhoneCamReceiver.exe\` をダウンロードして、古い exe と置き換えるだけです（初めての方はそのまま起動するとセットアップが始まります）。"
-            echo "- **iPhone**: AltStore の「My Apps」で PhoneCam を更新します（AltStore のソースは自動で最新になります）。"
+            echo "- **iPhone**: SideStore を開き、LocalDevVPN をオンにして Wi-Fi につないだ状態で、「My Apps」の PhoneCam を更新します（ソースは自動で最新になります）。"
             echo "- くわしい手順は [使い方ガイド](https://github.com/${{ github.repository }}/wiki) を見てください。"
             echo
             echo "---"
@@ -101,3 +106,4 @@ jobs:
             out/PhoneCam.ipa
             out/PhoneCamReceiver.exe
             out/altstore-source.json
+            out/sidestore-source.json
