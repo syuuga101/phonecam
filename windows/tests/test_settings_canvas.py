@@ -90,7 +90,6 @@ def test_flip_matches_numpy_slicing(shape, mirror, rotate, noncontiguous):
     assert result.flags.c_contiguous
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="save_settings silently drops pathlib destinations")
 def test_save_settings_accepts_path_objects(tmp_path):
     path = tmp_path / "settings.json"
     config = {**settings.DEFAULT_SETTINGS, "bitrate": 33}

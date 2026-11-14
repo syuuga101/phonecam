@@ -824,9 +824,15 @@ class Controller:
         if not isinstance(seq, int) or isinstance(seq, bool):
             return None
         last = self._edit_seq
-        self._edit_seq = seq
-        if last is None or seq <= last:
+        if last is None:
+            # 接続後の最初の status: ここを基準にする (過去の操作は取り込まない)
+            self._edit_seq = seq
             return None
+        if seq <= last:
+            # 古い/重複した seq では内部状態を一切変えない。
+            # (iPhone アプリの再起動などで seq が戻る場合は、切断で _edit_seq が None に戻るので基準が取り直される)
+            return None
+        self._edit_seq = seq
         notes = []
         lens = pe.get("lens")
         if lens in LENSES and lens != self.settings.get("lens"):

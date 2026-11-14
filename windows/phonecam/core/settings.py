@@ -464,10 +464,15 @@ _SAVE_LOCK = threading.Lock()  # 設定は UI スレッドと音声デバイス�
 def save_settings(settings, path=SETTINGS_PATH):
     try:
         with _SAVE_LOCK:
+            path = os.fspath(path)
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
             os.replace(tmp, path)
     except Exception:
-        pass
+        try:
+            from phonecam.core import crashlog
+            crashlog.log_error("save_settings")
+        except Exception:
+            pass

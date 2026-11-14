@@ -71,7 +71,6 @@ def test_update_timeout_reenables_check_button(monkeypatch):
     mock_update.fetch_latest.assert_not_called()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="A stale phoneEdit lowers the stored sequence")
 def test_stale_phone_edit_does_not_lower_the_last_seen_sequence():
     ctrl = receiver.Controller(persist=False, demo=True)
     ctrl._apply_phone_edit({"phoneEdit": {"seq": 1, "zoom": 1.0}})
