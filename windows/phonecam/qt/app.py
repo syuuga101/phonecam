@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Qt UI の起動: QApplication の設定 (スタイル・フォント・ライト/ダーク) と main()。
 
-    python windows/phonecam_qt.py
-Tk 版 (phonecam_receiver.py) は全ページの移植が終わるまで配布の入口のまま。
+    python windows/phonecam_qt.py [--setup-wizard | --setup-diagnose]
+セットアップ (ウィザード・診断) も Qt 版。
 """
 
 import os
@@ -96,21 +96,104 @@ def apply_font(app, language):
     app.setFont(f)
 
 
-def configure(app, ctrl):
-    """スタイル・フォント・テーマを設定し、theme の変更に追従させる。"""
+def configure_basic(app, theme="system"):
+    """スタイル (Windows 11 / Fusion)・フォント・テーマを設定する (Controller なしで使える)。"""
     from PySide6.QtWidgets import QStyleFactory
     from phonecam.i18n import get_language
     keys = {k.lower(): k for k in QStyleFactory.keys()}
     app.setStyle(keys.get("windows11") or keys.get("fusion") or "Fusion")
     apply_font(app, get_language())
-    apply_theme(app, ctrl.get("theme", "system"))
+    apply_theme(app, theme)
+
+
+def configure(app, ctrl):
+    """スタイル・フォント・テーマを設定し、theme の変更に追従させる。"""
+    configure_basic(app, ctrl.get("theme", "system"))
     ctrl.settings_changed.connect(lambda k, v: apply_theme(app, v) if k == "theme" else None)
+
+
+def _smoke_hook(result, name, close):
+    """PHONECAM_SMOKE=1 (CI の起動テスト): 数秒後に、セットアップの画面を作っても tkinter が読み込まれていないことを
+    APPDATA/PhoneCam/setup_smoke_<name>.txt に書いて閉じる。読み込まれていたら result["tk"] = True (終了コード 3)。"""
+    if os.environ.get("PHONECAM_SMOKE") != "1":
+        return
+    from PySide6.QtCore import QTimer
+
+    def done():
+        result["tk"] = "tkinter" in sys.modules
+        try:
+            from phonecam.core.paths import _appdata_dir
+            folder = _appdata_dir()
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, "setup_smoke_%s.txt" % name), "w", encoding="utf-8") as f:
+                f.write("tkinter loaded: %s\n" % result["tk"])
+        except Exception:
+            pass
+        close()
+
+    QTimer.singleShot(3000, done)
+
+
+def run_setup_window(args):
+    """--setup-wizard / --setup-diagnose: アプリ本体を開かずに、セットアップだけを単体のウィンドウで開く
+    (アプリ本体からは別プロセスではなく、同じプロセスのダイアログで開く。こちらは手動の起動用)。"""
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception as e:
+        _message_box("PySide6 が見つかりません。\n\npython -m pip install -r windows/requirements-qt.txt を実行してください。\n\n%s" % e)
+        return 1
+    from phonecam.core.settings import load_settings, migrate_legacy_settings, save_settings
+    from phonecam.i18n import set_language
+    migrate_legacy_settings()
+    settings = load_settings()
+    set_language(settings.get("language", "system"))   # phonecam_setup / qt.setup_* は import 時に t() を評価するので、その前に
+    set_app_user_model_id()
+    from phonecam.core import crashlog
+    crashlog.install()
+    app = QApplication(sys.argv)
+    app.setApplicationName("PhoneCam")
+    app.setQuitOnLastWindowClosed(True)
+    configure_basic(app, settings.get("theme", "system"))
+    from phonecam.qt.main_window import window_icon
+    app.setWindowIcon(window_icon())
+    from phonecam.core.softcam_reg import bind_setup_host
+    bind_setup_host()
+    smoke = {"tk": False}
+    if "--setup-diagnose" in args:
+        from phonecam.qt.setup_diag import DiagnosticsDialog
+        dialog = DiagnosticsDialog(None)
+        _smoke_hook(smoke, "diagnose", dialog.close)
+        dialog.exec()
+        return 3 if smoke["tk"] else 0
+    import phonecam_setup
+    from phonecam.qt.setup_common import QtRoot
+    from phonecam.qt.setup_wizard import SetupWizardDialog, make_audio_guard
+
+    def audio_get(key):
+        return load_settings().get(key)
+
+    def audio_set(key, value):
+        current = load_settings()
+        current[key] = value
+        save_settings(current)
+
+    def finish_setup():
+        current = load_settings()
+        current["setup_done"] = True
+        save_settings(current)
+
+    after_update = args[args.index("--after-update") + 1] if "--after-update" in args and args.index("--after-update") + 1 < len(args) else None
+    controller = phonecam_setup.SetupController(QtRoot(), audio_guard=make_audio_guard(audio_get, audio_set))
+    dialog = SetupWizardDialog(controller, None, on_finish=finish_setup, on_skip=finish_setup, update_version=after_update)
+    _smoke_hook(smoke, "wizard", lambda: dialog._end(lambda: None))
+    dialog.exec()
+    controller.close()
+    return 3 if smoke["tk"] else 0
 
 
 def main():
     if sys.argv[1:2] in (["--setup-wizard"], ["--setup-diagnose"]):
-        from phonecam.ui.app import main as setup_main  # import 時にホスト関数が bind される
-        return setup_main()
+        return run_setup_window(sys.argv[1:])
     helper = helper_main(sys.argv[1:])
     if helper is not None:
         return helper

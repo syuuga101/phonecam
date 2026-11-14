@@ -12,6 +12,7 @@ Analysis の結果 (a.binaries / a.datas) から名前で取り除く。ここ�
     Python 本体の OpenSSL (libcrypto-3.dll / libssl-3.dll) は残す (更新の確認の https で使う)
   - qdirect2d (Direct2D の代替プラットフォーム。通常は qwindows を使う)
   - Qt の翻訳 (QTranslator を使っていない)
+  - tkinter / Tcl/Tk (v2.9.0 で Tk の画面を全部やめた。_tkinter・tcl86t.dll・tk86t.dll と、Tcl/Tk のデータ)
   - Pillow の AVIF (_avif。AvifImagePlugin は ImportError を捕まえて無効になるだけ)
 """
 import sys
@@ -23,11 +24,13 @@ DROP_BASENAMES = (
     "qt6pdf.dll", "qpdf.dll",
     "libcrypto-3-x64.dll", "libssl-3-x64.dll",
     "qdirect2d.dll",
+    "_tkinter.pyd", "tcl86t.dll", "tk86t.dll",
 )
 DROP_PREFIXES = (
     "pyside6/plugins/tls/",
     "pyside6/translations/",
     "pil/_avif",
+    "_tcl_data/", "_tk_data/", "tcl/", "tk/", "tcl8/", "tcl8.6/", "tk8.6/",
 )
 
 BLOCK = '''

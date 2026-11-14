@@ -3,7 +3,7 @@
 from phonecam.core.settings import COLOR_DEFAULTS, NUMERIC_RANGES
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, bound_combo, bound_slider, button
-from phonecam.ui.labels import BG_MODE_LABELS, BG_QUALITY_LABELS
+from phonecam.labels import BG_MODE_LABELS, BG_QUALITY_LABELS
 
 
 def build(ctrl):

@@ -286,6 +286,7 @@ class MainWindow(QMainWindow):
 
         ctrl.toast.connect(self.show_toast)
         ctrl.camera_prompt.connect(self._ask_camera_registration)
+        ctrl.setup_requested.connect(self._open_setup)
         ctrl.status_changed.connect(lambda s: self._camera_status(ctrl, s))
         ctrl.update_changed.connect(self._update_banner)
         ctrl.update_action.connect(self._update_action)
@@ -626,6 +627,15 @@ class MainWindow(QMainWindow):
         super().resizeEvent(e)
         if hasattr(self, "toast_label") and self.toast_label.isVisible():
             self._place_toast()
+
+    def _open_setup(self, diagnose, after_update):
+        """セットアップ (ウィザード / AltServer の診断) を、別プロセスではなくこのプロセスのダイアログとして開く。"""
+        try:
+            from phonecam.qt.setup_wizard import open_setup_dialog
+            open_setup_dialog(self, self.ctrl, diagnose=diagnose, after_update=after_update)
+        except Exception as error:
+            self.ctrl.setup_dialog_closed()
+            self.show_toast(t("settings.setup.launch_error", error=error), "error")
 
     def _ask_camera_registration(self, state):
         key = "setup.first_run.update_cam" if state == "outdated" else "setup.first_run.register_cam"

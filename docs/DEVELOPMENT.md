@@ -14,9 +14,8 @@ phonecam/
 │   ├─ project.yml
 │   └─ PhoneCam/*.swift         CameraController, H264Encoder, StreamServer, Recorder, Effects, LowLatencyMic, ...
 ├─ windows/                     Windows 受信アプリ（Python / PySide6）
-│   ├─ phonecam_qt.py           入口（配布 exe の入口。Qt の画面）
-│   ├─ phonecam/                本体（core/ = 受信・デコード・仮想カメラなど、qt/ = 画面、controller.py = 画面と core をつなぐ層、ui/ = 旧 Tk 版の画面）
-│   ├─ phonecam_receiver.py     旧 Tk 版の入口（start.bat と --register/--setup のヘルパ起動で使用）
+│   ├─ phonecam_qt.py           入口（配布 exe の入口。start.bat・管理者ヘルパの --register / --setup もここ）
+│   ├─ phonecam/                本体（core/ = 受信・デコード・仮想カメラなど、qt/ = 画面、controller.py = 画面と core をつなぐ層、labels.py = 表示ラベル）
 │   ├─ phonecam_iphone.py       iPhone との接続まわり（usbmux など）
 │   ├─ phonecam_audio.py        音声の再生
 │   ├─ phonecam_setup.py        セットアップウィザード
@@ -63,7 +62,7 @@ Python 3.12 が必要です（「Add python.exe to PATH」と「py launcher」�
 
 1. `windows` フォルダの **install.bat** を実行（初回のみ。av / numpy / pyvirtualcam と、音声用の sounddevice が入ります）
 2. iPhone で PhoneCam を起動して画面を表示したままにします
-3. **start.bat** で受信アプリが開きます（旧 Tk 版の入口です。Qt 版を試すときは `py -3 phonecam_qt.py`）
+3. **start.bat** で受信アプリが開きます（中身は `py -3 phonecam_qt.py`）
 4. 「USB」または「Wi-Fi」を選んで接続します
 
 専用カメラを使いたいときは、自分でビルドした `softcam.dll` を `windows` フォルダに置いて `register.bat` を実行します（手順は `windows.yml` を参照）。無ければ OBS Virtual Camera を使います。`sounddevice` が入っていないと音声タブは使えません（映像は使えます）。

@@ -23,7 +23,7 @@ struct StatusPill: View {
             Text(text)
                 .font(.system(size: 13, weight: .semibold))
                 .lineLimit(1)
-            if model.micEnabled && model.micMuted {
+            if model.micMuted {
                 Image(systemName: "mic.slash.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.red)
@@ -110,7 +110,7 @@ struct LensChips: View {
             ForEach(order, id: \.self) { l in
                 let selected = model.lens == l
                 Button {
-                    model.selectLens(l)
+                    if !model.zoomDialActive { model.selectLens(l) }
                 } label: {
                     Group {
                         if l == "front" {
@@ -135,6 +135,90 @@ struct LensChips: View {
         .padding(3)
         .background(Color.black.opacity(0.35))
         .clipShape(Capsule())
+        .opacity(model.zoomDialActive ? 0 : 1)
+        // 長押し → そのまま左右にドラッグでズームのダイヤルを出す (純正カメラと同じ)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.35)
+                .sequenced(before: DragGesture(minimumDistance: 0))
+                .onChanged { value in
+                    if case .second(true, let drag) = value {
+                        model.dialDrag(drag?.translation.width ?? 0)
+                    }
+                }
+                .onEnded { _ in model.dialEnd() }
+        )
+    }
+}
+
+// MARK: - ズームのダイヤル (レンズのチップを長押しすると出る)
+
+struct ZoomDial: View {
+    @EnvironmentObject var model: AppModel
+
+    private func ticks(lo: Double, hi: Double) -> [(Double, Bool)] {
+        var vals = Set<Int>()   // 0.01 刻みの整数で重複を除く
+        var v = 0.5
+        while v <= hi + 0.001 {
+            vals.insert(Int((v * 100).rounded()))
+            v += v < 2 ? 0.1 : 0.5
+        }
+        for m in AppModel.dialMajorStops { vals.insert(Int((m * 100).rounded())) }
+        return vals.sorted().compactMap { i in
+            let d = Double(i) / 100
+            guard d >= lo - 0.001, d <= hi + 0.001 else { return nil }
+            let major = AppModel.dialMajorStops.contains { abs($0 - d) < 0.001 }
+            return (d, major)
+        }
+    }
+
+    var body: some View {
+        let k = model.zoomDisplayFactor
+        let lo = k
+        let hi = max(1.0, model.zoomMax) * k
+        let current = max(model.zoom, 0.01) * k
+        VStack(spacing: 2) {
+            Text(model.zoomText)
+                .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                .foregroundColor(.yellow)
+            Canvas { ctx, size in
+                let mid = size.width / 2
+                for (d, major) in ticks(lo: lo, hi: hi) {
+                    let x = mid + CGFloat(log2(d / current)) * AppModel.dialPointsPerOctave
+                    guard x > -20, x < size.width + 20 else { continue }
+                    let h: CGFloat = major ? 14 : 7
+                    var path = Path()
+                    path.move(to: CGPoint(x: x, y: 0))
+                    path.addLine(to: CGPoint(x: x, y: h))
+                    ctx.stroke(path, with: .color(.white.opacity(major ? 0.95 : 0.55)), lineWidth: major ? 1.5 : 1)
+                    if major {
+                        let label = d < 1 ? String(format: "%.1f", d) : String(format: "%g", d)
+                        ctx.draw(Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(.white),
+                                 at: CGPoint(x: x, y: h + 8))
+                    }
+                }
+                var c = Path()
+                c.move(to: CGPoint(x: mid, y: 0))
+                c.addLine(to: CGPoint(x: mid, y: 16))
+                ctx.stroke(c, with: .color(.yellow), lineWidth: 2)
+            }
+            .frame(height: 34)
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { model.dialDrag($0.translation.width) }
+                .onEnded { _ in model.dialEnd() }
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("ズームダイヤル"))
+        .accessibilityValue(Text(verbatim: model.zoomText))
+        .accessibilityAdjustableAction { dir in
+            model.dialStep(dir == .increment)
+        }
     }
 }
 
@@ -203,10 +287,6 @@ struct PreviewStage: View {
     /// 縦画面では右上に目 (プレビューの表示 / 非表示) のボタンだけを重ねる。ライトは操作バー (縦) / 操作列 (横) にある。横画面は右側の操作列にあるので出さない。
     let cornerButtons: Bool
 
-    @State private var pinchBase: Double?
-    @State private var zoomPillVisible = false
-    @State private var hideWork: DispatchWorkItem?
-
     var body: some View {
         ZStack {
             if model.previewEnabled {
@@ -231,68 +311,49 @@ struct PreviewStage: View {
                 HStack(alignment: .top) {
                     StatusPill()
                     Spacer(minLength: 8)
-                    if cornerButtons {
-                        PreviewToggleButton(style: .overlay)
+                    HStack(spacing: 8) {
+                        FullscreenButton(style: .overlay)
+                        if cornerButtons {
+                            PreviewToggleButton(style: .overlay)
+                        }
                     }
                 }
                 Spacer(minLength: 0)
-                LensChips()
+                ZStack(alignment: .bottom) {
+                    LensChips()
+                    if model.zoomDialActive {
+                        ZoomDial()
+                    }
+                }
             }
             .padding(8)
-
-            if zoomPillVisible {
-                Text(String(format: "%.1f×", model.zoom))
-                    .font(.system(size: 15, weight: .semibold).monospacedDigit())
-                    .foregroundColor(.yellow)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Capsule())
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
         }
         .frame(width: size.width, height: size.height)
         .background(Color.black)
         .clipped()
         .contentShape(Rectangle())
-        .gesture(pinch)
         .onTapGesture(count: 2) {
             model.setZoom(1.0, final: true)
-            flashZoomPill()
+            model.flashZoomHUD()
         }
-        .animation(.easeOut(duration: 0.15), value: zoomPillVisible)
     }
+}
 
-    private var pinch: some Gesture {
-        MagnifyGesture()
-            .onChanged { v in
-                if pinchBase == nil {
-                    pinchBase = model.zoom
-                    model.zoomGestureActive = true
-                }
-                hideWork?.cancel()
-                zoomPillVisible = true
-                model.setZoom((pinchBase ?? 1.0) * Double(v.magnification), final: false)
-            }
-            .onEnded { v in
-                model.setZoom((pinchBase ?? model.zoom) * Double(v.magnification), final: true)
-                pinchBase = nil
-                model.zoomGestureActive = false
-                scheduleHide()
-            }
-    }
+/// ズームの値 ("2.0×") の HUD。ピンチ中に画面中央へ出す。
+struct ZoomHUD: View {
+    @EnvironmentObject var model: AppModel
 
-    private func flashZoomPill() {
-        hideWork?.cancel()
-        zoomPillVisible = true
-        scheduleHide()
-    }
-
-    private func scheduleHide() {
-        let w = DispatchWorkItem { zoomPillVisible = false }
-        hideWork = w
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: w)
+    var body: some View {
+        Text(model.zoomText)
+            .font(.system(size: 15, weight: .semibold).monospacedDigit())
+            .foregroundColor(.yellow)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.6))
+            .clipShape(Capsule())
+            .opacity(model.zoomHUDVisible && !model.zoomDialActive ? 1 : 0)
+            .allowsHitTesting(false)
+            .animation(.easeOut(duration: 0.15), value: model.zoomHUDVisible)
     }
 }
 
@@ -314,6 +375,137 @@ struct TorchButton: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             model.toggleTorch()
         }
+    }
+}
+
+/// マイクのミュート。音声がつながっていなくても常に操作できる (ミュート中は赤)。
+struct MuteButton: View {
+    @EnvironmentObject var model: AppModel
+    var size: CGFloat = 48
+
+    var body: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            model.toggleMute()
+        } label: {
+            Image(systemName: model.micMuted ? "mic.slash.fill" : "mic.fill")
+                .font(.system(size: size * 0.42, weight: .semibold))
+                .foregroundColor(model.micMuted ? .white : .primary)
+                .frame(width: size, height: size)
+                .background(model.micMuted ? Color.red : Color(.tertiarySystemFill))
+                .clipShape(Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("マイク（ミュート）"))
+        .accessibilityValue(model.micMuted ? Text("ミュート中") : Text(""))
+    }
+}
+
+struct FullscreenButton: View {
+    @EnvironmentObject var model: AppModel
+    var style: RoundIconButton.Style
+    var size: CGFloat = 36
+
+    var body: some View {
+        RoundIconButton(symbol: model.previewFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                        size: size,
+                        style: style,
+                        label: model.previewFullscreen ? "全画面を閉じる" : "全画面") {
+            model.setPreviewFullscreen(!model.previewFullscreen)
+        }
+    }
+}
+
+/// プレビューの全画面表示。黒背景で縦横比を保ち、セーフエリアの外まで使う。
+/// 重ねる操作は 3 秒触らないと隠れる (タップで再表示)。状態のピル (ミュート中の表示つき) は消さない。
+struct FullscreenPreview: View {
+    @EnvironmentObject var model: AppModel
+    let showGrid: Bool
+    let showLevel: Bool
+
+    @State private var controlsVisible = true
+    @State private var hideWork: DispatchWorkItem?
+
+    private var shown: Bool { controlsVisible || model.zoomDialActive }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            GeometryReader { g in
+                PreviewPanel(region: g.size, showGrid: showGrid, showLevel: showLevel, cornerRadius: 0)
+            }
+            .ignoresSafeArea()
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                model.setZoom(1.0, final: true)
+                model.flashZoomHUD()
+                poke()
+            }
+            .onTapGesture {
+                if shown { hideNow() } else { poke() }
+            }
+
+            VStack(spacing: 0) {
+                HStack(alignment: .top) {
+                    StatusPill()
+                    Spacer(minLength: 8)
+                    FullscreenButton(style: .overlay, size: 40)
+                        .opacity(shown ? 1 : 0)
+                        .allowsHitTesting(shown)
+                }
+                Spacer(minLength: 0)
+                VStack(spacing: 10) {
+                    ZStack(alignment: .bottom) {
+                        LensChips()
+                        if model.zoomDialActive {
+                            ZoomDial()
+                        }
+                    }
+                    RecordTimerPill()
+                    HStack(spacing: 0) {
+                        MuteButton(size: 48)
+                            .frame(width: 64, alignment: .leading)
+                        Spacer(minLength: 0)
+                        RecordButton(recording: model.recActive) {
+                            model.toggleRecording()
+                            poke()
+                        }
+                        Spacer(minLength: 0)
+                        TorchButton(style: .bar, size: 48)
+                            .frame(width: 64, alignment: .trailing)
+                    }
+                }
+                .opacity(shown ? 1 : 0)
+                .allowsHitTesting(shown)
+            }
+            .padding(12)
+            .animation(.easeOut(duration: 0.2), value: shown)
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0).onChanged { _ in
+                if controlsVisible { schedule() }
+            }
+        )
+        .onAppear { poke() }
+        .onDisappear { hideWork?.cancel() }
+    }
+
+    private func poke() {
+        controlsVisible = true
+        schedule()
+    }
+
+    private func hideNow() {
+        hideWork?.cancel()
+        controlsVisible = false
+    }
+
+    private func schedule() {
+        hideWork?.cancel()
+        let w = DispatchWorkItem { controlsVisible = false }
+        hideWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: w)
     }
 }
 

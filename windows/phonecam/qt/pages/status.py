@@ -11,7 +11,7 @@ from phonecam.core.decoder import THIN_NOTICE_SEC
 from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph_window, range_label
 from phonecam.i18n import t
 from phonecam.qt.widgets import NO_VALUE, Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
-from phonecam.ui.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
+from phonecam.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, THIN_TEXT
 
 
 def _number(value, spec):

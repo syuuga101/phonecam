@@ -252,13 +252,10 @@ def helper_unregister(slot=1):
 
 
 def _error_box(text):
+    """管理者ヘルパ (--register / --setup など) の失敗を知らせる。Qt を初期化しないことがあるので、Win32 の MessageBoxW を直接呼ぶ。"""
     try:
-        import tkinter as tk  # 管理者ヘルパの失敗時だけ使うので、起動時には読まない
-        from tkinter import messagebox
-        r = tk.Tk()
-        r.withdraw()
-        messagebox.showerror("PhoneCam", text)
-        r.destroy()
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, str(text), "PhoneCam", 0x10)  # MB_ICONERROR
     except Exception:
         pass
 
@@ -271,7 +268,7 @@ def _setup_module():
 
 def bind_setup_host(link_connected=None):
     """phonecam_setup (ウィザード/管理者ジョブ) に本体のホスト関数を渡す。
-    Tk 版・Qt 版のどの入口から呼んでも同じ関数が bind される (管理者ヘルパ --setup も register_camera を使う)。"""
+    どの入口から呼んでも同じ関数が bind される (管理者ヘルパ --setup も register_camera を使う)。"""
     phonecam_setup = _setup_module()
     if phonecam_setup is None:
         return
@@ -282,7 +279,7 @@ def bind_setup_host(link_connected=None):
         registration_status=lambda: registration_status(),
         register_camera=lambda: helper_register(),
         run_elevated=lambda params, timeout_ms=ELEVATED_TIMEOUT_MS: run_elevated(params, timeout_ms),
-        script_path=lambda: os.path.join(WINDOWS_DIR, "phonecam_receiver.py"),
+        script_path=lambda: os.path.join(WINDOWS_DIR, "phonecam_qt.py"),
     )
     if link_connected is not None:
         fns["link_connected"] = link_connected
@@ -300,7 +297,7 @@ def helper_main(argv):
             phonecam_setup = _setup_module()
             if phonecam_setup is None:
                 return 1
-            bind_setup_host()  # register_camera などのホスト関数 (Qt 入口では ui.app が読まれない)
+            bind_setup_host()  # register_camera などのホスト関数 
             return phonecam_setup.run_job(job, expected_sha=sha)
         except Exception as e:
             _error_box("セットアップの実行に失敗しました。\n\n詳細: %s" % e)

@@ -73,6 +73,9 @@ _PATHS = {
                '<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     "more": '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+    "close": '<path d="M18 6 6 18M6 6l12 12"/>',
+    "circle": '<circle cx="12" cy="12" r="8"/>',
+    "minus": '<path d="M6 12h12"/>',
     "play": '<polygon points="6 3 20 12 6 21 6 3"/>',
     "pause": '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
 }
