@@ -81,7 +81,7 @@ private struct QRPreview: UIViewRepresentable {
     }
 
     func updateUIView(_ view: ScannerView, context: Context) {
-        context.coordinator.scanning = scanning
+        context.coordinator.setScanning(scanning)
     }
 
     static func dismantleUIView(_ view: ScannerView, coordinator: Coordinator) {
@@ -99,8 +99,12 @@ private struct QRPreview: UIViewRepresentable {
         private let model: AppModel
         private let onCode: (String) -> Void
         private let onError: () -> Void
-        var scanning = true
+        /// 読み取り待ちかどうか (メインスレッドからだけ触る)
+        private(set) var scanning = true
         private var stopped = false
+        /// 以下の 2 つは queue 上でだけ触る。読み取り後の確認中はセッションを止め、「やり直す」で再開する。
+        private var wantRunning = true
+        private var configured = false
 
         init(model: AppModel, onCode: @escaping (String) -> Void, onError: @escaping () -> Void) {
             self.model = model
@@ -118,6 +122,23 @@ private struct QRPreview: UIViewRepresentable {
                         self.queue.async { self.configure() }
                     }
                 }
+            }
+        }
+
+        /// 読み取り待ち (true) / 確認中 (false) の切り替え。確認中はカメラを止める (プレビューは止めた瞬間の静止画のまま)。
+        func setScanning(_ on: Bool) {
+            guard scanning != on else { return }
+            scanning = on
+            queue.async { [weak self] in self?.applyRunning(on) }
+        }
+
+        private func applyRunning(_ on: Bool) {
+            wantRunning = on
+            guard configured, !stopped else { return }
+            if on {
+                if !session.isRunning { session.startRunning() }
+            } else if session.isRunning {
+                session.stopRunning()
             }
         }
 
@@ -140,7 +161,8 @@ private struct QRPreview: UIViewRepresentable {
             }
             output.setMetadataObjectsDelegate(self, queue: .main)
             output.metadataObjectTypes = [.qr]
-            session.startRunning()
+            configured = true
+            if wantRunning { session.startRunning() }
         }
 
         func stop() {
@@ -156,7 +178,7 @@ private struct QRPreview: UIViewRepresentable {
             guard scanning, !stopped,
                   let code = metadataObjects.compactMap({ ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue }).first
             else { return }
-            scanning = false
+            setScanning(false)
             onCode(code)
         }
     }

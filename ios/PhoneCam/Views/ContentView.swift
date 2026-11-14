@@ -135,7 +135,7 @@ struct ContentView: View {
     /// 縦画面の操作バー (プレビューのすぐ下、1 行): 左にサムネイル / 中央に録画 / 右にライト
     private var controlBar: some View {
         VStack(spacing: 6) {
-            RecordTimerPill(recording: model.recActive, seconds: model.recSeconds)
+            RecordTimerPill()
             HStack(spacing: 0) {
                 LastRecordingButton(store: recordings) { showRecordings = true }
                     .frame(width: 64, alignment: .leading)
@@ -154,7 +154,7 @@ struct ContentView: View {
             TorchButton(style: .bar, size: 48)
             Spacer(minLength: 8)
             VStack(spacing: 6) {
-                RecordTimerPill(recording: model.recActive, seconds: model.recSeconds)
+                RecordTimerPill()
                 RecordButton(recording: model.recActive) { model.toggleRecording() }
             }
             Spacer(minLength: 8)

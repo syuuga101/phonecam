@@ -225,22 +225,6 @@
         }
       }
     },
-    "翻訳に参加する": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "翻訳に参加する"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Help translate"
-          }
-        }
-      }
-    },
     "画面": {
       "localizations": {
         "ja": {

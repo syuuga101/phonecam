@@ -260,13 +260,22 @@ struct PreviewPanel: View {
             FramingOverlay(layout: lay, crop: model.outputCanvas?.crop ?? false, showGrid: showGrid)
                 .allowsHitTesting(false)
             if showLevel {
-                LevelIndicator(deg: model.levelDeg, flat: model.levelFlat)
+                LevelReadout()
                     .position(x: lay.image.midX, y: lay.image.midY)
                     .allowsHitTesting(false)
             }
         }
         .frame(width: region.width, height: region.height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
+/// 水平メーター (LiveMetrics を観測するので、傾きが変わっても再描画されるのはこの View だけ)
+struct LevelReadout: View {
+    @EnvironmentObject var metrics: LiveMetrics
+
+    var body: some View {
+        LevelIndicator(deg: metrics.levelDeg, flat: metrics.levelFlat)
     }
 }
 

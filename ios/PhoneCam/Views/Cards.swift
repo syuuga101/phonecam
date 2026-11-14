@@ -36,22 +36,23 @@ struct InfoRow: View {
 /// 「配信情報」セクション (inset grouped List の中に置く)。刻々と変わる情報は操作より下に出す。
 struct StreamInfoSection: View {
     @EnvironmentObject var model: AppModel
+    @EnvironmentObject var metrics: LiveMetrics
 
     var body: some View {
         Section {
             InfoRow(symbol: "cable.connector", title: "接続",
                     value: model.isConnected ? model.connectionKind : String(localized: "未接続"))
             if model.wifiAllowed {
-                InfoRow(symbol: "wifi", title: "Wi-Fi アドレス", value: model.wifiAddress)
+                InfoRow(symbol: "wifi", title: "Wi-Fi アドレス", value: metrics.wifiAddress)
             }
-            InfoRow(symbol: "video", title: "映像", value: model.formatText)
+            InfoRow(symbol: "video", title: "映像", value: metrics.formatText)
             InfoRow(symbol: "rectangle.portrait.rotate", title: "向き",
                     value: (model.rotationAngle == 0 || model.rotationAngle == 180)
                         ? String(localized: "横向き") : String(localized: "縦向き"))
-            InfoRow(symbol: "speedometer", title: "ビットレート", value: model.bitrateText)
-            InfoRow(symbol: "film", title: "送信 fps", value: "\(model.sentFps)")
-            InfoRow(symbol: "thermometer.medium", title: "温度状態", value: model.thermalText)
-            InfoRow(symbol: "battery.100", title: "バッテリー", value: model.batteryText)
+            InfoRow(symbol: "speedometer", title: "ビットレート", value: metrics.bitrateText)
+            InfoRow(symbol: "film", title: "送信 fps", value: "\(metrics.sentFps)")
+            InfoRow(symbol: "thermometer.medium", title: "温度状態", value: metrics.thermalText)
+            InfoRow(symbol: "battery.100", title: "バッテリー", value: metrics.batteryText)
         } header: {
             Text("配信情報")
         }

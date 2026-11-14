@@ -127,7 +127,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     // MARK: - 開始
 
     func start() {
-        // UI は縦固定なので、向きの変化を RotationCoordinator に伝えるため明示的に有効化する
+        // UI は縦・横どちらにも回る (設定「画面の向き」で縦 / 横に固定もできる)。端末の向きの変化を RotationCoordinator に伝えるため、明示的に有効化する
         DispatchQueue.main.async {
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         }
