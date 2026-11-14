@@ -69,6 +69,19 @@ Python 3.12 が必要です（「Add python.exe to PATH」と「py launcher」�
 
 設定は `%APPDATA%\PhoneCam\phonecam_settings.json` に保存されます。
 
+## Windows 受信アプリのテスト
+
+リポジトリのルートで、Python 3.12 の環境から実行します。
+
+```powershell
+python -m pip install -r windows/requirements-test.txt
+python -m pytest windows/tests -ra
+```
+
+Qt のテストは既定で `QT_QPA_PLATFORM=offscreen` を使います。iPhone、仮想カメラの登録、ネットワーク接続は不要です。
+Qt の見た目を確認するときは既存の `python windows/qt_smoke.py --out qt-screens` を使います。
+GitHub Actions では Windows の pytest ジョブに失敗すると exe ビルドがスキップされ、リリースも公開されません。
+
 ## リリースの手順
 
 リリースは `VERSION` ファイルの変更で始まります。

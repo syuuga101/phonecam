@@ -5,6 +5,10 @@ on:
     paths:
       - "windows/**"
       - ".github/workflows/windows.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -21,7 +25,32 @@ permissions:
   contents: read
 
 jobs:
+  pytest:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            windows/requirements.txt
+            windows/requirements-test.txt
+
+      - name: Install test dependencies
+        run: python -m pip install -r windows/requirements-test.txt
+
+      - name: Run pytest
+        working-directory: windows
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -ra
+
   build:
+    needs: pytest
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -248,7 +277,7 @@ jobs:
   # concurrency は付けない: 同じ group の待機中のジョブは新しい方に取り消され、呼び出し元の
   # Release が cancelled になりうる。ブランチへの保存は force push で、重なっても最後のものが残るだけ。
   qt-screenshots:
-    if: ${{ !inputs.skip_screens }}
+    if: ${{ github.event_name != 'pull_request' && !inputs.skip_screens }}
     runs-on: windows-latest
     continue-on-error: true
     permissions:
