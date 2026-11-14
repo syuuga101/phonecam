@@ -91,6 +91,91 @@ def untranslated_texts(root):
     return found
 
 
+def check_expander_headers(win, failed):
+    """全ページの折りたたみ: 説明が入っていて、要約が「—」だけではなく、説明・要約・矢印が重ならないこと。"""
+    from phonecam.qt.widgets import NO_VALUE, Expander
+    from phonecam.qt.main_window import NAV_ITEMS
+    for i, (key, _icon) in enumerate(NAV_ITEMS):
+        if key == "cameras":
+            continue
+        win.select(i)
+        _settle(win._smoke_app, 120)
+        for ex in win.current_page().findChildren(Expander):
+            where = "%s/%s" % (key, ex.title_label.text())
+            if not ex.description_label.text_full():
+                failed.append((key, "expander '%s' has no description" % where))
+            if ex.summary_label.text_full().strip() in ("", NO_VALUE) and ex.summary_label.isVisible():
+                failed.append((key, "expander '%s' shows an empty summary" % where))
+            header = ex.header
+            desc_right = ex.description_label.mapTo(header, ex.description_label.rect().topRight()).x()
+            if ex.summary_label.isVisible():
+                summary_left = ex.summary_label.mapTo(header, ex.summary_label.rect().topLeft()).x()
+                if desc_right > summary_left:
+                    failed.append((key, "expander '%s': description overlaps the summary (%d > %d)" % (where, desc_right, summary_left)))
+                if ex.summary_label.mapTo(header, ex.summary_label.rect().topRight()).x() > ex.arrow.mapTo(header, ex.arrow.rect().topLeft()).x():
+                    failed.append((key, "expander '%s': summary overlaps the arrow" % where))
+
+
+def check_animation(app, win, failed):
+    """開閉アニメーションを手で 1 コマずつ (16ms 刻み) 進め、1 コマの処理時間と、レイアウト要求の数を測る。
+    1 コマが 16ms を超えるとガクつく。CI の揺れを見込んで、失敗にするのは 50ms 超えだけにし、実測値は表示する。"""
+    from PySide6.QtCore import QEvent, QObject
+    from phonecam.qt.main_window import NAV_ITEMS
+    from phonecam.qt.widgets import Expander
+
+    class Count(QObject):
+        n = 0
+
+        def eventFilter(self, obj, event):
+            if event.type() == QEvent.Type.LayoutRequest:
+                Count.n += 1
+            return False
+
+    counter = Count()
+    app.installEventFilter(counter)
+    try:
+        key = "status"
+        win.select(next(i for i, (k, _icon) in enumerate(NAV_ITEMS) if k == key))
+        win.resize(W, H)
+        _settle(app)
+        ex = win.current_page().findChildren(Expander)[0]
+        ex.set_expanded(False, animate=False, save=False)
+        _settle(app, 150)
+        for expanded in (True, False, True, False):
+            Count.n = 0
+            ex.set_expanded(expanded, animate=True, save=False)
+            anim = ex._anim
+            if anim.state() != anim.State.Running:
+                failed.append((key, "expander animation did not start (expanded=%s)" % expanded))
+                continue
+            anim.pause()
+            times, heights = [], []
+            for ms in range(0, anim.duration() + 1, 16):
+                t0 = time.perf_counter()
+                anim.setCurrentTime(ms)
+                app.processEvents()
+                times.append((time.perf_counter() - t0) * 1000.0)
+                heights.append(ex.curtain.height())
+            anim.stop()
+            ex._animation_finished()
+            _settle(app, 150)
+            steps = [b - a for a, b in zip(heights, heights[1:])]
+            monotonic = all(d >= 0 for d in steps) if expanded else all(d <= 0 for d in steps)
+            print("  animation expanded=%s frames=%d max=%.1fms avg=%.1fms layout_requests=%d" % (
+                expanded, len(times), max(times), sum(times) / len(times), Count.n))
+            if not monotonic:
+                failed.append((key, "expander height is not monotonic while animating: %s" % heights))
+            if max(times) > 50:
+                failed.append((key, "expander animation frame took %.1fms (> 50ms)" % max(times)))
+            if ex.curtain.isVisible() or ex.content.isVisible() != expanded:
+                failed.append((key, "expander is in a wrong state after the animation (expanded=%s)" % expanded))
+            if expanded and ex.content.height() < ex.content.layout().minimumSize().height():
+                failed.append((key, "expander content is squeezed after opening (%d)" % ex.content.height()))
+        ex.set_expanded(False, animate=False, save=False)
+    finally:
+        app.removeEventFilter(counter)
+
+
 def _sample_frame():
     """プレビュー用のサンプル映像 (横グラデーション + 丸)。numpy が無ければ None。"""
     try:
@@ -475,6 +560,9 @@ def child(scale, out):
     win.show()
     _settle(app)
     failed = list(win.page_errors)
+    win._smoke_app = app
+    check_expander_headers(win, failed)
+    check_animation(app, win, failed)
     # カメラが 1 台のとき: 「カメラ」ページ・ページ見出し・ナビ下の小さな表示は出さない
     cams_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "cameras")
     if not win.nav.item(cams_row).isHidden() or win.page_header.isHidden() is False or not win.camera_sub.isHidden():
