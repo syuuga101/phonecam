@@ -3,21 +3,29 @@
 
 - usbmux (Apple Mobile Device Service) への問い合わせ: 接続の有無 / 信頼 (ペアリング) 済みか / PhoneCam アプリに届くか
 - 各手順の状態 (✓ / 待機 / 手動確認) の判定
-- AltStore のソース URL と、追加用ディープリンク
+- SideStore に追加する配布元 (ソース) の URL と、追加用ディープリンク
+
+手順の文言は翻訳キーで持つ (画面に出すときに t() で引く)。SideStore の入れ方は公式の手順に合わせている:
+iloader で最初の 1 回だけ USB で入れ、あとは iPhone だけ (LocalDevVPN をオン・Wi-Fi) で更新する。
 """
 
 import os
 import plistlib
 import socket
 import struct
-import subprocess
+
+try:
+    from phonecam.i18n import t as _i18n_t
+except Exception:  # pragma: no cover
+    _i18n_t = None
 
 USBMUX_ADDR = ("127.0.0.1", 27015)
 PHONE_PORT = 5555
 CLIENT = {"ClientVersionString": "phonecam", "ProgName": "phonecam"}
 
-ALTSTORE_SOURCE_FILE = "altstore-source.json"
-ALTSTORE_BUNDLE_ID = "com.example.phonecam"  # ios/project.yml の PRODUCT_BUNDLE_IDENTIFIER と同じ
+# 配布元のファイル (AltStore 形式。SideStore も同じ形式を読む)
+SOURCE_FILE = "altstore-source.json"
+APP_BUNDLE_ID = "com.example.phonecam"  # ios/project.yml の PRODUCT_BUNDLE_IDENTIFIER と同じ
 
 # 状態
 DONE = "done"        # ✓
@@ -25,7 +33,16 @@ WAIT = "wait"        # まだ (自動で更新される)
 MANUAL = "manual"    # 自動では確認できない (利用者が目で見て進める)
 UNKNOWN = "unknown"  # 確認に失敗
 ISSUE = "issue"      # 要対応 (⚠ オレンジ表示)
-ALTSERVER_IMAGE = "AltServer.exe"
+
+
+def tr(key, **kw):
+    """翻訳 (phonecam.i18n が読めないときはキーのまま)。"""
+    if _i18n_t is None:
+        return key
+    try:
+        return _i18n_t(key, **kw) if kw else _i18n_t(key)
+    except Exception:
+        return key
 
 
 # ---------------------------------------------------------------------------
@@ -171,123 +188,82 @@ def probe_phonecam(snap, addr=USBMUX_ADDR, port=PHONE_PORT, timeout=2.0, connect
             pass
 
 
-def altserver_running(runner=None):
-    """AltServer.exe のプロセスが動いているか。psutil があればそれ、なければ tasklist。例外は投げない。"""
-    if runner is None:
-        try:
-            import psutil  # type: ignore
-            for p in psutil.process_iter(["name"]):
-                if (p.info.get("name") or "").lower() == ALTSERVER_IMAGE.lower():
-                    return True
-            return False
-        except ImportError:
-            pass
-        except Exception:
-            pass
-    try:
-        if runner is not None:
-            out = runner(["tasklist", "/FI", "IMAGENAME eq " + ALTSERVER_IMAGE, "/FO", "CSV", "/NH"])
-        else:
-            kw = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "timeout": 8}
-            if os.name == "nt":
-                kw["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
-            r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq " + ALTSERVER_IMAGE, "/FO", "CSV", "/NH"], **kw)
-            out = (r.stdout or b"").decode("mbcs" if os.name == "nt" else "utf-8", "replace")
-        return ('"%s"' % ALTSERVER_IMAGE).lower() in (out or "").lower()
-    except Exception:
-        return False
-
-
 # ---------------------------------------------------------------------------
 # 手順の定義と状態判定
 # ---------------------------------------------------------------------------
 
-IPHONE_STEPS = [
-    {"id": "usb", "title": "iPhoneをUSBで接続",
-     "lines": ["LightningケーブルでiPhoneをPCにつなぎます。", "iPhoneの画面のロックを解除しておきます。"]},
-    {"id": "trust", "title": "「このコンピュータを信頼」",
-     "lines": ["iPhoneに「このコンピュータを信頼しますか?」と出たら「信頼」を押します。",
-               "パスコードの入力を求められたら入力します。"]},
-    {"id": "itunes", "title": "iTunesでWi-Fi同期をオン",
-     "lines": ["iTunesでiPhoneを開き、「Wi-Fi経由でこのiPhoneと同期」にチェックを入れて「適用」を押します。",
-               "7日ごとの自動更新に使います。更新を手動で行うなら省略できます。"]},
-    {"id": "altstore", "title": "AltStoreをiPhoneに入れる",
-     "lines": ["AltServerを起動し、タスクトレイのAltServerのアイコン → Install AltStore → このiPhone を選びます。",
-               "Apple IDとパスワードを入力します。サブのApple IDでも大丈夫です。"]},
-    {"id": "settings", "title": "iPhone側の設定",
-     "lines": ["設定 > プライバシーとセキュリティ > デベロッパモード をオンにして、iPhoneを再起動します。",
-               "設定 > 一般 > VPNとデバイス管理 で自分のApple IDを開き、「信頼」を押します。"]},
-    {"id": "phonecam", "title": "PhoneCamを入れる",
-     "lines": ["AltStoreのソースにPhoneCamを追加すると、アプリの更新もAltStoreでできます。",
-               "iPhoneでQRコードを読み取るか、下のリンクをiPhoneで開きます。"]},
-    {"id": "test", "title": "接続テスト",
-     "lines": ["iPhoneでPhoneCamを開いたままにします（初回はカメラとローカルネットワークを「許可」）。",
-               "つながると自動で次へ進めます。"]},
-]
-# AltStore の更新 (Refresh) は「どのPCのAltServerからでも」できるが、そのPCが次の条件を満たしている必要がある
-ALTSTORE_REQUIREMENTS = [
-    "Apple公式サイト版の iTunes と iCloud が入っている（Microsoft Store版は不可）",
-    "そのPCにiPhoneをUSBでつないで、「このコンピュータを信頼」を一度押してある",
-    "iTunesで「Wi-Fi経由でこのiPhoneと同期」がオンになっている",
-    "AltServerが起動している（タスクトレイにアイコンがある）",
-    "同じネットワークにいて、VPNはオフ。Windowsのネットワークは「プライベート」",
-]
-ALTSTORE_NEW_PC_NOTE = ("新しいPCで更新できないときは、そのPCで AltServer → Install AltStore を一度実行してください。"
-                        "そのPCとiPhoneのペアリングがやり直され、入れてあるアプリはそのまま残ります。")
+def _step(sid, nlines):
+    return {"id": sid, "title": "setup.iphone.%s.title" % sid,
+            "lines": ["setup.iphone.%s.l%d" % (sid, n) for n in range(1, nlines + 1)]}
 
-# エラー 2003 (AltServer could not find this device) が出たとき
-ALT_2003_TITLE = "エラー2003「AltServer could not find this device」が出るとき"
-ALT_2003_CHECKLIST = [
-    "iPhoneをUSBでつないだまま、ロックを解除して更新する",
-    "タスクトレイのAltServerを終了して、もう一度起動する",
-    "iTunesでiPhoneを開き、「Wi-Fi経由でこのiPhoneと同期」にチェックを入れて「適用」を押す",
-    "iPhoneとPCを同じWi-Fiにつなぐ。VPN（Tailscaleなど）はオフにする",
-    "それでもだめなら、このPCから AltServer → Install AltStore でAltStoreを入れ直す（入れてあるアプリは残ります）",
+
+# title / lines は翻訳キー (画面に出すときに t() で引く)
+IPHONE_STEPS = [
+    _step("usb", 2),        # USB でつなぐ
+    _step("trust", 2),      # 「このコンピュータを信頼」
+    _step("iloader", 3),    # iloader で SideStore を入れる
+    _step("devmode", 2),    # デベロッパ App を信頼・デベロッパモード
+    _step("vpn", 3),        # LocalDevVPN を入れて Connect
+    _step("sidestore", 4),  # SideStore にサインインして 7 DAYS を更新
+    _step("phonecam", 3),   # SideStore に配布元を追加して PhoneCam を入れる
+    _step("test", 2),       # 接続テスト
 ]
+
+# すでに AltStore Classic を使っている人への案内 (iloader の段階の折りたたみ)
+MIGRATE_TITLE = "setup.iphone.migrate.title"
+MIGRATE_LINES = ["setup.iphone.migrate.l1", "setup.iphone.migrate.l2", "setup.iphone.migrate.l3"]
+
+# ペアリングファイルが切れたとき (iOS を更新したあとなど) の入れ直し
+PAIRING_TITLE = "setup.iphone.pairing.title"
+PAIRING_LINES = ["setup.iphone.pairing.l1", "setup.iphone.pairing.l2", "setup.iphone.pairing.l3",
+                 "setup.iphone.pairing.l4", "setup.iphone.pairing.l5", "setup.iphone.pairing.l6"]
+
+# SideStore を入れるときの条件 (導入チェックの下に出す)
+PREREQ_TITLE = "setup.iphone.prereq.title"
+PREREQ_INTRO = "setup.iphone.prereq.intro"
+PREREQ_LINES = ["setup.iphone.prereq.l1", "setup.iphone.prereq.l2", "setup.iphone.prereq.l3",
+                "setup.iphone.prereq.l4", "setup.iphone.prereq.l5"]
+PREREQ_NOTE = "setup.iphone.prereq.note"
 
 STEP_IDS = [s["id"] for s in IPHONE_STEPS]
 STEP_BY_ID = {s["id"]: s for s in IPHONE_STEPS}
 AUTO_ADVANCE = ("usb", "trust")  # 満たされていたら、初めて開いたときに限って自動で次へ進める手順
+# 自動では確認しきれず、利用者が「済んだ」を押す手順
+MANUAL_STEPS = ("iloader", "devmode", "vpn", "sidestore", "phonecam")
 
 
 def step_status(step_id, snap, ctx=None):
-    """(state, 表示文)。snap は query_usbmux の結果。ctx = {"altserver": bool, "app": bool, "link": bool}。"""
+    """(state, 表示文)。snap は query_usbmux の結果。ctx = {"iloader": bool, "app": bool, "link": bool, "confirmed": bool}。"""
     ctx = ctx or {}
     snap = snap or {}
     if step_id == "usb":
         if not snap.get("service"):
-            return ISSUE, "Apple USBドライバが見つかりません"
+            return ISSUE, tr("setup.iphone.status.no_driver")
         if snap.get("usb"):
-            return DONE, "iPhoneが見つかりました"
-        return WAIT, "iPhoneを待っています"
+            return DONE, tr("setup.iphone.status.found")
+        return WAIT, tr("setup.iphone.status.waiting")
     if step_id == "trust":
         if not snap.get("usb"):
-            return WAIT, "先にiPhoneをつないでください"
-        t = snap.get("trusted")
-        if t is True:
-            return DONE, "信頼済みです"
-        if t is False:
-            return WAIT, "iPhoneのロックを解除して「信頼」を押してください"
-        return UNKNOWN, "自動では確認できません"
+            return WAIT, tr("setup.iphone.status.connect_first")
+        trusted = snap.get("trusted")
+        if trusted is True:
+            return DONE, tr("setup.iphone.status.trusted")
+        if trusted is False:
+            return WAIT, tr("setup.iphone.status.unlock_trust")
+        return UNKNOWN, tr("setup.iphone.status.cannot_check")
     confirmed = ctx.get("confirmed")  # 利用者が「済んだ」を押した手順
-    if step_id == "altstore":
-        if ctx.get("altserver_running"):
-            return DONE, "AltServerは起動しています"
+    if step_id in MANUAL_STEPS:
         if confirmed:
-            return DONE, "確認済みです"
-        if not ctx.get("altserver"):
-            return ISSUE, "AltServerが未導入です（前の画面でインストールできます）"
-        return ISSUE, "AltServerを起動してください"
-    if step_id in ("itunes", "settings", "phonecam"):
-        if confirmed:
-            return DONE, "確認済みです"
-        return MANUAL, "ご自身で確認してください"
+            return DONE, tr("setup.wizard.confirmed_done")
+        if step_id == "iloader" and not ctx.get("iloader"):
+            return ISSUE, tr("setup.wizard.iloader_missing")
+        return MANUAL, tr("setup.wizard.manual_check")
     if step_id == "test":
         if ctx.get("link") or ctx.get("app"):
-            return DONE, "PhoneCamアプリとつながりました"
+            return DONE, tr("setup.iphone.status.test_done")
         if not snap.get("usb"):
-            return WAIT, "iPhoneがUSBで見つかりません"
-        return WAIT, "iPhoneでPhoneCamを開いてください"
+            return WAIT, tr("setup.iphone.status.test_no_usb")
+        return WAIT, tr("setup.iphone.status.test_open_app")
     return UNKNOWN, ""
 
 
@@ -297,15 +273,16 @@ def should_auto_advance(step_id, state, auto_done):
 
 
 # ---------------------------------------------------------------------------
-# AltStore ソース
+# SideStore の配布元 (ソース)
 # ---------------------------------------------------------------------------
 
 def source_url(repo):
     if not repo or "/" not in repo:
         return None
-    return "https://github.com/%s/releases/latest/download/%s" % (repo, ALTSTORE_SOURCE_FILE)
+    return "https://github.com/%s/releases/latest/download/%s" % (repo, SOURCE_FILE)
 
 
 def source_deeplink(repo):
+    """iPhone のカメラで読むと SideStore が開いて、配布元を追加できるリンク。"""
     url = source_url(repo)
-    return ("altstore://source?url=" + url) if url else None
+    return ("sidestore://source?url=" + url) if url else None

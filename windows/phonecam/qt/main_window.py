@@ -735,7 +735,7 @@ class MainWindow(QMainWindow):
             self._place_toast()
 
     def _open_setup(self, diagnose, after_update):
-        """セットアップ (ウィザード / AltServer の診断) を、別プロセスではなくこのプロセスのダイアログとして開く。"""
+        """セットアップ (ウィザード / SideStore の導入チェック) を、別プロセスではなくこのプロセスのダイアログとして開く。"""
         try:
             from phonecam.qt.setup_wizard import open_setup_dialog
             open_setup_dialog(self, self.ctrl, diagnose=diagnose, after_update=after_update)

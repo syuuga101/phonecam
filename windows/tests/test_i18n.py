@@ -181,8 +181,8 @@ def dynamic_families():
         "'wireless.route.' + self.route": [f"wireless.route.{r}" for r in ("tether", "hotspot", "lan", "registered")],
         "'wireless.mode_' + value": [f"wireless.mode_{v}" for v in ("auto", "usb", "wifi")],
         "'setup.wizard.components_%d' % name_n": [f"setup.wizard.components_{n}" for n in (1, 3, 5)],
-        "'setup.wizard.components_%d' % purpose_n": [f"setup.wizard.components_{n}" for n in range(2, 10)],
-        "'setup.wizard.manual_text_%d' % n": [f"setup.wizard.manual_text_{n}" for n in range(1, 6)],
+        "'setup.wizard.components_%d' % purpose_n": [f"setup.wizard.components_{n}" for n in range(2, 9)],
+        "'setup.wizard.manual_text_%d' % n": [f"setup.wizard.manual_text_{n}" for n in range(1, 5)],
         "'settings.language.name_' + str(code)": [f"settings.language.name_{c}" for c in LANGUAGES],
     }
 

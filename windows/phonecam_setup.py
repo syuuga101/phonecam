@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """PhoneCam セットアップ
 
-必要なソフト (Apple USBドライバ / iCloud / AltServer / VB-CABLE / VC++ ランタイム / PhoneCam カメラ) の
+必要なソフト (Apple USBドライバ / iloader / VB-CABLE / VC++ ランタイム / PhoneCam カメラ) の
 検出・ダウンロード・インストール・管理者ヘルパ (--setup)・手順つきインストールの状態機械 (GuidedFlow)・
-診断の評価を提供します。このモジュールは tkinter を読み込みません (画面は phonecam/qt/setup_wizard.py)。
+SideStore を入れるときの確認 (導入チェック) を提供します。このモジュールは tkinter を読み込みません (画面は phonecam/qt/setup_wizard.py)。
 
 受信アプリ本体 (phonecam_qt.py) とは bind() で関数を受け渡して連携します
 (本体を __main__ として実行しても二重 import にならないようにするため)。
@@ -52,292 +52,240 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 _JA = {
- "setup.wizard.step_confirm": "済んだ",
- "setup.wizard.fold_requirements": "別のPCで更新するときの条件",
- "setup.wizard.alt_running": "AltServerは起動しています",
- "setup.wizard.alt_not_running": "AltServerを起動してください",
- "setup.wizard.alt_missing": "AltServerが未導入です（前の画面でインストールできます）",
- "setup.wizard.confirmed_done": "確認済みです",
- "setup.wizard.manual_check": "ご自身で確認してください。済んだら右の「済んだ」にチェック",
- "setup.wizard.done_hint": "完了済み。次へ進めます",
-    "setup.wizard.components_1": "PhoneCamカメラ",
-    "setup.wizard.components_2": "OBSやDiscordに表示される専用カメラ",
-    "setup.wizard.components_3": "Visual C++ ランタイム",
-    "setup.wizard.components_4": "専用カメラの動作に必要",
-    "setup.wizard.components_5": "Apple USBドライバ（iTunes）",
-    "setup.wizard.components_6": "USBケーブルでの接続に必要（Wi-Fiだけなら不要）",
-    "setup.wizard.components_7": "AltServerの動作に必要",
-    "setup.wizard.components_8": "iPhoneにアプリを入れて自動更新する",
-    "setup.wizard.components_9": "iPhoneのマイクをOBSで使う（任意）。今のスピーカーとマイクは既定のまま変わりません",
-    "setup.wizard.manual_text_1": "公式サイトから「vc_redist.x64.exe」をダウンロードして実行してください。",
-    "setup.wizard.manual_text_2": "公式サイトの「Windows版iTunes（Microsoft Store版ではない方）」をダウンロードして実行してください。",
-    "setup.wizard.manual_text_3": "AltStoreの案内ページにある「iCloud（Apple公式サイト版）」のリンクからインストールしてください。",
-    "setup.wizard.manual_text_4": "公式サイトから「AltServer for Windows」をダウンロードし、zipを展開して Setup.exe を実行してください。",
-    "setup.wizard.manual_text_5": "公式サイトから zip をダウンロードして展開し、VBCABLE_Setup_x64.exe を管理者として実行してください。",
-    "setup.wizard.detect_camera_1": "ソース実行ではregister.batを使ってください",
-    "setup.wizard.detect_camera_2": "更新が必要です",
-    "setup.wizard.detect_camera_3": "このexeにはカメラが含まれていません",
-    "setup.wizard.detect_itunes_2": "Microsoft Store版の{names}が入っています。AltServerと一緒に使えないため、インストール時に削除して公式サイト版のiTunesに入れ替えます",
-    "setup.wizard.detect_itunes_3": "USB接続はOK・AltServerには公式サイト版が必要",
-    "setup.wizard.store_labels_1": "Appleデバイス",
-    "setup.wizard.remove_store_package_1": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: {detail}）",
-    "setup.wizard.remove_store_package_2": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード {code}）",
-    "setup.wizard.remove_store_package_3": "Microsoft Store版（{names}）を削除しました",
-    "setup.wizard.detect_icloud_1": "Microsoft Store版が入っています（インストール時に削除して公式サイト版に入れ替えます）",
-    "setup.wizard.detect_all_1": "確認できませんでした。「再チェック」を押してください",
-    "setup.wizard.friendly_net_error_1": "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.friendly_net_error_2": "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください",
-    "setup.wizard.friendly_net_error_3": "インターネットに接続できませんでした。ネットワークを確認して、もう一度お試しください",
-    "setup.wizard.friendly_net_error_4": "ダウンロードに失敗しました。ネットワークを確認して、もう一度お試しください",
-    "setup.wizard.validate_download_1": "ダウンロードしたファイルが見つかりません。もう一度お試しください",
-    "setup.wizard.validate_download_2": "ダウンロードしたファイルが空でした。もう一度お試しください",
-    "setup.wizard.validate_download_3": "ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.validate_download_4": "ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください",
-    "setup.wizard.validate_download_5": "ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.validate_download_6": "zipファイルが壊れています。もう一度ダウンロードしてください",
-    "setup.wizard.download_file_1": "安全でないURL (https以外) からはダウンロードしません。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.download_file_2": "ダウンロード先が安全でないURL (https以外) に転送されたため中止しました。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.download_file_3": "キャンセルされました。もう一度やり直すときは「もう一度試す」を押してください",
-    "setup.wizard.safe_extract_zip_1": "zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.safe_extract_zip_2": "zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_1": "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_2": "署名を確認しました（{publisher}）",
-    "setup.wizard.evaluate_signature_3": "不明",
-    "setup.wizard.evaluate_signature_4": "インストーラーの署名者が想定と違うため、実行しませんでした（想定: {expected} / 実際: {actual}）。ダウンロードをやり直してください",
-    "setup.wizard.evaluate_signature_5": "署名のないファイルです（{publisher} は署名なしで配布されています）。ファイルの改ざん検知のみで実行します",
-    "setup.wizard.evaluate_signature_6": "インストーラーに電子署名がないため、実行しませんでした（{publisher} の署名が必要です）。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_7": "インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: {detail}）",
-    "setup.wizard.evaluate_signature_9": "不明なエラー",
-    "setup.wizard.verify_authenticode_1": "Windows 以外では確認できません",
-    "setup.wizard.step_register_camera_1": "PhoneCamカメラを登録",
-    "setup.wizard.stage_for_run_1": "インストーラーの場所が不正です",
-    "setup.wizard.explain_exit_code_1": "インストールが途中で取り消されました。もう一度やり直してください",
-    "setup.wizard.explain_exit_code_2": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください",
-    "setup.wizard.explain_exit_code_4": "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください",
-    "setup.wizard.explain_exit_code_5": "インストーラーのファイルが壊れています。ダウンロードからやり直してください",
-    "setup.wizard.explain_exit_code_6": "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
-    "setup.wizard.explain_exit_code_7": "すでに新しい版が入っています。そのままお使いいただけます",
-    "setup.wizard.explain_exit_code_8": "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください",
-    "setup.wizard.run_installer_1": "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください",
-    "setup.wizard.run_installer_2": "終了コード {code}",
-    "setup.wizard.execute_step_1": "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください",
-    "setup.wizard.execute_step_2": "インストーラーが見つかりません。もう一度ダウンロードからやり直してください",
-    "setup.wizard.execute_step_3": "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください",
-    "setup.wizard.execute_step_4": "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.execute_step_5": "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.execute_step_6": "winget 終了コード {code}",
-    "setup.wizard.execute_step_7": "不明な手順です。PhoneCamを最新版にしてからやり直してください",
-    "setup.wizard.execute_step_8": "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください",
-    "setup.wizard.execute_step_9": "予期しないエラーが起きました。もう一度お試しください",
-    "setup.wizard.run_job_1": "ジョブファイルの検証情報がないため実行しませんでした",
-    "setup.wizard.run_job_2": "ジョブファイルが変更されています",
-    "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: {detail}）",
-    "setup.wizard.slow_hint_1": "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）",
-    "setup.wizard.missing_common_1": "インストーラーを最後の「完了」まで進めてから「確認」を押してください。「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。",
-    "setup.wizard.guide_1": "「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
-    "setup.wizard.guide_2": "「次へ」→ 使用許諾に同意 →「インストール」を押します",
-    "setup.wizard.guide_3": "「ユーザーアカウント制御」が出たら「はい」を押します",
-    "setup.wizard.guide_4": "「完了」が出たら押して、この画面の「確認」を押します",
-    "setup.wizard.guide_5": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
-    "setup.wizard.guide_6": "Apple公式サイト版のiTunesがまだ見つかりません。",
-    "setup.wizard.guide_7": "「インストーラーを開く」を押します（iCloudのインストーラーが開きます）",
-    "setup.wizard.guide_8": "使用許諾に同意して「インストール」を押します",
-    "setup.wizard.guide_9": "完了したら「完了」を押して、この画面の「確認」を押します",
-    "setup.wizard.guide_10": "iCloudにサインインする必要はありません。再起動を求められたら「いいえ（あとで）」を選び、すべて終わってからPCを再起動してください。",
-    "setup.wizard.guide_11": "Apple公式サイト版のiCloudがまだ見つかりません。",
-    "setup.wizard.guide_12": "「インストーラーを開く」を押します（AltServerのインストーラーが開きます）",
-    "setup.wizard.guide_13": "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
-    "setup.wizard.guide_14": "「Finish」を押します。画面右下のタスクトレイにAltServerのアイコンが出ます",
-    "setup.wizard.guide_15": "この画面の「確認」を押します",
-    "setup.wizard.guide_16": "Windowsファイアウォールの許可画面が出たら、「プライベート ネットワーク」にチェックを入れて「アクセスを許可する」を押してください（AltServerがiPhoneを見つけるのに必要です）。",
-    "setup.wizard.guide_17": "AltServerがまだ見つかりません。",
-    "setup.wizard.guide_18": "「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
-    "setup.wizard.guide_19": "「Install Driver」ボタンを押します",
-    "setup.wizard.guide_20": "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
-    "setup.wizard.guide_21": "「OK」で閉じて、この画面の「確認」を押します",
-    "setup.wizard.guide_22": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
-    "setup.wizard.guide_23": "VB-CABLE（CABLE Input）がまだ見つかりません。",
-    "setup.wizard.missing_words_1": "「{name}」はまだ使える状態になっていません（{detail}）",
-    "setup.wizard.missing_words_2": "「{name}」がまだ見つかりません。",
-    "setup.wizard.shell_open_1": "Windows 以外では開けません",
-    "setup.wizard.shell_open_2": "ShellExecute に失敗しました ({code})",
-    "setup.wizard.guidedflow_skip_1": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます",
-    "setup.wizard.guidedflow_prepare_1": "{name}: すでに入っています",
-    "setup.wizard.guidedflow_prepare_2": "すでに入っていました",
-    "setup.wizard.guidedflow_prepare_3": "{name} のMicrosoft Store版を削除しています…",
-    "setup.wizard.prepare_prog_1": "{name} をダウンロード中… {done} / {total}",
-    "setup.wizard.prepare_prog_2": "{name} をダウンロード中… {done}",
-    "setup.wizard.guidedflow_prepare_4": "{name} をダウンロード中…",
-    "setup.wizard.guidedflow_prepare_5": "{name}: ダウンロード完了",
-    "setup.wizard.guidedflow_prepare_6": "{name} のインストーラーを確認しています…",
-    "setup.wizard.guidedflow_prepare_7": "このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。",
-    "setup.wizard.guidedflow_prepare_8": "インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.guidedflow_prepare_9": "{name}: 「インストーラーを開く」を押してください",
-    "setup.wizard.guidedflow__locate_1": "zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください",
-    "setup.wizard.guidedflow_launch_1": "インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください",
-    "setup.wizard.guidedflow_launch_2": "インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください",
-    "setup.wizard.guidedflow_launch_3": "管理者の確認で「いいえ」が押されました。もう一度「インストーラーを開く」を押して、「はい」を選んでください",
-    "setup.wizard.guidedflow_launch_4": "インストーラーを開けませんでした。ウイルス対策ソフトがブロックしていないか確認して、「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.guidedflow_check_1": "インストーラーがまだ動いています。画面の案内に沿って「完了」まで進めてから、もう一度「確認」を押してください",
-    "setup.wizard.run_diagnostics_1": "AltServer が起動しているか確認しています…",
-    "setup.wizard.run_diagnostics_2": "AltServer が起動している",
-    "setup.wizard.run_diagnostics_3": "確認できませんでした",
-    "setup.wizard.run_diagnostics_4": "もう一度「診断」を押してください",
-    "setup.wizard.run_diagnostics_5": "AltServer が動いていません",
-    "setup.wizard.run_diagnostics_6": "スタートメニューから AltServer を起動してください（セットアップタブの「AltServerを起動」でも開けます）",
-    "setup.wizard.run_diagnostics_7": "Apple Mobile Device Service が動いている",
-    "setup.wizard.run_diagnostics_8": "Apple公式サイト版のiTunesを入れて、PCを再起動してください（セットアップタブの「インストール」から入れられます）",
-    "setup.wizard.run_diagnostics_9": "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します",
-    "setup.wizard.run_diagnostics_10": "Bonjour Service が動いている",
-    "setup.wizard.run_diagnostics_11": "Bonjour は公式サイト版のiTunes / iCloudと一緒に入ります。公式サイト版を入れ直してください",
-    "setup.wizard.run_diagnostics_12": "サービスを開始してください（Windowsキー → 「サービス」→ Bonjour サービス →「開始」）。直らないときはPCを再起動します",
-    "setup.wizard.run_diagnostics_13": "{service} を確認しています…",
-    "setup.wizard.run_diagnostics_14": "サービスが止まっています",
-    "setup.wizard.run_diagnostics_15": "サービスが見つかりません",
-    "setup.wizard.run_diagnostics_16": "iTunes を確認しています…",
-    "setup.wizard.run_diagnostics_17": "公式サイト版のiTunesが入っている",
-    "setup.wizard.run_diagnostics_18": "Microsoft Store版は使えません。セットアップタブの「インストール」で公式サイト版に入れ替えてください",
-    "setup.wizard.run_diagnostics_19": "iTunes が見つかりません",
-    "setup.wizard.run_diagnostics_20": "セットアップタブの「インストール」からApple公式サイト版のiTunesを入れてください",
-    "setup.wizard.run_diagnostics_21": "iPhone を確認しています…",
-    "setup.wizard.run_diagnostics_22": "iPhoneがUSBでつながっている",
-    "setup.wizard.run_diagnostics_23": "つながっていますが、このPCを信頼していません",
-    "setup.wizard.run_diagnostics_24": "iPhoneのロックを解除して、「このコンピュータを信頼」→「信頼」を押してください",
-    "setup.wizard.run_diagnostics_25": "iPhoneが見つかりません",
-    "setup.wizard.run_diagnostics_26": "LightningケーブルでPCにつなぎ、iPhoneのロックを解除して「信頼」を押してください。更新中はUSBでつないだままにするのがいちばん確実です",
-    "setup.wizard.run_diagnostics_27": "ネットワークの設定を確認しています…",
-    "setup.wizard.run_diagnostics_28": "ネットワークの種類が「プライベート」",
-    "setup.wizard.run_diagnostics_29": "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク で「プライベート」を選んでください",
-    "setup.wizard.run_diagnostics_30": "VPN がオフ",
-    "setup.wizard.run_diagnostics_31": "Tailscale などのVPNを使っているときは、いったんオフにしてください",
-    "setup.wizard.run_diagnostics_32": "設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、ネットワーク プロファイルを「プライベート」にしてください",
-    "setup.wizard.run_diagnostics_33": "ネットワークが見つかりません",
-    "setup.wizard.run_diagnostics_34": "Wi-Fi または有線LANにつないでください",
-    "setup.wizard.run_diagnostics_35": "「パブリック」になっています（{networks}）",
-    "setup.wizard.run_diagnostics_36": "「パブリック」のネットワークもあります（{networks}）",
-    "setup.wizard.run_diagnostics_37": "iPhoneと同じネットワークが「パブリック」なら、設定 > ネットワークとインターネット > Wi-Fi（またはイーサネット）> 接続中のネットワーク を開き、ネットワーク プロファイルを「プライベート」にしてください",
-    "setup.wizard.run_diagnostics_38": "VPNらしい接続が有効です（{adapters}）",
-    "setup.wizard.run_diagnostics_39": "Tailscale などのVPNをいったんオフにしてから更新してください（AltServerがiPhoneを見つけにくくなります）",
-    "setup.wizard.run_diagnostics_40": "ファイアウォールを確認しています…（少し時間がかかります）",
-    "setup.wizard.run_diagnostics_41": "ファイアウォールがAltServerを許可している",
-    "setup.wizard.run_diagnostics_42": "AltServer を起動したときの Windows セキュリティの画面で、「プライベート ネットワーク」を許可してください",
-    "setup.wizard.run_diagnostics_43": "AltServer をブロックするルールがあります",
-    "setup.wizard.run_diagnostics_44": "Windowsセキュリティ > ファイアウォールとネットワーク保護 > ファイアウォールによるアプリケーションの許可 で、AltServer の「プライベート」にチェックを入れてください",
-    "setup.wizard.run_diagnostics_45": "AltServer を許可するルールが見つかりません",
-    "setup.wizard.run_diagnostics_46": "AltServer を起動し直して、出てきた画面で「プライベート ネットワーク」にチェックして「アクセスを許可する」を押してください。出ないときは、Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 から AltServer を追加します",
-    "setup.wizard.run_diagnostics_fw_bonjour_block": "Bonjour（mDNS）をブロックするルールがあります",
-    "setup.wizard.run_diagnostics_fw_bonjour_fix": "Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 で、Bonjour サービスの「プライベート」にチェックを入れてください（UDP 5353 を使います）",
-    "setup.wizard.run_diagnostics_fw_bonjour_label": "ファイアウォールがBonjour（mDNS・UDP 5353）を許可している",
-    "setup.wizard.run_diagnostics_fw_bonjour_none": "Bonjour（mDNS・UDP 5353）を許可するルールが見つかりません",
-    "setup.wizard.run_diagnostics_fw_act_allow": "許可",
-    "setup.wizard.run_diagnostics_fw_act_block": "ブロック",
-    "setup.wizard.run_diagnostics_fw_dir_in": "受信",
-    "setup.wizard.run_diagnostics_fw_dir_out": "送信",
-    "setup.wizard.run_diagnostics_fw_disabled": "無効",
-    "setup.wizard.run_diagnostics_fw_fix_partial": "Windowsセキュリティ > ファイアウォールによるアプリケーションの許可 で、{app} の「{missing}」にチェックを入れてください",
-    "setup.wizard.run_diagnostics_fw_partial": "{app} の許可ルールはありますが、今のネットワークの種類（{current}）が含まれていません。足りないプロファイル: {missing}",
-    "setup.wizard.run_diagnostics_fw_profile_domain": "ドメイン",
-    "setup.wizard.run_diagnostics_fw_profile_private": "プライベート",
-    "setup.wizard.run_diagnostics_fw_profile_public": "パブリック",
-    "setup.wizard.run_diagnostics_fw_rule_item": "{name}［{profiles} / {kind}］",
-    "setup.wizard.run_diagnostics_fw_rules_suffix": "（見つかったルール: {rules}）",
-    "setup.wizard.diagnostics_summary_1": "問題は見つかりませんでした。それでも更新できないときは、下の「エラー2003が出るとき」を上から順に試してください。",
-    "setup.wizard.setupengine__prepare_1": "{name} をインストール",
-    "setup.wizard.setupengine__prepare_2": "zipの中にインストーラーが見つかりませんでした",
-    "setup.wizard.setupengine_run_1": "準備に失敗しました。もう一度お試しください",
-    "setup.wizard.setupengine_run_2": "{name}: wingetで代わりにインストールします",
-    "setup.wizard.setupengine_run_3": "{name} をインストール (winget)",
-    "setup.wizard.setupengine_run_4": "結果を確認中…",
-    "setup.wizard.setupengine_run_5": "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: {detail}）",
-    "setup.wizard.setupengine_run_6": "インストールは終わりましたが、まだ認識できません。再起動してから再チェックしてください",
-    "setup.wizard.setupengine_run_7": "登録の処理は終わりましたが、状態が変わっていません。もう一度お試しください",
-    "setup.wizard.setupengine__run_elevated_1": "管理者の確認が表示されたら「はい」を押してください…",
-    "setup.wizard.setupengine__run_elevated_2": "管理者権限でインストールを開始します ({count} 件)",
-    "setup.wizard.setupengine__run_elevated_3": "管理者の確認がキャンセルされたため、インストールしませんでした。もう一度お試しください。",
-    "setup.wizard.setupengine__run_elevated_4": "インストールが時間内に終わりませんでした。もう一度お試しください。",
-    "setup.wizard.setupengine__run_elevated_5": "インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
-    "setup.wizard.setupengine__run_elevated_6": "詳細: {kind} {code}",
-    "setup.wizard.setupengine__run_elevated_7": "完了",
-    "setup.wizard.setupengine__run_elevated_8": "失敗 {detail}",
-    "setup.wizard.setupengine__run_elevated_9": "実行されませんでした",
-    "setup.wizard.setupcontroller_start_1": "準備しています…",
-    "setup.wizard.start_work_1": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: {detail}）",
-    "setup.wizard.guided_run_work_1": "予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.guided_open_work_1": "インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
-    "setup.wizard.icons_1": "導入済み",
-    "setup.wizard.icons_2": "未導入",
-    "setup.wizard.icons_3": "要確認",
-    "setup.wizard.setuppanel_render_1": "確認しています…",
-    "setup.wizard.setuppanel__row_1": "失敗",
-    "setup.wizard.setuppanel__row_2": "公式のインストーラーを開いて、手順を画面で案内します",
-    "setup.wizard.setuppanel__wizard_action_1": "スキップ",
-    "setup.wizard.setuppanel__tab_action_1": "更新",
-    "setup.wizard.setuppanel__tab_action_2": "インストール",
-    "setup.wizard.diagnosticsdialog___init___1": "AltServerの診断",
-    "setup.wizard.diagnosticsdialog___init___2": "閉じる",
-    "setup.wizard.diagnosticsdialog___init___3": "もう一度診断する",
-    "setup.wizard.diagnosticsdialog_run_1": "診断しています…",
-    "setup.wizard.run_work_1": "診断",
-    "setup.wizard.run_work_2": "診断を実行できませんでした ({detail})",
-    "setup.wizard.run_work_3": "もう一度「診断する」を押してください",
-    "setup.wizard.diagnosticsdialog_render_1": "更新に使うPCの条件",
-    "setup.wizard.diagnosticsdialog_render_2": "AltStoreは、どのPCのAltServerからでも更新できます。ただし、そのPCで次がそろっている必要があります。",
-    "setup.wizard.diagnosticsdialog_render_3": "AltStore公式の手順を開く",
-    "setup.wizard.setupwizard_1": "ようこそ",
-    "setup.wizard.setupwizard_2": "必要なソフトの確認",
-    "setup.wizard.setupwizard_3": "iPhoneの準備",
-    "setup.wizard.setupwizard___init___1": "PhoneCam セットアップ",
-    "setup.wizard.setupwizard__page_welcome_1": "PhoneCam へようこそ",
-    "setup.wizard.setupwizard__page_welcome_2": "iPhoneをOBSのカメラにするために必要なソフトを確認します。すでに入っているものは飛ばします。\nVisual C++ とカメラの登録は自動で入れます（管理者の確認が1回出ます）。\niTunes・iCloud・AltServer・VB-CABLE は、公式のインストーラーを画面に開いて、押すボタンを1つずつご案内します。\nそのあと、iPhoneにPhoneCamを入れる手順もご案内します。",
-    "setup.wizard.setupwizard__page_welcome_3": "次へ",
-    "setup.wizard.setupwizard__page_check_1": "iPhoneをマイクとしても使う",
-    "setup.wizard.setupwizard__page_check_2": "OBSやDiscordでiPhoneの音声を使うための「VB-CABLE」（無料）を一緒に入れます。PCのマイクを使う場合は不要です。",
-    "setup.wizard.setupwizard__page_check_3": "再チェック",
-    "setup.wizard.setupwizard__page_install_1": "詳細 ▸",
-    "setup.wizard.setupwizard__page_install_2": "もう一度試す",
-    "setup.wizard.setupwizard__page_install_3": "あとで（中止）",
-    "setup.wizard.setupwizard__toggle_log_1": "詳細 ▾",
-    "setup.wizard.setupwizard_overall_text_1": "続けて、下の案内に沿ってインストールします",
-    "setup.wizard.setupwizard_overall_text_2": "一部のインストールが完了しませんでした（下の案内を見てください）",
-    "setup.wizard.setupwizard_overall_text_3": "完了しました（あとで入れる項目があります）",
-    "setup.wizard.setupwizard_overall_text_4": "完了しました",
-    "setup.wizard.setupwizard__show_outcome_1": "再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。",
-    "setup.wizard.setupwizard__show_outcome_2": "{name} は自動で入れられませんでした。「{text}」",
-    "setup.wizard.setupwizard__show_outcome_3": "{name} の公式ページを開く",
-    "setup.wizard.setupwizard__render_results_1": "詳細: {detail}",
-    "setup.wizard.setupwizard__render_guided_1": "{name} をインストール（{index} / {total}）",
-    "setup.wizard.setupwizard__render_guided_2": "インストーラーを準備しています。上のバーが進みます…",
-    "setup.wizard.setupwizard__render_guided_3": "インストールされたか確認しています…",
-    "setup.wizard.setupwizard__render_guided_4": "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます（このまま「確認」を押しても進めます）",
-    "setup.wizard.setupwizard__render_guided_5": "インストーラーを開く",
-    "setup.wizard.setupwizard__render_guided_6": "確認",
-    "setup.wizard.setupwizard__render_guided_7": "インストーラーをもう一度開く",
-    "setup.wizard.setupwizard__render_guided_8": "公式ページを開く",
-    "setup.wizard.setupwizard__render_guided_9": "この項目はあとで",
-    "setup.wizard.setupwizard__elapsed_text_1": "インストーラーを実行中です（経過 {minutes}:{seconds:02d}）。画面の案内に沿って進めてください",
-    "setup.wizard.setupwizard__page_step_1": "全{total}段階",
-    "setup.wizard.setupwizard__page_step_2": "あとで",
-    "setup.wizard.setupwizard__page_step_3": "戻る",
-    "setup.wizard.setupwizard__extra_itunes_1": "iTunesを開く",
-    "setup.wizard.setupwizard__extra_itunes_2": "iTunesが見つかりません。前の画面でインストールできます。",
-    "setup.wizard.setupwizard__extra_altstore_1": "AltServerを起動",
-    "setup.wizard.setupwizard__extra_altstore_2": "公式の手順を開く",
-    "setup.wizard.setupwizard__extra_altstore_3": "うまくいかないときは、AltServerを「管理者として実行」してみてください。",
-    "setup.wizard.setupwizard__extra_phonecam_1": "iPhoneのカメラでQRコードを読み取り、AltStoreで開きます。",
-    "setup.wizard.setupwizard__extra_phonecam_2": "追加できたら、AltStoreで「PhoneCam」を入手します。",
-    "setup.wizard.setupwizard__extra_phonecam_3": "URLをコピー",
-    "setup.wizard.setupwizard__extra_phonecam_4": "QRが使えないときは、PhoneCam.ipaを直接入れる方法もあります。AltServerのアイコンをShiftキーを押しながらクリック → 「Sideload .ipa…」→ 保存したPhoneCam.ipa を選びます。（この方法だと、アプリの更新は自分で入れ直します）",
-    "setup.wizard.setupwizard__extra_phonecam_5": "インストール時に「AltServer.ServerError 2005」が出たときは、AltStoreの「My Apps」でAltStoreを一度「Refresh」してから、もう一度インストールしてください。",
-    "setup.wizard.setupwizard__extra_phonecam_6": "PhoneCam.ipaをダウンロード",
-    "setup.wizard.setupwizard__extra_phonecam_7": "保存しました: {path}",
-    "setup.wizard.setupwizard__copy_1": "✓ URLをコピーしました",
-    "setup.wizard.setupwizard__download_ipa_1": "ダウンロード中…",
  "common.list_separator": "、",
- "setup.wizard.explain_exit_code_2_store": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください",
+ "setup.wizard.check_iloader_1": "iloader を確認しています…",
+ "setup.wizard.check_iloader_2": "iloaderが入っている",
+ "setup.wizard.check_iloader_3": "iloaderが見つかりません",
+ "setup.wizard.check_iloader_4": "セットアップの「インストール」からiloaderを入れてください。入らないときは、iloaderの公式ページからMSIをダウンロードして実行します",
+ "setup.wizard.components_1": "PhoneCamカメラ",
+ "setup.wizard.components_2": "OBSやDiscordに表示される専用カメラ",
+ "setup.wizard.components_3": "Visual C++ ランタイム",
+ "setup.wizard.components_4": "専用カメラの動作に必要",
+ "setup.wizard.components_5": "Apple USBドライバ（iTunes）",
+ "setup.wizard.components_6": "iPhoneとのUSB接続に必要。SideStoreを入れるときに使います",
+ "setup.wizard.components_7": "iPhoneにSideStoreを入れるPC用ツール。最初の1回だけ使います",
+ "setup.wizard.components_8": "iPhoneのマイクをOBSで使う（任意）。今のスピーカーとマイクは既定のまま変わりません",
+ "setup.wizard.confirmed_done": "確認済みです",
+ "setup.wizard.detect_all_1": "確認できませんでした。「再チェック」を押してください",
+ "setup.wizard.detect_camera_1": "ソース実行ではregister.batを使ってください",
+ "setup.wizard.detect_camera_2": "更新が必要です",
+ "setup.wizard.detect_camera_3": "このexeにはカメラが含まれていません",
+ "setup.wizard.detect_itunes_2": "Microsoft Store版の{names}が入っています。iloaderはApple公式サイト版のほうが安定するため、インストール時に削除して公式サイト版のiTunesに入れ替えます",
+ "setup.wizard.detect_itunes_3": "USB接続はOK・iloaderには公式サイト版がおすすめ",
+ "setup.wizard.diagnostics_summary_1": "問題は見つかりませんでした。iloaderで「Install SideStore (Stable)」に進めます。うまくいかないときは、下の条件とペアリングファイルの入れ直しを確認してください。",
+ "setup.wizard.diagnostics_summary_both": "直す必要があるもの: {fix_count} 件、確認してほしいもの: {check_count} 件。下の「→」の案内を上から順に試してください。",
  "setup.wizard.diagnostics_summary_ng": "直す必要があるもの: {fix_count} 件。下の「→」の案内を上から順に試してください。",
  "setup.wizard.diagnostics_summary_warn": "確認してほしいもの: {check_count} 件。下の「→」の案内を上から順に試してください。",
- "setup.wizard.diagnostics_summary_both": "直す必要があるもの: {fix_count} 件、確認してほしいもの: {check_count} 件。下の「→」の案内を上から順に試してください。",
+ "setup.wizard.diagnosticsdialog___init___1": "SideStoreの導入チェック",
+ "setup.wizard.diagnosticsdialog___init___2": "閉じる",
+ "setup.wizard.diagnosticsdialog___init___3": "もう一度チェックする",
+ "setup.wizard.diagnosticsdialog_render_3": "SideStore公式の手順を開く",
+ "setup.wizard.diagnosticsdialog_run_1": "確認しています…",
+ "setup.wizard.done_hint": "完了済み。次へ進めます",
+ "setup.wizard.download_file_1": "安全でないURL (https以外) からはダウンロードしません。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.download_file_2": "ダウンロード先が安全でないURL (https以外) に転送されたため中止しました。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.download_file_3": "キャンセルされました。もう一度やり直すときは「もう一度試す」を押してください",
+ "setup.wizard.evaluate_signature_1": "このインストーラーは署名の確認対象として登録されていないため、実行しませんでした。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.evaluate_signature_2": "署名を確認しました（{publisher}）",
+ "setup.wizard.evaluate_signature_3": "不明",
+ "setup.wizard.evaluate_signature_4": "インストーラーの署名者が想定と違うため、実行しませんでした（想定: {expected} / 実際: {actual}）。ダウンロードをやり直してください",
+ "setup.wizard.evaluate_signature_5": "署名のないファイルです（{publisher} は署名なしで配布されています）。ファイルの改ざん検知のみで実行します",
+ "setup.wizard.evaluate_signature_6": "インストーラーに電子署名がないため、実行しませんでした（{publisher} の署名が必要です）。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.evaluate_signature_7": "インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: {detail}）",
+ "setup.wizard.evaluate_signature_9": "不明なエラー",
+ "setup.wizard.execute_step_1": "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください",
+ "setup.wizard.execute_step_2": "インストーラーが見つかりません。もう一度ダウンロードからやり直してください",
+ "setup.wizard.execute_step_3": "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください",
+ "setup.wizard.execute_step_4": "許可されていないwingetパッケージのため実行しませんでした。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.execute_step_5": "wingetでのインストールに失敗しました。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.execute_step_6": "winget 終了コード {code}",
+ "setup.wizard.execute_step_7": "不明な手順です。PhoneCamを最新版にしてからやり直してください",
+ "setup.wizard.execute_step_8": "インストールが時間内に終わりませんでした。PCを再起動してから、もう一度お試しください",
+ "setup.wizard.execute_step_9": "予期しないエラーが起きました。もう一度お試しください",
+ "setup.wizard.explain_exit_code_1": "インストールが途中で取り消されました。もう一度やり直してください",
+ "setup.wizard.explain_exit_code_2": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください",
+ "setup.wizard.explain_exit_code_2_store": "インストール中にエラーが起きました。PCを再起動してから、もう一度お試しください。Microsoft Store版が残っていると失敗します。設定 > アプリ からStore版をアンインストールしてください",
+ "setup.wizard.explain_exit_code_4": "ほかのインストールが動いています。終わるまで待ってから、もう一度お試しください",
+ "setup.wizard.explain_exit_code_5": "インストーラーのファイルが壊れています。ダウンロードからやり直してください",
+ "setup.wizard.explain_exit_code_6": "権限が足りないか、PCの設定でブロックされました。PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
+ "setup.wizard.explain_exit_code_7": "すでに新しい版が入っています。そのままお使いいただけます",
+ "setup.wizard.explain_exit_code_8": "インストーラーが失敗しました。もう一度試して、だめなら「公式ページを開く」から手動で入れてください",
+ "setup.wizard.friendly_net_error_1": "ダウンロード元が応答しませんでした。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.friendly_net_error_2": "ダウンロードがタイムアウトしました。ネットワークを確認して、もう一度お試しください",
+ "setup.wizard.friendly_net_error_3": "インターネットに接続できませんでした。ネットワークを確認して、もう一度お試しください",
+ "setup.wizard.friendly_net_error_4": "ダウンロードに失敗しました。ネットワークを確認して、もう一度お試しください",
+ "setup.wizard.guide_1": "「インストーラーを開く」を押します（Appleのインストーラーが開きます）",
+ "setup.wizard.guide_10": "インストールが終わると、次の画面の「iloaderを開く」からiloaderを開けます。",
+ "setup.wizard.guide_11": "iloaderがまだ見つかりません。",
+ "setup.wizard.guide_18": "「インストーラーを開く」を押します（VB-CABLEのセットアップが開きます）",
+ "setup.wizard.guide_19": "「Install Driver」ボタンを押します",
+ "setup.wizard.guide_2": "「次へ」→ 使用許諾に同意 →「インストール」を押します",
+ "setup.wizard.guide_20": "「このデバイスソフトウェアをインストールしますか?」が出たら「インストール」を押します",
+ "setup.wizard.guide_21": "「OK」で閉じて、この画面の「確認」を押します",
+ "setup.wizard.guide_22": "再起動が必要と出たら、すべて終わってからPCを再起動してください。インストール中に既定のスピーカーが切り替わっても、PhoneCamが元に戻します。",
+ "setup.wizard.guide_23": "VB-CABLE（CABLE Input）がまだ見つかりません。",
+ "setup.wizard.guide_3": "「ユーザーアカウント制御」が出たら「はい」を押します",
+ "setup.wizard.guide_4": "「完了」が出たら押して、この画面の「確認」を押します",
+ "setup.wizard.guide_5": "オプションはそのままで大丈夫です。再起動を求められたら「あとで」を選んでください。",
+ "setup.wizard.guide_6": "Apple公式サイト版のiTunesがまだ見つかりません。",
+ "setup.wizard.guide_7": "「インストーラーを開く」を押します（iloaderのインストーラーが開きます）",
+ "setup.wizard.guide_8": "「Next」→「Install」を押します（Windowsの青い警告が出たら「詳細情報」→「実行」）",
+ "setup.wizard.guide_9": "「Finish」を押して、この画面の「確認」を押します",
+ "setup.wizard.guided_open_work_1": "インストーラーを開けませんでした。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.guided_run_work_1": "予期しないエラーが起きました。「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.guidedflow__locate_1": "zipの中にインストーラーが見つかりませんでした。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.guidedflow_check_1": "インストーラーがまだ動いています。画面の案内に沿って「完了」まで進めてから、もう一度「確認」を押してください",
+ "setup.wizard.guidedflow_launch_1": "インストーラーが変更されていたため開きませんでした。「もう一度試す」でダウンロードからやり直してください",
+ "setup.wizard.guidedflow_launch_2": "インストーラーのファイルが見つかりません。「もう一度試す」でダウンロードからやり直してください",
+ "setup.wizard.guidedflow_launch_3": "管理者の確認で「いいえ」が押されました。もう一度「インストーラーを開く」を押して、「はい」を選んでください",
+ "setup.wizard.guidedflow_launch_4": "インストーラーを開けませんでした。ウイルス対策ソフトがブロックしていないか確認して、「もう一度試す」を押すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.guidedflow_prepare_1": "{name}: すでに入っています",
+ "setup.wizard.guidedflow_prepare_2": "すでに入っていました",
+ "setup.wizard.guidedflow_prepare_3": "{name} のMicrosoft Store版を削除しています…",
+ "setup.wizard.guidedflow_prepare_4": "{name} をダウンロード中…",
+ "setup.wizard.guidedflow_prepare_5": "{name}: ダウンロード完了",
+ "setup.wizard.guidedflow_prepare_6": "{name} のインストーラーを確認しています…",
+ "setup.wizard.guidedflow_prepare_7": "このインストーラーには電子署名がありません。Windowsの青い警告が出たら「詳細情報」→「実行」を押してください。",
+ "setup.wizard.guidedflow_prepare_8": "インストーラーの準備に失敗しました。もう一度試すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.guidedflow_prepare_9": "{name}: 「インストーラーを開く」を押してください",
+ "setup.wizard.guidedflow_skip_1": "あとで入れます。セットアップタブの「インストール」からいつでも入れられます",
+ "setup.wizard.icons_1": "導入済み",
+ "setup.wizard.icons_2": "未導入",
+ "setup.wizard.icons_3": "要確認",
+ "setup.wizard.iloader_hint": "iloaderがiPhoneを見つけないときは、「SideStoreの導入チェック」で原因を探せます。",
+ "setup.wizard.iloader_missing": "iloaderが未導入です（前の画面でインストールできます）",
+ "setup.wizard.iloader_open": "iloaderを開く",
+ "setup.wizard.iloader_page": "iloaderのダウンロードページ",
+ "setup.wizard.manual_check": "ご自身で確認してください。済んだら右の「済んだ」にチェック",
+ "setup.wizard.manual_text_1": "公式サイトから「vc_redist.x64.exe」をダウンロードして実行してください。",
+ "setup.wizard.manual_text_2": "公式サイトの「Windows版iTunes（Microsoft Store版ではない方）」をダウンロードして実行してください。",
+ "setup.wizard.manual_text_3": "公式ページ（GitHubのリリース）から「iloader-windows-x64.msi」をダウンロードして実行してください。",
+ "setup.wizard.manual_text_4": "公式サイトから zip をダウンロードして展開し、VBCABLE_Setup_x64.exe を管理者として実行してください。",
+ "setup.wizard.missing_common_1": "インストーラーを最後の「完了」まで進めてから「確認」を押してください。「再起動が必要」と出たときは、PCを再起動してから、セットアップタブの「再チェック」を押してください。",
+ "setup.wizard.missing_words_1": "「{name}」はまだ使える状態になっていません（{detail}）",
+ "setup.wizard.missing_words_2": "「{name}」がまだ見つかりません。",
+ "setup.wizard.prepare_prog_1": "{name} をダウンロード中… {done} / {total}",
+ "setup.wizard.prepare_prog_2": "{name} をダウンロード中… {done}",
+ "setup.wizard.remove_store_package_1": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: {detail}）",
+ "setup.wizard.remove_store_package_2": "Microsoft Store版を削除できませんでした。設定 > アプリ から手動でアンインストールしてください（詳細: コード {code}）",
+ "setup.wizard.remove_store_package_3": "Microsoft Store版（{names}）を削除しました",
+ "setup.wizard.run_diagnostics_13": "{service} を確認しています…",
+ "setup.wizard.run_diagnostics_14": "サービスが止まっています",
+ "setup.wizard.run_diagnostics_15": "サービスが見つかりません",
+ "setup.wizard.run_diagnostics_16": "iTunes を確認しています…",
+ "setup.wizard.run_diagnostics_17": "iTunes（Apple公式サイト版）が入っている",
+ "setup.wizard.run_diagnostics_18": "Microsoft Store版でも動くことがありますが、Apple公式サイト版のほうが確実です。セットアップの「インストール」で入れ替えられます",
+ "setup.wizard.run_diagnostics_19": "iTunes が見つかりません",
+ "setup.wizard.run_diagnostics_20": "セットアップの「インストール」からApple公式サイト版のiTunesを入れてください",
+ "setup.wizard.run_diagnostics_21": "iPhone を確認しています…",
+ "setup.wizard.run_diagnostics_22": "iPhoneがUSBでつながっている",
+ "setup.wizard.run_diagnostics_23": "つながっていますが、このPCを信頼していません",
+ "setup.wizard.run_diagnostics_24": "iPhoneのロックを解除して、「このコンピュータを信頼」→「信頼」を押してください",
+ "setup.wizard.run_diagnostics_25": "iPhoneが見つかりません",
+ "setup.wizard.run_diagnostics_26": "LightningケーブルなどでPCにつなぎ、iPhoneのロックを解除して「信頼」を押してください。iloaderでSideStoreを入れる間は、USBでつないだままにします",
+ "setup.wizard.run_diagnostics_3": "確認できませんでした",
+ "setup.wizard.run_diagnostics_4": "もう一度チェックしてください",
+ "setup.wizard.run_diagnostics_7": "Apple Mobile Device Service が動いている",
+ "setup.wizard.run_diagnostics_8": "Apple公式サイト版のiTunesを入れて、PCを再起動してください（セットアップの「インストール」から入れられます）",
+ "setup.wizard.run_diagnostics_9": "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します",
+ "setup.wizard.run_installer_1": "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください",
+ "setup.wizard.run_installer_2": "終了コード {code}",
+ "setup.wizard.run_job_1": "ジョブファイルの検証情報がないため実行しませんでした",
+ "setup.wizard.run_job_2": "ジョブファイルが変更されています",
+ "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: {detail}）",
+ "setup.wizard.run_work_1": "チェック",
+ "setup.wizard.run_work_2": "チェックを実行できませんでした ({detail})",
+ "setup.wizard.run_work_3": "もう一度「チェックする」を押してください",
+ "setup.wizard.safe_extract_zip_1": "zipの中身が不正です。もう一度ダウンロードするか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.safe_extract_zip_2": "zipの展開後のサイズが大きすぎます。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.setupcontroller_start_1": "準備しています…",
+ "setup.wizard.setupengine__prepare_1": "{name} をインストール",
+ "setup.wizard.setupengine__prepare_2": "zipの中にインストーラーが見つかりませんでした",
+ "setup.wizard.setupengine__run_elevated_1": "管理者の確認が表示されたら「はい」を押してください…",
+ "setup.wizard.setupengine__run_elevated_2": "管理者権限でインストールを開始します ({count} 件)",
+ "setup.wizard.setupengine__run_elevated_3": "管理者の確認がキャンセルされたため、インストールしませんでした。もう一度お試しください。",
+ "setup.wizard.setupengine__run_elevated_4": "インストールが時間内に終わりませんでした。もう一度お試しください。",
+ "setup.wizard.setupengine__run_elevated_5": "インストールを実行できませんでした。もう一度お試しください。だめなときは PhoneCamReceiver.exe を右クリック →「管理者として実行」でやり直してください",
+ "setup.wizard.setupengine__run_elevated_6": "詳細: {kind} {code}",
+ "setup.wizard.setupengine__run_elevated_7": "完了",
+ "setup.wizard.setupengine__run_elevated_8": "失敗 {detail}",
+ "setup.wizard.setupengine__run_elevated_9": "実行されませんでした",
+ "setup.wizard.setupengine_run_1": "準備に失敗しました。もう一度お試しください",
+ "setup.wizard.setupengine_run_2": "{name}: wingetで代わりにインストールします",
+ "setup.wizard.setupengine_run_3": "{name} をインストール (winget)",
+ "setup.wizard.setupengine_run_4": "結果を確認中…",
+ "setup.wizard.setupengine_run_5": "インストール後の確認に失敗しました。「再チェック」を押してください（詳細: {detail}）",
+ "setup.wizard.setupengine_run_6": "インストールは終わりましたが、まだ認識できません。再起動してから再チェックしてください",
+ "setup.wizard.setupengine_run_7": "登録の処理は終わりましたが、状態が変わっていません。もう一度お試しください",
+ "setup.wizard.setuppanel__row_1": "失敗",
+ "setup.wizard.setuppanel__row_2": "公式のインストーラーを開いて、手順を画面で案内します",
+ "setup.wizard.setuppanel__tab_action_1": "更新",
+ "setup.wizard.setuppanel__tab_action_2": "インストール",
+ "setup.wizard.setuppanel__wizard_action_1": "スキップ",
+ "setup.wizard.setuppanel_render_1": "確認しています…",
+ "setup.wizard.setupwizard_1": "ようこそ",
+ "setup.wizard.setupwizard_2": "必要なソフトの確認",
+ "setup.wizard.setupwizard_3": "iPhoneの準備",
+ "setup.wizard.setupwizard___init___1": "PhoneCam セットアップ",
+ "setup.wizard.setupwizard__copy_1": "✓ URLをコピーしました",
+ "setup.wizard.setupwizard__download_ipa_1": "ダウンロード中…",
+ "setup.wizard.setupwizard__elapsed_text_1": "インストーラーを実行中です（経過 {minutes}:{seconds:02d}）。画面の案内に沿って進めてください",
+ "setup.wizard.setupwizard__extra_phonecam_1": "iPhoneのカメラでQRコードを読み取ると、SideStoreが開いて、PhoneCamの配布元を追加できます。",
+ "setup.wizard.setupwizard__extra_phonecam_2": "追加できたら、SideStoreの「Browse」でPhoneCamを選んで「GET」を押します。",
+ "setup.wizard.setupwizard__extra_phonecam_3": "URLをコピー",
+ "setup.wizard.setupwizard__extra_phonecam_4": "QRが使えないときは、上のURLをコピーして、SideStoreの「Sources」の「+」から追加します。PhoneCam.ipaを直接入れる方法もあります（SideStoreの「My Apps」の「+」から選びます。この方法だと、アプリの更新は自分で入れ直します）。",
+ "setup.wizard.setupwizard__extra_phonecam_5": "入れるときにエラーが出たら、LocalDevVPNがオン（Connect）で、iPhoneがWi-Fiにつながっているか確認してください。",
+ "setup.wizard.setupwizard__extra_phonecam_6": "PhoneCam.ipaをダウンロード",
+ "setup.wizard.setupwizard__extra_phonecam_7": "保存しました: {path}",
+ "setup.wizard.setupwizard__page_check_1": "iPhoneをマイクとしても使う",
+ "setup.wizard.setupwizard__page_check_2": "OBSやDiscordでiPhoneの音声を使うための「VB-CABLE」（無料）を一緒に入れます。PCのマイクを使う場合は不要です。",
+ "setup.wizard.setupwizard__page_check_3": "再チェック",
+ "setup.wizard.setupwizard__page_install_1": "詳細 ▸",
+ "setup.wizard.setupwizard__page_install_2": "もう一度試す",
+ "setup.wizard.setupwizard__page_install_3": "あとで（中止）",
+ "setup.wizard.setupwizard__page_step_1": "全{total}段階",
+ "setup.wizard.setupwizard__page_step_2": "あとで",
+ "setup.wizard.setupwizard__page_step_3": "戻る",
+ "setup.wizard.setupwizard__page_welcome_1": "PhoneCam へようこそ",
+ "setup.wizard.setupwizard__page_welcome_2": "iPhoneをOBSのカメラにするために必要なソフトを確認します。すでに入っているものは飛ばします。\nVisual C++ とカメラの登録は自動で入れます（管理者の確認が1回出ます）。\niTunes・iloader・VB-CABLE は、公式のインストーラーを画面に開いて、押すボタンを1つずつご案内します。\nそのあと、iPhoneにSideStoreとPhoneCamを入れる手順もご案内します。",
+ "setup.wizard.setupwizard__page_welcome_3": "次へ",
+ "setup.wizard.setupwizard__render_guided_1": "{name} をインストール（{index} / {total}）",
+ "setup.wizard.setupwizard__render_guided_2": "インストーラーを準備しています。上のバーが進みます…",
+ "setup.wizard.setupwizard__render_guided_3": "インストールされたか確認しています…",
+ "setup.wizard.setupwizard__render_guided_4": "✓ インストールを確認できました。インストーラーの「完了」を押して閉じると、次に進みます（このまま「確認」を押しても進めます）",
+ "setup.wizard.setupwizard__render_guided_5": "インストーラーを開く",
+ "setup.wizard.setupwizard__render_guided_6": "確認",
+ "setup.wizard.setupwizard__render_guided_7": "インストーラーをもう一度開く",
+ "setup.wizard.setupwizard__render_guided_8": "公式ページを開く",
+ "setup.wizard.setupwizard__render_guided_9": "この項目はあとで",
+ "setup.wizard.setupwizard__render_results_1": "詳細: {detail}",
+ "setup.wizard.setupwizard__show_outcome_1": "再起動が必要です。セットアップがすべて終わったあとに、PCを再起動してください。",
+ "setup.wizard.setupwizard__show_outcome_2": "{name} は自動で入れられませんでした。「{text}」",
+ "setup.wizard.setupwizard__show_outcome_3": "{name} の公式ページを開く",
+ "setup.wizard.setupwizard__toggle_log_1": "詳細 ▾",
+ "setup.wizard.setupwizard_overall_text_1": "続けて、下の案内に沿ってインストールします",
+ "setup.wizard.setupwizard_overall_text_2": "一部のインストールが完了しませんでした（下の案内を見てください）",
+ "setup.wizard.setupwizard_overall_text_3": "完了しました（あとで入れる項目があります）",
+ "setup.wizard.setupwizard_overall_text_4": "完了しました",
+ "setup.wizard.shell_open_1": "Windows 以外では開けません",
+ "setup.wizard.shell_open_2": "ShellExecute に失敗しました ({code})",
+ "setup.wizard.slow_hint_1": "インストーラーの画面がほかのウィンドウの後ろに隠れていないか確認してください（タスクバーのアイコンも見てください）",
+ "setup.wizard.stage_for_run_1": "インストーラーの場所が不正です",
+ "setup.wizard.start_work_1": "セットアップ中にエラーが起きました。もう一度お試しください（詳細: {detail}）",
+ "setup.wizard.step_confirm": "済んだ",
+ "setup.wizard.step_register_camera_1": "PhoneCamカメラを登録",
+ "setup.wizard.store_labels_1": "Appleデバイス",
+ "setup.wizard.validate_download_1": "ダウンロードしたファイルが見つかりません。もう一度お試しください",
+ "setup.wizard.validate_download_2": "ダウンロードしたファイルが空でした。もう一度お試しください",
+ "setup.wizard.validate_download_3": "ダウンロードしたファイルが小さすぎます（エラーページの可能性があります）。しばらくしてからもう一度試すか、「公式ページを開く」から手動で入れてください",
+ "setup.wizard.validate_download_4": "ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください",
+ "setup.wizard.validate_download_5": "ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください",
+ "setup.wizard.validate_download_6": "zipファイルが壊れています。もう一度ダウンロードしてください",
+ "setup.wizard.verify_authenticode_1": "Windows 以外では確認できません",
+ "setup.wizard.vpn_copy": "URLをコピー",
+ "setup.wizard.vpn_page": "App Storeのページを開く",
+ "setup.wizard.vpn_qr": "iPhoneのカメラでQRコードを読み取ると、LocalDevVPNのApp Storeのページが開きます。",
 }
 
 
@@ -401,7 +349,12 @@ APPLE_SERVICE_KEY = r"SYSTEM\CurrentControlSet\Services\Apple Mobile Device Serv
 USBMUX_ADDR = ("127.0.0.1", 27015)
 VCREDIST_KEY = r"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
 CABLE_KEYWORD = "CABLE Input"
-FAQ_URL = "https://faq.altstore.io/altstore-classic/how-to-install-altstore-windows"
+# SideStore / iloader の公式ページ
+SIDESTORE_DOCS_URL = "https://docs.sidestore.io/docs/installation/install"
+PAIRING_DOCS_URL = "https://docs.sidestore.io/docs/advanced/pairing-file"
+ILOADER_PAGE_URL = "https://github.com/nab138/iloader/releases/latest"
+LOCALDEVVPN_URL = "https://apps.apple.com/app/localdevvpn/id6755608044"
+ILOADER_NAME = "iloader"
 
 # 追加の再起動コード
 EXIT_REBOOT = (3010, 1641)
@@ -412,17 +365,16 @@ COMPONENTS = [
     {"id": "camera", "required": True},
     {"id": "vcredist", "required": True},
     {"id": "itunes", "required": True},
-    {"id": "icloud", "name": "iCloud", "required": False},
-    {"id": "altserver", "name": "AltServer", "required": False, "default_on": True},
+    {"id": "iloader", "name": "iloader", "required": False, "default_on": True},
     {"id": "vbcable", "name": "VB-CABLE", "required": False},
 ]
 # 表示する文言 (言語を切り替えたら localize() で入れ直す)。COMPONENTS の各項目に name / purpose を足す
 _COMPONENT_TEXT = {
-    "camera": (1, 2), "vcredist": (3, 4), "itunes": (5, 6), "icloud": (None, 7), "altserver": (None, 8), "vbcable": (None, 9),
+    "camera": (1, 2), "vcredist": (3, 4), "itunes": (5, 6), "iloader": (None, 7), "vbcable": (None, 8),
 }
 COMPONENT_BY_ID = {c["id"]: c for c in COMPONENTS}
 # インストールする順番
-INSTALL_ORDER = ["vcredist", "itunes", "icloud", "altserver", "vbcable", "camera"]
+INSTALL_ORDER = ["vcredist", "itunes", "iloader", "vbcable", "camera"]
 
 SOURCES = {
     "vcredist": {
@@ -437,15 +389,12 @@ SOURCES = {
         "winget": "Apple.iTunes",
         "page": "https://www.apple.com/itunes/",
     },
-    "icloud": {
-        "url": "https://updates.cdn-apple.com/2020/windows/001-39935-20200911-1A70AA56-F448-11EA-8CC0-99D41950005E/iCloudSetup.exe",
-        "file": "iCloudSetup.exe", "kind": "exe",
-        "args": ["/quiet", "/norestart"], "ok_codes": [0, 3010, 1641],
-        "page": FAQ_URL,
-    },
-    "altserver": {
-        "url": "https://cdn.altstore.io/file/altstore/altinstaller.zip", "file": "altinstaller.zip", "kind": "zip",
-        "page": "https://altstore.io/",
+    # iloader (SideStore を iPhone に入れる PC 用ツール)。公式配布 (GitHub のリリース) の MSI。ファイル名に版を含まないので
+    # latest/download で常に最新が取れる。公式の案内は「Windows は MSI を推奨」
+    "iloader": {
+        "url": "https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.msi",
+        "file": "iloader-windows-x64.msi", "kind": "msi",
+        "page": ILOADER_PAGE_URL,
     },
     "vbcable": {
         "url": "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip", "file": "VBCABLE_Driver_Pack46.zip",
@@ -509,15 +458,17 @@ def reg_value(path, name, view=64):
 
 
 def uninstall_entries():
-    """アンインストール情報 (HKLM の 64bit / 32bit 両方) から (表示名, バージョン) を列挙する。"""
+    """アンインストール情報 (HKLM の 64bit / 32bit 両方と HKCU) から (表示名, バージョン) を列挙する。"""
     wr = _winreg()
     out = []
     if wr is None:
         return out
     base = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    for flag in (wr.KEY_WOW64_64KEY, wr.KEY_WOW64_32KEY):
+    # HKLM (64bit / 32bit) に加えて、ユーザー単位のインストール (HKCU) も見る
+    for hive, flag in ((wr.HKEY_LOCAL_MACHINE, wr.KEY_WOW64_64KEY), (wr.HKEY_LOCAL_MACHINE, wr.KEY_WOW64_32KEY),
+                       (wr.HKEY_CURRENT_USER, 0)):
         try:
-            with wr.OpenKey(wr.HKEY_LOCAL_MACHINE, base, 0, wr.KEY_READ | flag) as root:
+            with wr.OpenKey(hive, base, 0, wr.KEY_READ | flag) as root:
                 i = 0
                 while True:
                     try:
@@ -578,8 +529,27 @@ def _has_entry(entries, *needles, exact=False):
     return False
 
 
-def find_altserver():
-    return _any_file([os.path.join("AltServer", "AltServer.exe")])
+def _local_dirs():
+    out = []
+    for key in ("LOCALAPPDATA",):
+        v = os.environ.get(key)
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
+def find_iloader():
+    """iloader.exe のインストール先。見つからなければ None。(MSI は Program Files、ユーザー単位の版は LocalAppData 以下)"""
+    rels = [os.path.join("iloader", "iloader.exe")]
+    hit = _any_file(rels)
+    if hit:
+        return hit
+    for base in _local_dirs():
+        for rel in (os.path.join("iloader", "iloader.exe"), os.path.join("Programs", "iloader", "iloader.exe")):
+            p = os.path.join(base, rel)
+            if os.path.isfile(p):
+                return p
+    return None
 
 
 def audio_device_names():
@@ -625,17 +595,17 @@ def detect_itunes(entries=None):
     return {"state": STATE_MISSING, "detail": ""}
 
 
-# Microsoft Store 版のパッケージ名。公式サイト版と共存できず、AltServer は公式サイト版が必要なので入れ替える
-# itunes には「Appleデバイス」アプリも含める。入っていると iTunes でiPhoneを扱えず、AltServer がiPhoneを見つけられない (エラー2003)
-STORE_PACKAGES = {"icloud": ["AppleInc.iCloud"], "itunes": ["AppleInc.iTunes", "AppleInc.AppleDevices"]}
-STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes"}   # localize() が AppleDevices を足す
+# Microsoft Store 版のパッケージ名。公式サイト版 (Apple 版の iTunes) と共存できないので、入れるときは入れ替える
+# itunes には「Appleデバイス」アプリも含める。両方あると iPhone を扱う側が競合して、iloader が iPhone を見つけにくくなる
+STORE_PACKAGES = {"itunes": ["AppleInc.iTunes", "AppleInc.AppleDevices"]}
+STORE_LABELS = {"AppleInc.iTunes": "iTunes"}   # localize() が AppleDevices を足す
 
 
 APPX_REPO_KEY = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
 
 
 def store_package_installed(cid):
-    r"""Microsoft Store 版 (AppleInc.iCloud_* など) が今のユーザーに入っているか。
+    r"""Microsoft Store 版 (AppleInc.iTunes_* など) が今のユーザーに入っているか。
     %LOCALAPPDATA%\Packages のフォルダはアンインストール後も残ることがあるので使わず、
     インストール済みパッケージの登録 (HKCU の AppModel\Repository\Packages) を見る。"""
     return bool(installed_store_packages(cid))
@@ -665,10 +635,6 @@ def installed_store_packages(cid):
     return found
 
 
-def _store_icloud_installed():
-    return store_package_installed("icloud")
-
-
 def remove_store_package(cid, runner=None):
     """Store 版を現在のユーザーから削除する (管理者権限は不要。通常権限のプロセスで呼ぶこと)。
     戻り値: (成功したか, メッセージ)"""
@@ -693,21 +659,15 @@ def remove_store_package(cid, runner=None):
     return True, t("setup.wizard.remove_store_package_3", names=t("common.list_separator").join(STORE_LABELS.get(p, p) for p in pkgs))
 
 
-def detect_icloud(entries=None):
-    entries = uninstall_entries() if entries is None else entries
-    # 公式サイト版はアンインストール情報に「iCloud」で登録される。失敗したインストールの残りファイルで
-    # 誤判定しないよう、ファイルの有無ではなく登録で判定する
-    if _has_entry(entries, "icloud", exact=True):
-        return {"state": STATE_OK, "detail": ""}
-    if _store_icloud_installed():
-        # Store 版があると公式サイト版のインストールは失敗する (終了コード 1603)。AltStore が動いていればそのままでよい
-        return {"state": STATE_WARN, "detail": t("setup.wizard.detect_icloud_1")}
-    return {"state": STATE_MISSING, "detail": ""}
+def _is_iloader_entry(name):
+    low = name.strip().lower()
+    return low == ILOADER_NAME or low.startswith(ILOADER_NAME + " ")
 
 
-def detect_altserver(entries=None):
+def detect_iloader(entries=None):
+    """iloader が入っているか。インストール先のファイルか、アンインストール情報 (レジストリ) のどちらかがあれば導入済み。"""
     entries = uninstall_entries() if entries is None else entries
-    if _has_entry(entries, "altserver") or find_altserver():
+    if find_iloader() or any(_is_iloader_entry(name) for name, _ in entries):
         return {"state": STATE_OK, "detail": ""}
     return {"state": STATE_MISSING, "detail": ""}
 
@@ -732,8 +692,7 @@ def detect_all():
         "camera": detect_camera,
         "vcredist": detect_vcredist,
         "itunes": lambda: detect_itunes(entries),
-        "icloud": lambda: detect_icloud(entries),
-        "altserver": lambda: detect_altserver(entries),
+        "iloader": lambda: detect_iloader(entries),
         "vbcable": lambda: detect_vbcable(entries),
     }
     out = {}
@@ -907,12 +866,10 @@ def sha256_file(path):
 SIGNER_POLICY = {
     "vcredist": {"publisher": "Microsoft Corporation", "names": ["Microsoft Corporation"], "match": "exact", "unsigned_ok": False},
     "itunes": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
-    "icloud": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
     "vbcable": {"publisher": "VB-Audio Software (Vincent Burel)", "names": ["VB-Audio", "Vincent Burel"], "match": "contains", "unsigned_ok": False},
-    # AltServer は公式の配布物が署名されているか確認できていない。署名されていれば発行元を確認し、
-    # 署名が無いときだけは「ジョブファイルのSHA-256による改ざん検知」(従来の保護) に頼って実行する。
-    "altserver": {"publisher": "Riley Testut / AltStore", "names": ["Riley", "Testut", "AltStore"], "match": "contains",
-                  "unsigned_ok": True},
+    # iloader は配布物が署名されているか確認できていない。署名されていれば発行元を確認し、
+    # 署名が無いときだけは「SHA-256 による改ざん検知」(ダウンロード後に控えた値と、実行直前の値の照合) に頼って実行する。
+    "iloader": {"publisher": "iloader (nab138)", "names": ["nab138", "iloader"], "match": "contains", "unsigned_ok": True},
 }
 
 # WinVerifyTrust の戻り値 (HRESULT)
@@ -1290,9 +1247,9 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
 # 手順つきインストール (guided): 公式のインストーラーを画面に出して、手順を案内する
 # ---------------------------------------------------------------------------
 # 自動 (無人) でも確実なものだけを自動にする: VC++ ランタイム / PhoneCamカメラの登録 (と Store 版の削除)。
-# iTunes / iCloud / AltServer / VB-CABLE は、公式のインストーラーを普通のウィンドウで開き、手順を画面に出す。
+# iTunes / iloader / VB-CABLE は、公式のインストーラーを普通のウィンドウで開き、手順を画面に出す。
 
-GUIDED_IDS = ("itunes", "icloud", "altserver", "vbcable")
+GUIDED_IDS = ("itunes", "iloader", "vbcable")
 SLOW_SECONDS = 180          # インストーラーがこれより長く動いているとき、隠れていないか確認を促す
 AUTO_CHECK_SECONDS = 5.0    # インストーラーの実行中に、導入済みになったか裏で確かめる間隔
 SLOW_HINT = ""
@@ -1310,7 +1267,7 @@ def localize():
         comp["purpose"] = t("setup.wizard.components_%d" % purpose_n)
     MANUAL_TEXT.clear()
     MANUAL_TEXT.update({cid: t("setup.wizard.manual_text_%d" % n)
-                        for cid, n in (("vcredist", 1), ("itunes", 2), ("icloud", 3), ("altserver", 4), ("vbcable", 5))})
+                        for cid, n in (("vcredist", 1), ("itunes", 2), ("iloader", 3), ("vbcable", 4))})
     STORE_LABELS["AppleInc.AppleDevices"] = t("setup.wizard.store_labels_1")
     SLOW_HINT = t("setup.wizard.slow_hint_1")
     MISSING_COMMON = t("setup.wizard.missing_common_1")
@@ -1324,22 +1281,13 @@ def localize():
             "note": t("setup.wizard.guide_5"),
             "missing": t("setup.wizard.guide_6"),
         },
-        "icloud": {
+        "iloader": {
             "steps": [t("setup.wizard.guide_7"),
                       t("setup.wizard.guide_8"),
                       t("setup.wizard.guide_3"),
                       t("setup.wizard.guide_9")],
             "note": t("setup.wizard.guide_10"),
             "missing": t("setup.wizard.guide_11"),
-        },
-        "altserver": {
-            "steps": [t("setup.wizard.guide_12"),
-                      t("setup.wizard.guide_13"),
-                      t("setup.wizard.guide_3"),
-                      t("setup.wizard.guide_14"),
-                      t("setup.wizard.guide_15")],
-            "note": t("setup.wizard.guide_16"),
-            "missing": t("setup.wizard.guide_17"),
         },
         "vbcable": {
             "steps": [t("setup.wizard.guide_18"),
@@ -1604,15 +1552,9 @@ class GuidedFlow:
 
     def _locate(self, cid, dest):
         """ダウンロードしたファイルから、開くインストーラー {"path", "args", "cwd"} を決める。"""
-        if cid == "altserver":
-            root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
-            exe = find_file(root, ["setup.exe"])
-            if exe:
-                return {"path": exe, "args": [], "cwd": os.path.dirname(exe)}
-            msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
-            if msi:
-                return {"path": msi, "args": [], "cwd": os.path.dirname(msi), "msi": True}
-            raise DownloadError(t("setup.wizard.guidedflow__locate_1"))
+        if cid == "iloader":
+            # 配布物は MSI そのもの (zip ではない)。msiexec /i で普通のウィンドウとして開く
+            return {"path": dest, "args": [], "cwd": os.path.dirname(dest), "msi": True}
         if cid == "vbcable":
             root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
@@ -1723,15 +1665,14 @@ class GuidedFlow:
 
 
 # ---------------------------------------------------------------------------
-# AltServer の診断 (エラー 2003 など「iPhoneが見つからない」ときの原因探し)
+# SideStore の導入チェック (iloader で SideStore を入れる前の確認)
 # ---------------------------------------------------------------------------
-# 外部コマンドはシェルを通さず、引数のリストで実行する。出力の解析はコマンドの実行と切り離してあり、
-# 実行関数 (run) を差し替えてテストできる。日本語/英語どちらの Windows でも読めるよう、文言ではなく構造で判定する。
+# 確認するのは「iTunes (Apple 版) / Apple Mobile Device Service / USB で見えて信頼済みか / iloader」の 4 つ。
+# 外部コマンドはシェルを通さず、引数のリストで実行する。実行関数 (run) を差し替えてテストできる。
+# 日本語/英語どちらの Windows でも読めるよう、文言ではなく構造 (戻りコードと状態名) で判定する。
 
 DIAG_OK, DIAG_NG, DIAG_WARN = "ok", "ng", "warn"
-VPN_KEYWORDS = ("tailscale", "wireguard", "openvpn", "nordlynx", "zerotier", "warp", "wintun", "tap-windows",
-                "expressvpn", "protonvpn", "mullvad", "vpn", "cisco anyconnect", "forticlient", "globalprotect")
-NET_PRIVATE, NET_PUBLIC, NET_DOMAIN = "private", "public", "domain"
+AMDS_SERVICE = "Apple Mobile Device Service"
 
 
 def run_text(cmd, timeout=20):
@@ -1754,11 +1695,6 @@ def run_text(cmd, timeout=20):
         return None, ""
 
 
-def parse_tasklist_has(stdout, image):
-    """tasklist /FO CSV /NH の出力に image (例: AltServer.exe) のプロセスがあるか。"""
-    return ('"%s"' % image).lower() in (stdout or "").lower()
-
-
 def parse_sc_state(rc, stdout):
     """sc query の結果 → "running" / "stopped" / "missing" (サービスなし) / "unknown"。"""
     text = stdout or ""
@@ -1773,307 +1709,13 @@ def parse_sc_state(rc, stdout):
     return "unknown"
 
 
-def _net_category(v):
-    if isinstance(v, int) or (isinstance(v, str) and v.strip().isdigit()):
-        return {0: NET_PUBLIC, 1: NET_PRIVATE, 2: NET_DOMAIN}.get(int(v), "")
-    t = str(v or "").strip().lower()
-    if t.startswith("public"):
-        return NET_PUBLIC
-    if t.startswith("private"):
-        return NET_PRIVATE
-    if t.startswith("domain"):
-        return NET_DOMAIN
-    return ""
-
-
-def _as_list(v):
-    if v is None:
-        return []
-    return v if isinstance(v, list) else [v]
-
-
-def parse_network_json(stdout):
-    """PowerShell の JSON 出力 → ({"profiles": [{name, alias, category}], "adapters": [{name, desc}]}) または None。"""
-    text = (stdout or "").strip()
-    i, j = text.find("{"), text.rfind("}")
-    if i < 0 or j <= i:
-        return None
-    try:
-        data = json.loads(text[i:j + 1])
-    except Exception:
-        return None
-    profiles = [{"name": str(p.get("name") or ""), "alias": str(p.get("alias") or ""), "category": _net_category(p.get("cat"))}
-                for p in _as_list(data.get("profiles")) if isinstance(p, dict)]
-    adapters = [{"name": str(a.get("name") or ""), "desc": str(a.get("desc") or "")}
-                for a in _as_list(data.get("adapters")) if isinstance(a, dict)]
-    return {"profiles": profiles, "adapters": adapters}
-
-
-def find_vpn_adapters(adapters):
-    out = []
-    for a in adapters or []:
-        text = ("%s %s" % (a.get("name", ""), a.get("desc", ""))).lower()
-        if any(k in text for k in VPN_KEYWORDS):
-            out.append(a.get("name") or a.get("desc") or "")
-    return out
-
-
-# --- ファイアウォール判定 ---------------------------------------------------------------
-# 言語に依存しない PowerShell (Get-NetFirewall*) の JSON を主にして、失敗したときだけ netsh の出力を読む。
-# どちらも同じ形のルール dict に直してから _eval_firewall で判定する:
-#   {name, display, enabled(bool), direction("in"/"out"/""), action("allow"/"block"/""), profiles(bit 1=Domain 2=Private 4=Public),
-#    program, protocol, lport}
-FW_DOMAIN, FW_PRIVATE, FW_PUBLIC, FW_ALL = 1, 2, 4, 7
-_FW_CAT_BIT = {NET_DOMAIN: FW_DOMAIN, NET_PRIVATE: FW_PRIVATE, NET_PUBLIC: FW_PUBLIC}
-
-_FW_SCRIPT = (
-    "$ErrorActionPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
-    "$global:rows=@{}; "
-    "function Add-Rule($r,$prog,$proto,$lport){ if($r -and -not $global:rows.ContainsKey($r.Name)){ "
-    "$global:rows[$r.Name]=@{name=[string]$r.Name; display=[string]$r.DisplayName; en=[string][int]$r.Enabled; dir=[string][int]$r.Direction; "
-    "act=[string][int]$r.Action; prof=[string][int]$r.Profile; prog=[string]$prog; proto=[string]$proto; lport=((@($lport) | ForEach-Object { [string]$_ }) -join ',')} } }; "
-    "$pat='(?i)(^|[\\\\/])(altserver|mdnsresponder)\\.exe$'; "
-    "foreach($f in @(Get-NetFirewallApplicationFilter | Where-Object { $_.Program -match $pat })){ "
-    "foreach($r in @(Get-NetFirewallRule -AssociatedNetFirewallApplicationFilter $f)){ Add-Rule $r $f.Program '' '' } }; "
-    "foreach($r in @(Get-NetFirewallRule | Where-Object { $_.DisplayName -match '(?i)altserver|bonjour|mdns' -or $_.Name -match '(?i)altserver|bonjour|mdns' })){ "
-    "$af=Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $r; $pf=Get-NetFirewallPortFilter -AssociatedNetFirewallRule $r; "
-    "Add-Rule $r $af.Program $pf.Protocol $pf.LocalPort }; "
-    "foreach($f in @(Get-NetFirewallPortFilter | Where-Object { [string]$_.Protocol -eq 'UDP' -and (@($_.LocalPort) -contains '5353') })){ "
-    "foreach($r in @(Get-NetFirewallRule -AssociatedNetFirewallPortFilter $f)){ "
-    "$af=Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $r; Add-Rule $r $af.Program $f.Protocol $f.LocalPort } }; "
-    "@{rules=@($global:rows.Values)} | ConvertTo-Json -Compress -Depth 4")
-
-
-def _fw_enabled(v):
-    s = str(v if v is not None else "").strip().lower()
-    if s in ("1", "true", "yes", "y", "はい", "有効"):
-        return True
-    return False
-
-
-def _fw_direction(v):
-    s = str(v if v is not None else "").strip().lower()
-    if not s:
-        return ""
-    if s == "1" or s.startswith(("in", "入", "受信", "内向", "インバウンド")):
-        return "in"
-    if s == "2" or s.startswith(("out", "出", "送信", "外向", "アウトバウンド")):
-        return "out"
-    return ""
-
-
-def _fw_action(v):
-    s = str(v if v is not None else "").strip().lower()
-    if s == "2" or s.startswith(("allow", "許可", "bypass", "セキュリティで保護されている場合")):
-        return "allow"
-    if s == "4" or s.startswith(("block", "ブロック", "拒否", "遮断", "ブロック")):
-        return "block"
-    return ""
-
-
-def _fw_profiles(v):
-    """プロファイルの値 → ビット (Domain=1 Private=2 Public=4)。数値 / 英語名 / 日本語名のどれでも読む。空は全部。"""
-    s = str(v if v is not None else "").strip().lower()
-    if not s:
-        return FW_ALL
-    if s.lstrip("-").isdigit():
-        n = int(s) & FW_ALL
-        return n or FW_ALL
-    bits = 0
-    for tok in re.split(r"[,、，;\s/]+", s):
-        if not tok:
-            continue
-        if tok.startswith(("any", "all", "任意", "すべて", "全て")):
-            return FW_ALL
-        if tok.startswith(("domain", "ドメイン")):
-            bits |= FW_DOMAIN
-        elif tok.startswith(("private", "プライベート", "非公開")):
-            bits |= FW_PRIVATE
-        elif tok.startswith(("public", "パブリック", "公開")):
-            bits |= FW_PUBLIC
-    return bits or FW_ALL
-
-
-def _fw_rule(name="", display="", enabled=False, direction="", action="", profiles=FW_ALL, program="", protocol="", lport=""):
-    return {"name": name, "display": display or name, "enabled": enabled, "direction": direction, "action": action,
-            "profiles": profiles, "program": program, "protocol": str(protocol or "").lower(), "lport": str(lport or "")}
-
-
-def parse_firewall_json(stdout):
-    """_FW_SCRIPT の JSON → ルール dict のリスト。JSON として読めなければ None (netsh に戻る合図)。"""
-    text = (stdout or "").strip()
-    i, j = text.find("{"), text.rfind("}")
-    if i < 0 or j <= i:
-        return None
-    try:
-        data = json.loads(text[i:j + 1])
-    except Exception:
-        return None
-    if not isinstance(data, dict) or "rules" not in data:
-        return None
-    return [_fw_rule(str(r.get("name") or ""), str(r.get("display") or ""), _fw_enabled(r.get("en")), _fw_direction(r.get("dir")),
-                     _fw_action(r.get("act")), _fw_profiles(r.get("prof")), str(r.get("prog") or ""), r.get("proto"), r.get("lport"))
-            for r in _as_list(data.get("rules")) if isinstance(r, dict)]
-
-
-# netsh の項目名 (英語/日本語、空白除去・小文字化したもの) → フィールド
-_NETSH_KEYS = {
-    "rulename": "name", "規則名": "name", "ルール名": "name",
-    "enabled": "enabled", "有効": "enabled",
-    "direction": "direction", "方向": "direction",
-    "profiles": "profiles", "profile": "profiles", "プロファイル": "profiles",
-    "program": "program", "プログラム": "program",
-    "action": "action", "操作": "action", "アクション": "action",
-    "protocol": "protocol", "プロトコル": "protocol",
-    "localport": "lport", "ローカルポート": "lport",
-}
-
-
-def parse_firewall_netsh(stdout):
-    """netsh advfirewall firewall show rule name=all の出力 → ルール dict のリスト。
-    「規則名:」/「Rule Name:」の行で新しいルールが始まる (空行の有無には頼らない)。値は日本語・英語どちらでも読む。"""
-    rules, cur = [], None
-
-    def flush():
-        if cur is not None:
-            rules.append(_fw_rule(cur.get("name", ""), "", _fw_enabled(cur.get("enabled")), _fw_direction(cur.get("direction")),
-                                  _fw_action(cur.get("action")), _fw_profiles(cur.get("profiles")), cur.get("program", ""),
-                                  cur.get("protocol", ""), cur.get("lport", "")))
-
-    for line in (stdout or "").splitlines():
-        m = re.match(r"^\s*([^:：]+?)\s*[:：]\s*(.*?)\s*$", line.replace("　", " "))
-        if not m:
-            continue
-        key = re.sub(r"\s+", "", m.group(1)).lower()
-        field = _NETSH_KEYS.get(key)
-        if not field:
-            continue
-        if field == "name":
-            flush()
-            cur = {}
-        if cur is None:
-            continue
-        cur.setdefault(field, m.group(2))
-    flush()
-    return rules
-
-
-def parse_firewall(stdout, keyword="altserver"):
-    """互換用: netsh の出力から keyword を含む (名前かプログラム) ルールを調べる。
-    戻り値: {"found": 件数, "allow_in": 有効な受信許可があるか, "block": 有効なブロックがあるか}"""
-    res = {"found": 0, "allow_in": False, "block": False}
-    for r in parse_firewall_netsh(stdout):
-        if keyword.lower() not in ("%s %s" % (r["name"], r["program"])).lower():
-            continue
-        res["found"] += 1
-        if not r["enabled"]:
-            continue
-        if r["action"] == "allow" and r["direction"] in ("in", ""):
-            res["allow_in"] = True
-        elif r["action"] == "block":
-            res["block"] = True
-    return res
-
-
-def _fw_basename(path):
-    return re.split(r"[\\/]", str(path or "").strip().strip('"'))[-1].lower()
-
-
-def fw_is_altserver(r):
-    return _fw_basename(r["program"]) == "altserver.exe" or "altserver" in ("%s %s" % (r["name"], r["display"])).lower()
-
-
-def fw_is_bonjour(r):
-    if _fw_basename(r["program"]) == "mdnsresponder.exe" or re.search(r"bonjour|mdns", "%s %s" % (r["name"], r["display"]), re.I):
-        return True
-    return r["protocol"] in ("udp", "17") and "5353" in re.split(r"[,\s]+", r["lport"])
-
-
-def fw_active_bits(net):
-    """今つながっているネットワークの種類 → プロファイルのビット。わからなければ 0。"""
-    bits = 0
-    for p in (net or {}).get("profiles", []):
-        bits |= _FW_CAT_BIT.get(p.get("category"), 0)
-    return bits
-
-
-def _fw_profile_names(bits):
-    names = []
-    for bit, key in ((FW_DOMAIN, "setup.wizard.run_diagnostics_fw_profile_domain"),
-                     (FW_PRIVATE, "setup.wizard.run_diagnostics_fw_profile_private"),
-                     (FW_PUBLIC, "setup.wizard.run_diagnostics_fw_profile_public")):
-        if bits & bit:
-            names.append(t(key))
-    return t("common.list_separator").join(names)
-
-
-def fw_describe_rule(r):
-    """ユーザーが画面と見比べられるように「名前（プロファイル / 受信・許可 / 無効）」の形にする。"""
-    kind = []
-    if r["direction"] == "in":
-        kind.append(t("setup.wizard.run_diagnostics_fw_dir_in"))
-    elif r["direction"] == "out":
-        kind.append(t("setup.wizard.run_diagnostics_fw_dir_out"))
-    if r["action"] == "allow":
-        kind.append(t("setup.wizard.run_diagnostics_fw_act_allow"))
-    elif r["action"] == "block":
-        kind.append(t("setup.wizard.run_diagnostics_fw_act_block"))
-    if not r["enabled"]:
-        kind.append(t("setup.wizard.run_diagnostics_fw_disabled"))
-    return t("setup.wizard.run_diagnostics_fw_rule_item", name=r["display"] or r["name"] or r["program"],
-             profiles=_fw_profile_names(r["profiles"]), kind="・".join(kind))
-
-
-def evaluate_firewall(rules, matcher, active_bits=0):
-    """matcher に合うルールを調べる。戻り値 {"state": "ok"/"block"/"partial"/"none", "missing": 足りないビット, "found": [rule...], "blockers": [rule...]}。
-    有効な受信ブロックが今のネットワークに効いていれば block (ブロックが優先)。許可があっても今のネットワークの
-    プロファイルを含まなければ partial。active_bits=0 はネットワーク不明 (どれか1つでも許可があれば ok)。"""
-    found = [r for r in rules if matcher(r)]
-    live = [r for r in found if r["enabled"] and r["direction"] in ("in", "")]
-    act = active_bits or FW_ALL
-    blockers = [r for r in live if r["action"] == "block" and r["profiles"] & act]
-    allows = [r for r in live if r["action"] == "allow"]
-    covered = 0
-    for r in allows:
-        covered |= r["profiles"]
-    missing = (active_bits & ~covered) if active_bits else 0
-    if blockers:
-        state = "block"
-    elif allows and not missing:
-        state = "ok"
-    elif allows:
-        state = "partial"
-    else:
-        state = "none"
-    return {"state": state, "missing": missing, "found": found, "blockers": blockers}
-
-
-def get_firewall_rules(run):
-    """PowerShell (言語に依存しない) で取得。失敗したときだけ netsh の解析に戻る。取れなければ None。"""
-    rc, txt = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _FW_SCRIPT], 60)
-    rules = parse_firewall_json(txt) if rc is not None else None
-    if rules is not None:
-        return rules
-    rc, txt = run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], 40)
-    if rc is None:
-        return None
-    return parse_firewall_netsh(txt)
-
-
-_NET_SCRIPT = (
-    "$ErrorActionPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; "
-    "$p=@(Get-NetConnectionProfile | ForEach-Object { @{name=$_.Name; alias=$_.InterfaceAlias; cat=[int]$_.NetworkCategory} }); "
-    "$a=@(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { @{name=$_.Name; desc=$_.InterfaceDescription} }); "
-    "@{profiles=$p; adapters=$a} | ConvertTo-Json -Compress -Depth 4")
-
-
 def _diag(did, label, state, detail="", fix=""):
     return {"id": did, "label": label, "state": state, "detail": detail, "fix": fix}
 
 
-def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=None):
-    """AltServer の診断。戻り値: [{id, label, state(ok/ng/warn), detail, fix}]。
-    run(cmd_list, timeout) -> (rc, text) を差し替えてテストできる。itunes_status / usb_snapshot も差し替え可。"""
+def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, iloader_status=None, progress=None):
+    """SideStore の導入チェック。戻り値: [{id, label, state(ok/ng/warn), detail, fix}]。
+    run(cmd_list, timeout) -> (rc, text) を差し替えてテストできる。itunes_status / usb_snapshot / iloader_status も差し替え可。"""
     run = run or run_text
     out = []
 
@@ -2084,38 +1726,7 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
             except Exception:
                 pass
 
-    # 1. AltServer.exe が動いているか
-    note(t("setup.wizard.run_diagnostics_1"))
-    rc, txt = run(["tasklist", "/FI", "IMAGENAME eq AltServer.exe", "/FO", "CSV", "/NH"], 15)
-    if rc is None:
-        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_4")))
-    elif parse_tasklist_has(txt, "AltServer.exe"):
-        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_OK))
-    else:
-        out.append(_diag("altserver", t("setup.wizard.run_diagnostics_2"), DIAG_NG, t("setup.wizard.run_diagnostics_5"),
-                         t("setup.wizard.run_diagnostics_6")))
-
-    # 2. Apple Mobile Device Service / 3. Bonjour Service
-    for did, label, svc, fix_missing, fix_stopped in (
-            ("amds", t("setup.wizard.run_diagnostics_7"), "Apple Mobile Device Service",
-             t("setup.wizard.run_diagnostics_8"),
-             t("setup.wizard.run_diagnostics_9")),
-            ("bonjour", t("setup.wizard.run_diagnostics_10"), "Bonjour Service",
-             t("setup.wizard.run_diagnostics_11"),
-             t("setup.wizard.run_diagnostics_12"))):
-        note(t("setup.wizard.run_diagnostics_13", service=svc))
-        rc, txt = run(["sc.exe", "query", svc], 15)
-        state = "unknown" if rc is None else parse_sc_state(rc, txt)
-        if state == "running":
-            out.append(_diag(did, label, DIAG_OK))
-        elif state == "stopped":
-            out.append(_diag(did, label, DIAG_NG, t("setup.wizard.run_diagnostics_14"), fix_stopped))
-        elif state == "missing":
-            out.append(_diag(did, label, DIAG_NG, t("setup.wizard.run_diagnostics_15"), fix_missing))
-        else:
-            out.append(_diag(did, label, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_4")))
-
-    # 4. 公式サイト版 iTunes
+    # 1. iTunes (Apple 版)
     note(t("setup.wizard.run_diagnostics_16"))
     try:
         st = itunes_status() if itunes_status else detect_itunes()
@@ -2124,13 +1735,28 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
     if st.get("state") == STATE_OK:
         out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_OK))
     elif st.get("state") == STATE_WARN:
-        out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_NG, st.get("detail", ""),
+        # Microsoft Store 版 (または「Appleデバイス」アプリ) でも動くことはあるので、直さないといけない扱い (NG) にはしない
+        out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_WARN, st.get("detail", ""),
                          t("setup.wizard.run_diagnostics_18")))
     else:
         out.append(_diag("itunes", t("setup.wizard.run_diagnostics_17"), DIAG_NG, t("setup.wizard.run_diagnostics_19"),
                          t("setup.wizard.run_diagnostics_20")))
 
-    # 5. iPhone が USB でつながっている (+ 信頼)
+    # 2. Apple Mobile Device Service (iPhone を USB で扱うサービス)
+    note(t("setup.wizard.run_diagnostics_13", service=AMDS_SERVICE))
+    label = t("setup.wizard.run_diagnostics_7")
+    rc, txt = run(["sc.exe", "query", AMDS_SERVICE], 15)
+    state = "unknown" if rc is None else parse_sc_state(rc, txt)
+    if state == "running":
+        out.append(_diag("amds", label, DIAG_OK))
+    elif state == "stopped":
+        out.append(_diag("amds", label, DIAG_NG, t("setup.wizard.run_diagnostics_14"), t("setup.wizard.run_diagnostics_9")))
+    elif state == "missing":
+        out.append(_diag("amds", label, DIAG_NG, t("setup.wizard.run_diagnostics_15"), t("setup.wizard.run_diagnostics_8")))
+    else:
+        out.append(_diag("amds", label, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_4")))
+
+    # 3. iPhone が USB でつながっている (+ 信頼)
     note(t("setup.wizard.run_diagnostics_21"))
     try:
         snap = usb_snapshot() if usb_snapshot else (iphone.query_usbmux() if iphone is not None else {})
@@ -2146,82 +1772,20 @@ def run_diagnostics(run=None, itunes_status=None, usb_snapshot=None, progress=No
         out.append(_diag("usb", t("setup.wizard.run_diagnostics_22"), DIAG_NG, t("setup.wizard.run_diagnostics_25"),
                          t("setup.wizard.run_diagnostics_26")))
 
-    # 6. ネットワークの種類 / 7. VPN
-    note(t("setup.wizard.run_diagnostics_27"))
-    rc, txt = run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", _NET_SCRIPT], 30)
-    net = parse_network_json(txt) if rc is not None else None
-    if net is None:
-        out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"),
-                         t("setup.wizard.run_diagnostics_29")))
-        out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_31")))
+    # 4. iloader
+    note(t("setup.wizard.check_iloader_1"))
+    try:
+        st = iloader_status() if iloader_status else detect_iloader()
+    except Exception:
+        st = {"state": STATE_WARN, "detail": t("setup.wizard.run_diagnostics_3")}
+    if st.get("state") == STATE_OK:
+        out.append(_diag("iloader", t("setup.wizard.check_iloader_2"), DIAG_OK))
+    elif st.get("state") == STATE_WARN:
+        out.append(_diag("iloader", t("setup.wizard.check_iloader_2"), DIAG_WARN, t("setup.wizard.run_diagnostics_3"),
+                         t("setup.wizard.run_diagnostics_4")))
     else:
-        publics = [p for p in net["profiles"] if p["category"] == NET_PUBLIC]
-        others = [p for p in net["profiles"] if p["category"] in (NET_PRIVATE, NET_DOMAIN)]
-        fix_net = (t("setup.wizard.run_diagnostics_32"))
-        if not net["profiles"]:
-            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN, t("setup.wizard.run_diagnostics_33"),
-                             t("setup.wizard.run_diagnostics_34")))
-        elif publics and not others:
-            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_NG,
-                             t("setup.wizard.run_diagnostics_35", networks=t("common.list_separator").join(p["name"] or p["alias"] for p in publics)), fix_net))
-        elif publics:
-            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_WARN,
-                             t("setup.wizard.run_diagnostics_36", networks=t("common.list_separator").join(p["name"] or p["alias"] for p in publics)),
-                             t("setup.wizard.run_diagnostics_37")))
-        else:
-            out.append(_diag("network", t("setup.wizard.run_diagnostics_28"), DIAG_OK))
-        vpns = find_vpn_adapters(net["adapters"])
-        if vpns:
-            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_WARN, t("setup.wizard.run_diagnostics_38", adapters=t("common.list_separator").join(vpns)),
-                             t("setup.wizard.run_diagnostics_39")))
-        else:
-            out.append(_diag("vpn", t("setup.wizard.run_diagnostics_30"), DIAG_OK))
-
-    # 8. ファイアウォール (AltServer) / 9. ファイアウォール (Bonjour)
-    note(t("setup.wizard.run_diagnostics_40"))
-    rules = get_firewall_rules(run)
-    active = fw_active_bits(net)
-    current = _fw_profile_names(active)
-    lbl_alt, lbl_bj = t("setup.wizard.run_diagnostics_41"), t("setup.wizard.run_diagnostics_fw_bonjour_label")
-    if rules is None:
-        out.append(_diag("firewall", lbl_alt, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_42")))
-        out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN, t("setup.wizard.run_diagnostics_3"), t("setup.wizard.run_diagnostics_42")))
-    else:
-        def suffix(res, only=None):
-            shown = only if only is not None else res["found"]
-            if not shown:
-                return ""
-            return t("setup.wizard.run_diagnostics_fw_rules_suffix", rules=t("common.list_separator").join(fw_describe_rule(r) for r in shown))
-
-        def fix_partial(app, res):
-            return t("setup.wizard.run_diagnostics_fw_fix_partial", app=app, missing=_fw_profile_names(res["missing"]))
-
-        res = evaluate_firewall(rules, fw_is_altserver, active)
-        if res["state"] == "ok":
-            out.append(_diag("firewall", lbl_alt, DIAG_OK))
-        elif res["state"] == "block":
-            out.append(_diag("firewall", lbl_alt, DIAG_NG, t("setup.wizard.run_diagnostics_43") + suffix(res, res["blockers"]),
-                             t("setup.wizard.run_diagnostics_44")))
-        elif res["state"] == "partial":
-            out.append(_diag("firewall", lbl_alt, DIAG_WARN,
-                             t("setup.wizard.run_diagnostics_fw_partial", app="AltServer", current=current, missing=_fw_profile_names(res["missing"])) + suffix(res),
-                             fix_partial("AltServer", res)))
-        else:
-            out.append(_diag("firewall", lbl_alt, DIAG_NG, t("setup.wizard.run_diagnostics_45") + suffix(res), t("setup.wizard.run_diagnostics_46")))
-
-        res = evaluate_firewall(rules, fw_is_bonjour, active)
-        if res["state"] == "ok":
-            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_OK))
-        elif res["state"] == "block":
-            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_NG, t("setup.wizard.run_diagnostics_fw_bonjour_block") + suffix(res, res["blockers"]),
-                             t("setup.wizard.run_diagnostics_fw_bonjour_fix")))
-        elif res["state"] == "partial":
-            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN,
-                             t("setup.wizard.run_diagnostics_fw_partial", app="Bonjour", current=current, missing=_fw_profile_names(res["missing"])) + suffix(res),
-                             fix_partial("Bonjour", res)))
-        else:
-            out.append(_diag("firewall_bonjour", lbl_bj, DIAG_WARN, t("setup.wizard.run_diagnostics_fw_bonjour_none") + suffix(res),
-                             t("setup.wizard.run_diagnostics_fw_bonjour_fix")))
+        out.append(_diag("iloader", t("setup.wizard.check_iloader_2"), DIAG_NG, t("setup.wizard.check_iloader_3"),
+                         t("setup.wizard.check_iloader_4")))
     note("")
     return out
 
@@ -2244,7 +1808,7 @@ def diagnostics_summary(results):
 # ---------------------------------------------------------------------------
 
 def default_selection(statuses, mic=False):
-    """初期のチェック状態。導入済みは False、必須の未導入は True、任意は AltServer だけ True。"""
+    """初期のチェック状態。導入済みは False、必須の未導入は True、任意は iloader だけ True。"""
     sel = {}
     for c in COMPONENTS:
         cid = c["id"]
@@ -2269,13 +1833,12 @@ def is_selectable(cid, statuses):
 
 
 def expand_selection(ids, statuses):
-    """AltServer を選んだら、足りない iTunes (公式サイト版) と iCloud も追加する。並びはインストール順。"""
+    """iloader を選んだら、足りない iTunes (Apple 版) も追加する。並びはインストール順。"""
     chosen = set(ids)
-    if "altserver" in chosen:
-        for dep in ("itunes", "icloud"):
-            # 「要確認」(Store版など) も公式サイト版に入れ替える
-            if statuses.get(dep, {}).get("state") != STATE_OK:
-                chosen.add(dep)
+    if "iloader" in chosen:
+        # iloader は iTunes (Apple Mobile Device Service) 経由で iPhone を見つける。「要確認」(Store版など) も Apple 版に入れ替える
+        if statuses.get("itunes", {}).get("state") != STATE_OK:
+            chosen.add("itunes")
     if "camera" in chosen and statuses.get("vcredist", {}).get("state") == STATE_MISSING:
         chosen.add("vcredist")
     return [c for c in INSTALL_ORDER if c in chosen]
@@ -2306,16 +1869,8 @@ class SetupEngine:
         emit("stage", text=t("setup.wizard.guidedflow_prepare_4", name=COMPONENT_BY_ID[cid]["name"]))
         self.downloader(src["url"], dest, src["kind"], progress=progress, cancel=cancel)
         title = t("setup.wizard.setupengine__prepare_1", name=COMPONENT_BY_ID[cid]["name"])
-        if cid == "altserver":
-            root = safe_extract_zip(dest, os.path.join(self.dir, "altserver"))
-            msi = find_file(root, ["setup.msi", "altserver.msi", "altinstaller.msi"])
-            if msi:
-                return step_msi(cid, title, msi, stage_dir=root)
-            exe = find_file(root, ["setup.exe"])
-            if exe:
-                # 無人インストールが効かない場合は、通常のウィンドウ付きでもう一度実行する
-                return step_exe(cid, title, exe, ["/quiet", "/norestart"], retry_args=[], stage_dir=root)
-            raise DownloadError(t("setup.wizard.setupengine__prepare_2"))
+        if cid == "iloader":
+            return step_msi(cid, title, dest)
         if cid == "vbcable":
             root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
@@ -2710,7 +2265,7 @@ class SetupController:
         self._q.put((kind, kw.get("text") if kind in ("stage", "log") else kw.get("value")))
 
     def guided_begin(self, ids):
-        """iTunes / iCloud / AltServer / VB-CABLE を、公式インストーラーを開く形で順に進める。"""
+        """iTunes / iloader / VB-CABLE を、公式インストーラーを開く形で順に進める。"""
         ids = [c for c in ids if c in GUIDED_IDS]
         if not ids:
             return False
@@ -2863,10 +2418,10 @@ class SetupController:
 # 画面に依存しない補助 (Qt の画面が使う)
 # ---------------------------------------------------------------------------
 
-# 画面ページの番号: 0 ようこそ / 1 確認 / 2 インストール / 3〜9 iPhone の手順 (7つ)
+# 画面ページの番号: 0 ようこそ / 1 確認 / 2 インストール / 3〜 iPhone の手順 (phonecam_iphone.IPHONE_STEPS の数だけ)
 PAGE_WELCOME, PAGE_CHECK, PAGE_INSTALL, PAGE_IPHONE = 0, 1, 2, 3
 POLL_MS = 2000
-MANUAL_STEPS = ("itunes", "altstore", "settings", "phonecam")  # 自動では確認しきれず、「済んだ」を押せる手順
+MANUAL_STEPS = tuple(iphone.MANUAL_STEPS) if iphone is not None else ()  # 自動では確認しきれず、「済んだ」を押せる手順
 
 
 def overall_text(out, guided_pending=False):

@@ -57,6 +57,57 @@ def test_wizard_next_moves_welcome_to_check(app):
         wizard.deleteLater()
 
 
+@pytest.mark.parametrize("language", ["ja", "en"])
+def test_wizard_iphone_pages_follow_sidestore_flow_and_are_translated(app, monkeypatch, language):
+    import re
+
+    from PySide6.QtWidgets import QLabel, QPushButton
+
+    import phonecam_iphone as iphone
+    from phonecam import i18n
+    from phonecam.qt.setup_common import Fold
+
+    monkeypatch.setattr(i18n, "_LANG", language)
+    monkeypatch.setattr(iphone, "query_usbmux", lambda *a, **k: {"service": True, "usb": True, "trusted": True})
+    monkeypatch.setattr(iphone, "probe_phonecam", lambda *a, **k: False)
+    monkeypatch.setattr(setup, "find_iloader", lambda: r"C:\Program Files\iloader\iloader.exe")
+    controller = setup.SetupController(Mock(), engine=Mock())
+    wizard = SetupWizardDialog(controller, start="iphone")
+    wizard.show()
+    raw_key = re.compile(r"^(setup|status|common)\.[a-z0-9_.]+$")
+    try:
+        assert [step["id"] for step in iphone.IPHONE_STEPS] == [
+            "usb", "trust", "iloader", "devmode", "vpn", "sidestore", "phonecam", "test"]
+        for index, step in enumerate(iphone.IPHONE_STEPS):
+            wizard.show_page(setup.PAGE_IPHONE + index)
+            wizard._pump_timer.stop()
+            wizard._hop_timer.stop()
+            for fold in wizard.findChildren(Fold):
+                fold.set_open(True)
+            texts = [w.text().strip() for w in wizard.findChildren(QLabel)]
+            texts += [w.text().strip() for w in wizard.findChildren(QPushButton)]
+            assert not [text for text in texts if raw_key.match(text)], step["id"]
+            assert i18n.t(step["title"]) in texts
+            if step["id"] == "iloader":
+                assert len(wizard.findChildren(Fold)) == 2       # AltStore から乗り換える人 / ペアリングファイル
+                assert wizard.iloader_btn is not None and wizard.iloader_btn.isEnabled()
+            if step["id"] == "sidestore":
+                assert len(wizard.findChildren(Fold)) == 1       # ペアリングファイル
+            if step["id"] in setup.MANUAL_STEPS:
+                assert wizard.confirm_cb is not None
+        # 「済んだ」を押すと ✓ になり、「次へ」で次の段階へ進む
+        wizard.show_page(setup.PAGE_IPHONE + 3)
+        wizard._pump_timer.stop()
+        wizard.confirm_cb.setChecked(True)
+        assert iphone.step_status("devmode", {}, wizard._ctx())[0] == iphone.DONE
+        wizard.next_btn.click()
+        assert wizard.page == setup.PAGE_IPHONE + 4
+        wizard._pump_timer.stop()
+    finally:
+        wizard.close()
+        wizard.deleteLater()
+
+
 # ---------------------------------------------------------------------------
 # 翻訳キーがそのまま画面に出ていないこと / 言語の切り替え
 # ---------------------------------------------------------------------------

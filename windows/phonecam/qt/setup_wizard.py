@@ -6,7 +6,7 @@
     本文            スクロールできる。中身が収まらなくても、下のボタン行は常に見える
     ボタン行 (固定)  あとで / 戻る / 次へ
 
-ページ: 0 ようこそ / 1 必要なソフトの確認 / 2 インストール / 3〜9 iPhone の手順 (全7段階)。
+ページ: 0 ようこそ / 1 必要なソフトの確認 / 2 インストール / 3〜 iPhone の手順 (SideStore を入れる 8 段階)。
 ロジック (検出・ジョブ・状態機械) は phonecam_setup.py の SetupController / GuidedFlow をそのまま使い、
 この module は画面だけを持つ。tkinter は読み込まない。
 
@@ -182,11 +182,9 @@ class SetupWizardDialog(QDialog):
         self._visited = set()
         self._first = False
         self._probing = False
-        self._alt_probe = False
         self._probe_result = None
         self._next_probe = 0.0
         self._dl_state = None
-        self.alt_running = False
         self._confirmed = set()
         self._just_auto = False
         self._step_id = ""
@@ -311,8 +309,7 @@ class SetupWizardDialog(QDialog):
         self.chip = None
         self.chip_glyph = None
         self.confirm_cb = None
-        self.alt_btn = None
-        self.alt_btn_next = None
+        self.iloader_btn = None
         self.dl_label = None
         self.dl_btn = None
         self.log_visible = False
@@ -646,7 +643,7 @@ class SetupWizardDialog(QDialog):
             lay.addWidget(ResultRow(comp, r))
         self.result_card.setVisible(bool(ids))
 
-    # -- 手順つきインストール (iTunes / iCloud / AltServer / VB-CABLE) ----------
+    # -- 手順つきインストール (iTunes / iloader / VB-CABLE) ----------
     def _render_guided(self):
         if self.guided_lay is None:
             return
@@ -751,12 +748,13 @@ class SetupWizardDialog(QDialog):
         except Exception:
             pass
 
-    # -- ページ 3〜9: iPhone の手順 --------------------------------------------
+    # -- ページ 3〜: iPhone の手順 --------------------------------------------
     def _ctx(self):
-        alt = bool(ps.find_altserver())
-        if not alt:
+        path = ps.find_iloader()
+        installed = bool(path)
+        if not installed:
             try:
-                alt = self.controller.statuses.get("altserver", {}).get("state") == ps.STATE_OK
+                installed = self.controller.statuses.get("iloader", {}).get("state") == ps.STATE_OK
             except Exception:
                 pass
         link = False
@@ -766,7 +764,7 @@ class SetupWizardDialog(QDialog):
                 link = bool(fn())
             except Exception:
                 link = False
-        return {"altserver": alt, "app": self.app_ok, "link": link, "altserver_running": self.alt_running,
+        return {"iloader": installed, "iloader_path": path, "app": self.app_ok, "link": link,
                 "confirmed": self._step_id in self._confirmed}
 
     def _page_step(self, i):
@@ -777,9 +775,9 @@ class SetupWizardDialog(QDialog):
         self._step_id = sid
         self._first = sid not in self._visited
         self._visited.add(sid)
-        self._header(step["title"], number=i + 1, total=len(steps))
+        self._header(t(step["title"]), number=i + 1, total=len(steps))
         for line in step["lines"]:
-            self.lay.addWidget(WrapLabel(line, "text", 10.0))
+            self.lay.addWidget(WrapLabel(t(line), "text", 10.0))
         row = QHBoxLayout()
         row.setSpacing(10)
         row.setContentsMargins(0, 8, 0, 4)
@@ -841,32 +839,57 @@ class SetupWizardDialog(QDialog):
             out.append(b)
         return out
 
-    def _extra_itunes(self):
-        path = ps.find_itunes()
-        self._btn_row([(t("setup.wizard.setupwizard__extra_itunes_1"), lambda: self.launch(path), bool(path))])
-        if not path:
-            self.lay.addWidget(WrapLabel(t("setup.wizard.setupwizard__extra_itunes_2"), "sub", 9.0))
+    def _fold(self, title_key, lines_keys):
+        """番号つきの手順の折りたたみ (題名と行は翻訳キー)。"""
+        def body(lay):
+            lay.addWidget(NumberedLines([t(k) for k in lines_keys], numbered=True, size=9.0))
+        return Fold(t(title_key), body, self._queue_fit)
 
-    def _extra_altstore(self):
+    def _pairing_fold(self):
+        """ペアリングファイルが切れたとき (iOS を更新したあとなど): iloader で入れ直す手順。"""
         iphone = ps.iphone
-        path = ps.find_altserver()
-        btns = self._btn_row([
-            (t("setup.wizard.setupwizard__extra_altstore_1"), lambda: self.launch(path), bool(path)),
-            (t("setup.wizard.setupwizard__extra_altstore_2"), lambda: self.open_url(ps.FAQ_URL), True),
-            (t("setup.wizard.diagnosticsdialog___init___1"), self._open_diagnostics, True)])
-        self.alt_btn = btns[0]
-        self.alt_btn_next = btns[1]
-        self.lay.addWidget(WrapLabel(t("setup.wizard.setupwizard__extra_altstore_3"), "sub", 9.0))
-        if iphone is not None:
-            def req(lay):
-                lay.addWidget(WrapLabel(t("setup.wizard.diagnosticsdialog_render_2"), "sub", 9.0))
-                lay.addWidget(NumberedLines(iphone.ALTSTORE_REQUIREMENTS, numbered=True, size=9.0))
-                lay.addWidget(WrapLabel(iphone.ALTSTORE_NEW_PC_NOTE, "sub", 9.0))
 
-            def err(lay):
-                lay.addWidget(NumberedLines(iphone.ALT_2003_CHECKLIST, numbered=True, size=9.0))
-            self.lay.addWidget(Fold(t("setup.wizard.fold_requirements"), req, self._queue_fit))
-            self.lay.addWidget(Fold(iphone.ALT_2003_TITLE, err, self._queue_fit))
+        def body(lay):
+            lay.addWidget(WrapLabel(t(iphone.PAIRING_LINES[0]), "sub", 9.0))
+            lay.addWidget(NumberedLines([t(k) for k in iphone.PAIRING_LINES[1:]], numbered=True, size=9.0))
+        return Fold(t(iphone.PAIRING_TITLE), body, self._queue_fit)
+
+    def _extra_iloader(self):
+        iphone = ps.iphone
+        path = ps.find_iloader()
+        btns = self._btn_row([
+            (t("setup.wizard.iloader_open"), lambda: self.launch(ps.find_iloader() or path), bool(path)),
+            (t("setup.wizard.iloader_page"), lambda: self.open_url(ps.ILOADER_PAGE_URL), True),
+            (t("setup.wizard.diagnosticsdialog___init___1"), self._open_diagnostics, True),
+            (t("setup.wizard.diagnosticsdialog_render_3"), lambda: self.open_url(ps.SIDESTORE_DOCS_URL), True)])
+        self.iloader_btn = btns[0]
+        self.lay.addWidget(WrapLabel(t("setup.wizard.iloader_hint"), "sub", 9.0))
+        if iphone is not None:
+            # すでに AltStore を使っている人への案内と、ペアリングファイルの入れ直し
+            self.lay.addWidget(self._fold(iphone.MIGRATE_TITLE, iphone.MIGRATE_LINES))
+            self.lay.addWidget(self._pairing_fold())
+
+    def _extra_sidestore(self):
+        if ps.iphone is not None:
+            self.lay.addWidget(self._pairing_fold())
+
+    def _extra_vpn(self):
+        url = ps.LOCALDEVVPN_URL
+        if ps.phonecam_qr is not None:
+            box = QHBoxLayout()
+            box.setSpacing(16)
+            try:
+                box.addWidget(QrView(ps.phonecam_qr.make_qr(url, "M"), cell=4, quiet=3), 0, Qt.AlignmentFlag.AlignTop)
+            except Exception:
+                pass
+            side = QVBoxLayout()
+            side.setSpacing(6)
+            side.addWidget(WrapLabel(t("setup.wizard.vpn_qr"), "sub", 9.0))
+            side.addStretch(1)
+            box.addLayout(side, 1)
+            self.lay.addLayout(box)
+        self._btn_row([(t("setup.wizard.vpn_page"), lambda: self.open_url(url), True),
+                       (t("setup.wizard.vpn_copy"), lambda: self._copy(url), True)])
 
     def _open_diagnostics(self):
         from phonecam.qt.setup_diag import DiagnosticsDialog
@@ -979,13 +1002,11 @@ class SetupWizardDialog(QDialog):
                 snap, app = self._probe_result
                 self._probe_result = None
                 self.snap, self.app_ok = snap, app
-                self.alt_running = bool(self._alt_probe)
                 self._next_probe = time.monotonic() + ps.POLL_MS / 1000.0
                 self._apply()
             if not self._probing and time.monotonic() >= self._next_probe:
                 self._probing = True
                 want_app = self._step_id == "test"
-                want_alt = self._step_id == "altstore"
                 linked = bool(self._ctx().get("link"))
 
                 def work():
@@ -994,8 +1015,6 @@ class SetupWizardDialog(QDialog):
                         app = False
                         if want_app and not linked:
                             app = iphone.probe_phonecam(snap)
-                        if want_alt:
-                            self._alt_probe = iphone.altserver_running()
                         self._probe_result = (snap, app)
                     except Exception:
                         self._probe_result = ({}, False)
@@ -1010,18 +1029,7 @@ class SetupWizardDialog(QDialog):
         self._pump_timer.start(250)
 
     def _status_text(self, sid, state, text, ctx):
-        """翻訳できる状態文 (自動検出の追加分)。それ以外は iphone モジュールの文言をそのまま使う。"""
-        iphone = ps.iphone
-        if sid == "altstore":
-            if ctx.get("altserver_running"):
-                return t("setup.wizard.alt_running")
-            if state == iphone.ISSUE:
-                return t("setup.wizard.alt_not_running") if ctx.get("altserver") else t("setup.wizard.alt_missing")
-        if sid in ps.MANUAL_STEPS:
-            if state == iphone.DONE:
-                return t("setup.wizard.confirmed_done")
-            if state == iphone.MANUAL:
-                return t("setup.wizard.manual_check")
+        """検出状態の文。手順の判定 (phonecam_iphone.step_status) が翻訳済みの文を返すので、そのまま使う。"""
         return text
 
     def _render_chip(self):
@@ -1044,11 +1052,8 @@ class SetupWizardDialog(QDialog):
             self.chip.setText(text)
             self.chip.set_role("text" if state == iphone.DONE else "sub")
             self.chip_glyph.set_state(glyph)
-            detected = self._step_id == "altstore" and bool(ctx.get("altserver_running"))
-            if self.confirm_cb is not None:
-                self.confirm_cb.setVisible(not detected)
-            if self.alt_btn is not None:
-                self.alt_btn.setVisible(not ctx.get("altserver_running"))
+            if self.iloader_btn is not None:
+                self.iloader_btn.setEnabled(bool(ctx.get("iloader_path")))
             if self._step_id == "test":
                 self.next_btn.setEnabled(state == iphone.DONE)
             elif self.page < ps.PAGE_IPHONE + len(iphone.IPHONE_STEPS) - 1:
