@@ -8,7 +8,7 @@
 window.grab() で PNG にする。倍率は QT_SCALE_FACTOR を変えた子プロセスで切り替える。
 各ページについて、スクロール位置を中ほどにした画像 (*_scroll.png) も撮る。
 ページの build が失敗していたら終了コード 1 (画像は撮れた分だけ残す)。
-最後に、セットアップのウィザード (ようこそ / 確認 / インストール / iPhone の 7 段階) と AltServer の診断も、
+最後に、セットアップのウィザード (ようこそ / 確認 / インストール / iPhone の 8 段階) と SideStore の導入チェックも、
 サンプルの検出結果で x {ライト, ダーク} 撮る (setup_*.png)。本体から開く経路 (同じプロセスのダイアログ) と、
 tkinter が読み込まれないことも確かめる。
 カメラが 1 台のときは「カメラ」ページとカメラの切り替えが出ないことを確かめ、2 台にしたあとは
@@ -238,12 +238,10 @@ def setup_shots(app, ctrl, win, out, scale):
     tk_before = "tkinter" in sys.modules
     iphone = ps.iphone
     fake_snap = {"service": True, "usb": ["00008110-001A2B3C4D5E6F01"], "trusted": True}
-    saved = (iphone.query_usbmux, iphone.altserver_running, iphone.probe_phonecam, ps.find_altserver, ps.find_itunes,
-             dict(ps._host))
+    saved = (iphone.query_usbmux, iphone.probe_phonecam, ps.find_iloader, ps.find_itunes, dict(ps._host))
     iphone.query_usbmux = lambda *a, **k: fake_snap
-    iphone.altserver_running = lambda *a, **k: False
     iphone.probe_phonecam = lambda *a, **k: False
-    ps.find_altserver = lambda: r"C:\Program Files (x86)\AltServer\AltServer.exe"
+    ps.find_iloader = lambda: r"C:\Program Files\iloader\iloader.exe"
     ps.find_itunes = lambda: None
     ps.bind(is_frozen=lambda: True, link_connected=lambda: False)
     tmp = tempfile.mkdtemp(prefix="pcsetup")
@@ -252,8 +250,7 @@ def setup_shots(app, ctrl, win, out, scale):
         "camera": {"state": S_MISS, "detail": ""},
         "vcredist": {"state": S_OK, "detail": ""},
         "itunes": {"state": S_WARN, "detail": t("setup.wizard.detect_itunes_3")},
-        "icloud": {"state": S_MISS, "detail": ""},
-        "altserver": {"state": S_MISS, "detail": ""},
+        "iloader": {"state": S_MISS, "detail": ""},
         "vbcable": {"state": S_MISS, "detail": ""},
     }
 
@@ -265,7 +262,7 @@ def setup_shots(app, ctrl, win, out, scale):
         c.apply_defaults()
         return c
 
-    def make_flow(phase, ids=("itunes", "icloud", "altserver")):
+    def make_flow(phase, ids=("itunes", "iloader", "vbcable")):
         flow = ps.GuidedFlow(list(ids), tmp, detector=lambda: statuses)
         flow.phase = phase
         flow.statuses = dict(statuses)
@@ -358,42 +355,53 @@ def setup_shots(app, ctrl, win, out, scale):
             snap(dlg, "setup_02_install_guided_running", theme)
             c.guided.finished = True
             c.guided.results = {"itunes": {"ok": True, "skipped": False, "detail": ""},
-                                "icloud": {"ok": False, "skipped": True, "detail": t("setup.wizard.guidedflow_skip_1")},
-                                "altserver": {"ok": True, "skipped": False, "detail": ""}}
+                                "iloader": {"ok": True, "skipped": False, "detail": ""},
+                                "vbcable": {"ok": False, "skipped": True, "detail": t("setup.wizard.guidedflow_skip_1")}}
             c.outcome["results"].update({k: dict(v, code=None) for k, v in c.guided.results.items()})
-            c.outcome["ids"] += ["itunes", "icloud", "altserver"]
+            c.outcome["ids"] += ["itunes", "iloader", "vbcable"]
             c.outcome["reboot"] = True
             show(dlg, ps.PAGE_INSTALL)
             snap(dlg, "setup_02_install_done", theme)
-            # 3〜9 iPhone の手順 (全 7 段階)
+            # 3〜10 iPhone の手順 (全 8 段階)
             for i, step in enumerate(iphone.IPHONE_STEPS):
                 show(dlg, ps.PAGE_IPHONE + i)
                 dlg.snap = fake_snap
                 dlg._render_chip()
                 name = "setup_step%d_%s" % (i + 1, step["id"])
-                snap(dlg, name, theme, check_scroll=step["id"] in ("altstore", "phonecam"))
-                if step["id"] == "itunes":
+                snap(dlg, name, theme, check_scroll=step["id"] in ("iloader", "vpn", "phonecam"))
+                if step["id"] == "iloader":
                     dlg.confirm_cb.setChecked(True)   # 「済んだ」
                     _settle(app, 200)
                     snap(dlg, name + "_confirmed", theme)
-                if step["id"] == "altstore":
                     folds = dlg.findChildren(Fold)
                     if len(folds) != 2:
-                        failed.append((name, "expected 2 folds (requirements / error 2003), got %d" % len(folds)))
+                        failed.append((name, "expected 2 folds (AltStore migration / pairing file), got %d" % len(folds)))
                     for fold in folds:
                         fold.set_open(True)
                     _settle(app, 250)
                     snap(dlg, name + "_folds", theme, check_scroll=True)
+                if step["id"] == "sidestore":
+                    folds = dlg.findChildren(Fold)
+                    if len(folds) != 1:
+                        failed.append((name, "expected 1 fold (pairing file), got %d" % len(folds)))
+                    for fold in folds:
+                        fold.set_open(True)
+                    _settle(app, 250)
+                    snap(dlg, name + "_folds", theme)
             close_dialog(dlg)
             # 診断ダイアログ (実行中 -> 結果)
             gate = threading.Event()
-            results = [ps._diag("usb", "Apple Mobile Device Service", ps.DIAG_OK, "起動しています"),
-                       ps._diag("altserver", "AltServer", ps.DIAG_NG, "起動していません", "タスクトレイから AltServer を起動してください"),
-                       ps._diag("vpn", "VPN", ps.DIAG_WARN, "Tailscale が見つかりました", "VPN をオフにしてもう一度試してください")]
+            results = [ps._diag("amds", t("setup.wizard.run_diagnostics_7"), ps.DIAG_OK),
+                       ps._diag("itunes", t("setup.wizard.run_diagnostics_17"), ps.DIAG_WARN, t("setup.wizard.detect_itunes_3"),
+                                t("setup.wizard.run_diagnostics_18")),
+                       ps._diag("usb", t("setup.wizard.run_diagnostics_22"), ps.DIAG_NG, t("setup.wizard.run_diagnostics_25"),
+                                t("setup.wizard.run_diagnostics_26")),
+                       ps._diag("iloader", t("setup.wizard.check_iloader_2"), ps.DIAG_NG, t("setup.wizard.check_iloader_3"),
+                                t("setup.wizard.check_iloader_4"))]
 
             def runner(progress=None):
                 if progress:
-                    progress("ネットワークの設定を確認しています…")
+                    progress(t("setup.wizard.run_diagnostics_21"))
                 gate.wait(10)
                 return results
 
@@ -442,8 +450,7 @@ def setup_shots(app, ctrl, win, out, scale):
         traceback.print_exc()
         failed.append(("setup", "exception while building the setup screens"))
     finally:
-        (iphone.query_usbmux, iphone.altserver_running, iphone.probe_phonecam, ps.find_altserver, ps.find_itunes,
-         host) = saved
+        (iphone.query_usbmux, iphone.probe_phonecam, ps.find_iloader, ps.find_itunes, host) = saved
         ps._host.clear()
         ps._host.update(host)
     return failed

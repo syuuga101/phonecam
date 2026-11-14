@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""「AltServerの診断」(Qt 版)。チェックごとに ✓ / ✗ / ⚠ と、直し方を 1 行で出す。診断は別スレッドで実行する。
+"""「SideStoreの導入チェック」(Qt 版)。チェックごとに ✓ / ✗ / ⚠ と、直し方を 1 行で出す。チェックは別スレッドで実行する。
 
     DiagnosticsDialog(parent, runner=None, open_url=None)   # runner(progress=fn) -> [診断結果]
-    --setup-diagnose と、設定の「AltServerの診断」、ウィザードの AltStore の手順から開く。
+    --setup-diagnose と、設定の「SideStoreの導入チェック」、ウィザードの iloader の手順から開く。
 """
 
 import threading
@@ -127,7 +127,7 @@ class DiagnosticsDialog(QDialog):
                 self._box.append([ps._diag("error", t("setup.wizard.run_work_1"), ps.DIAG_WARN,
                                            t("setup.wizard.run_work_2", detail=e), t("setup.wizard.run_work_3"))])
 
-        threading.Thread(target=work, name="altserver-diag", daemon=True).start()
+        threading.Thread(target=work, name="sidestore-check", daemon=True).start()
         self._timer.start()
 
     def _poll(self):
@@ -170,12 +170,15 @@ class DiagnosticsDialog(QDialog):
                 card.layout().addWidget(self._result_row(r))
             body_lay.addWidget(card)
         if iphone is not None:
-            add_text_section(body_lay, iphone.ALT_2003_TITLE, iphone.ALT_2003_CHECKLIST, numbered=True)
-            add_text_section(body_lay, t("setup.wizard.diagnosticsdialog_render_1"), iphone.ALTSTORE_REQUIREMENTS,
-                             numbered=True, intro=t("setup.wizard.diagnosticsdialog_render_2"))
-            body_lay.addWidget(WrapLabel(iphone.ALTSTORE_NEW_PC_NOTE, "sub", 9.0))
+            # SideStore を入れる条件と、ペアリングファイルが切れたときの入れ直し
+            add_text_section(body_lay, t(iphone.PREREQ_TITLE), [t(k) for k in iphone.PREREQ_LINES],
+                             numbered=True, intro=t(iphone.PREREQ_INTRO))
+            body_lay.addWidget(WrapLabel(t(iphone.PREREQ_NOTE), "sub", 9.0))
+            add_text_section(body_lay, t(iphone.PAIRING_TITLE), [t(k) for k in iphone.PAIRING_LINES[1:]],
+                             numbered=True, intro=t(iphone.PAIRING_LINES[0]))
         link_row = QHBoxLayout()
-        link_row.addWidget(link_button(t("setup.wizard.diagnosticsdialog_render_3"), lambda: self.open_url(ps.FAQ_URL)))
+        link_row.addWidget(link_button(t("setup.wizard.diagnosticsdialog_render_3"), lambda: self.open_url(ps.SIDESTORE_DOCS_URL)))
+        link_row.addWidget(link_button(t("setup.wizard.iloader_page"), lambda: self.open_url(ps.ILOADER_PAGE_URL)))
         link_row.addStretch(1)
         body_lay.addLayout(link_row)
         body_lay.addStretch(1)

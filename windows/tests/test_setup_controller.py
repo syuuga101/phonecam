@@ -15,7 +15,7 @@ def test_guided_flow_detects_after_own_installer_exits(tmp_path, monkeypatch):
     installer.alive.return_value = True
     launcher = Mock(return_value=installer)
     monkeypatch.setattr(setup, "check_installer_signature", lambda *a: (True, "", False))
-    flow = setup.GuidedFlow(["itunes", "icloud"], tmp_path, downloader=download,
+    flow = setup.GuidedFlow(["itunes", "iloader"], tmp_path, downloader=download,
                             detector=detector, launcher=launcher, store_check=lambda cid: False)
     assert flow.phase == flow.PREPARING
     flow.prepare()
@@ -28,10 +28,10 @@ def test_guided_flow_detects_after_own_installer_exits(tmp_path, monkeypatch):
     assert flow.phase == flow.MISSING
     detector.return_value = {"itunes": {"state": setup.STATE_OK}}
     assert flow.check() == "done"
-    assert flow.current == "icloud" and flow.phase == flow.PREPARING
+    assert flow.current == "iloader" and flow.phase == flow.PREPARING
     assert flow.results["itunes"]["ok"]
     flow.skip()
-    assert flow.finished and flow.results["icloud"]["skipped"]
+    assert flow.finished and flow.results["iloader"]["skipped"]
     launcher.assert_called_once()
     installer.close.assert_called_once()
 
