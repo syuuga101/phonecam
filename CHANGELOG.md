@@ -2,6 +2,20 @@
 
 PhoneCam の主な変更をバージョンごとにまとめています。
 
+## v2.11.0
+
+### 配布方法の変更
+- iPhone アプリの入れ方を、AltStore から **SideStore** に変えました。SideStore は最初の 1 回だけ PC と USB で入れれば、そのあとは iPhone だけで更新・7 日ごとの再署名ができます（LocalDevVPN をオンにして Wi-Fi で行います）。
+- SideStore に追加する配布元: https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.json （これまでの altstore-source.json も引き続き使えます）
+
+### Windows
+- 初期セットアップを SideStore 向けに作り直しました（iloader で SideStore を入れる → デベロッパモード → LocalDevVPN → SideStore にサインイン → PhoneCam を入れる）。iloader の自動インストールにも対応しました。
+- 「AltServer の診断」を「SideStore の導入チェック」に変えました（iTunes・Apple Mobile Device Service・USB での信頼・iloader を確認します）。
+- AltServer と iCloud は不要になりました。
+
+### iPhone
+- 「SideStore で更新」ボタンから、SideStore で PhoneCam の配布元を開くようにしました。
+
 ## v2.10.0
 
 ### Windows
