@@ -442,9 +442,38 @@ class ConnectionPage(Page):
             self.vcam_status.set_status(t("multi.vcam.busy"))
         else:
             self.vcam_status.set_status(t("multi.vcam.outdated" if state == "outdated" else "multi.vcam.missing"), "warning")
+        tip = self._vcam_tooltip()
+        for widget in (self.obs_label, self.vcam_status, self.vcam_button):
+            widget.setToolTip(tip)
         self.vcam_button.setVisible(self.ctrl.frozen and state in ("missing", "outdated"))
         self.vcam_button.setEnabled(not busy)
         self.phone_label.setText(group.phone_name(self.ctrl))
+
+    def _vcam_tooltip(self):
+        """OBS に複数のカメラが出ないときに自分で確かめるための情報: カメラごとの登録状態と、レジストリ上の名前 (FriendlyName)。"""
+        if not self.ctrl.frozen:
+            return ""
+        try:
+            from phonecam.core.softcam_reg import CAMERA_SLOTS, slot_report
+            words = {"ok": t("multi.vcam.ready"), "missing": t("multi.vcam.missing"),
+                     "outdated": t("multi.vcam.outdated"), "unavailable": t("multi.vcam.tip.unavailable")}
+            none = t("multi.vcam.tip.none")
+            lines = [t("multi.vcam.tip.title")]
+            mine = self.camera_group.slot_of(self.ctrl)
+            current = None
+            for slot in CAMERA_SLOTS:
+                report = slot_report(slot)
+                if slot == mine:
+                    current = report
+                lines.append(t("multi.vcam.tip.camera", n=slot, state=words.get(report["status"], report["status"]),
+                               name=report["name"][0] or none))
+            if current is not None:
+                lines.append(t("multi.vcam.tip.clsid", clsid=current["clsid"]))
+                lines.append(t("multi.vcam.tip.dll", dll64=current["dll"][0] or none, dll32=current["dll"][32] or none))
+            lines.append(t("multi.vcam.tip.hint"))
+            return "\n".join(lines)
+        except Exception:
+            return ""
 
     def _change_phone(self):
         from phonecam.qt.multicam import DevicePickDialog

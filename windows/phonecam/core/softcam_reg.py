@@ -123,6 +123,54 @@ def softcam_registered_path(slot=1, view=0):
         return None
 
 
+VIDEO_INPUT_CATEGORY = "{860BB310-5D01-11d0-BD3B-00A0C911CE86}"
+
+
+def directshow_friendly_name(slot=1, view=0):
+    """OBS などが DirectShow の「ビデオ入力デバイス」として見る名前 (レジストリの FriendlyName)。
+    HKCR\\CLSID\\{860BB310-...}\\Instance の下で、このスロットの CLSID を持つ項目を探す。無ければ None。"""
+    try:
+        import winreg
+        clsid = camera_clsid(slot).lower()
+        flags = winreg.KEY_READ | (winreg.KEY_WOW64_32KEY if view == 32 else 0)
+        base = "CLSID\\%s\\Instance" % VIDEO_INPUT_CATEGORY
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, base, 0, flags) as root:
+            index = 0
+            while True:
+                try:
+                    key_name = winreg.EnumKey(root, index)
+                except OSError:
+                    return None
+                index += 1
+                try:
+                    with winreg.OpenKey(root, key_name, 0, flags) as item:
+                        try:
+                            owner = str(winreg.QueryValueEx(item, "CLSID")[0]).lower()
+                        except OSError:
+                            owner = key_name.lower()
+                        if owner == clsid or key_name.lower() == clsid:
+                            return str(winreg.QueryValueEx(item, "FriendlyName")[0])
+                except OSError:
+                    continue
+    except Exception:
+        return None
+
+
+def slot_report(slot=1):
+    """OBS に出ないときの確認用: スロットの登録状態・CLSID・登録された DLL・DirectShow 上の名前 (64bit / 32bit)。"""
+    try:
+        status = registration_status(slot)
+    except Exception:
+        status = "unavailable"
+    return {
+        "slot": slot,
+        "clsid": camera_clsid(slot),
+        "status": status,
+        "dll": {view: softcam_registered_path(slot, view) for view in (0, 32)},
+        "name": {view: directshow_friendly_name(slot, view) for view in (0, 32)},
+    }
+
+
 _last_outdated_logged = {}
 
 
