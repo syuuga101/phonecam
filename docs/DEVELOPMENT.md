@@ -27,7 +27,7 @@ phonecam/
 │   ├─ workflows/ios.yml        iOS ビルド（署名なし IPA）
 │   ├─ workflows/windows.yml    softcam のビルド + exe のビルド
 │   ├─ workflows/release.yml    リリース作成
-│   └─ scripts/                 make_altstore_source.py（AltStore ソース JSON の生成）、list_bundle.py（exe の同梱物の一覧）
+│   └─ scripts/                 make_altstore_source.py（SideStore 用のソース JSON の生成。AltStore と同じ形式）、list_bundle.py（exe の同梱物の一覧）
 └─ docs/                        ドキュメント
 ```
 
@@ -41,9 +41,9 @@ phonecam/
 2. GitHub の **Actions** タブで「Build iOS (unsigned IPA)」を選び、**Run workflow** を押します（`ios/` を変更して push しても自動で動きます）。
 3. 数分で終わります。実行結果の **Artifacts** から `PhoneCam-ipa` をダウンロードすると `PhoneCam.ipa` が入っています。
 
-ワークフローの流れ: XcodeGen で Xcode プロジェクトを作成 → 署名なしでビルド（`MARKETING_VERSION` は `VERSION` ファイル、`CURRENT_PROJECT_VERSION` は実行番号）→ アドホック署名とエンタイトルメント（`get-task-allow`）を付けて IPA にまとめる。署名なしのままだと AltStore / AltServer が読み込めないことがあるため仮署名を付けています。実際の署名は AltStore 側でやり直されます。
+ワークフローの流れ: XcodeGen で Xcode プロジェクトを作成 → 署名なしでビルド（`MARKETING_VERSION` は `VERSION` ファイル、`CURRENT_PROJECT_VERSION` は実行番号）→ アドホック署名とエンタイトルメント（`get-task-allow`）を付けて IPA にまとめる。署名なしのままだと SideStore などが読み込めないことがあるため仮署名を付けています。実際の署名は SideStore 側でやり直されます。
 
-> AltStore のソース（`altstore-source.json`）の `appPermissions` にも `get-task-allow` を書く必要があります。書いていないと AltStore が「requires additional permissions not specified by the source」で拒否します。
+> ソース（`altstore-source.json`。SideStore と AltStore で共通の形式）の `appPermissions` にも `get-task-allow` を書く必要があります。書いていないと SideStore（AltStore 系）が「requires additional permissions not specified by the source」で拒否します。
 
 ### Windows 受信アプリ（exe）
 
@@ -94,7 +94,7 @@ GitHub Actions では Windows の pytest ジョブに失敗すると exe ビル�
    - `make_altstore_source.py` で `altstore-source.json` を作成
    - `PhoneCam.ipa` / `PhoneCamReceiver.exe` / `altstore-source.json` を添付してリリースを公開
 
-`workflow_dispatch` で手動実行もできます。AltStore のソース URL（`https://github.com/syuuga101/phonecam/releases/latest/download/altstore-source.json`）は常に最新リリースを指します。
+`workflow_dispatch` で手動実行もできます。SideStore のソース URL（`https://github.com/syuuga101/phonecam/releases/latest/download/altstore-source.json`）は常に最新リリースを指します。
 
 ワークフローで使うサードパーティの Action（`softprops/action-gh-release`）は、コミット SHA で固定しています。更新するときは、新しいタグの SHA を調べて書き換えてください。
 

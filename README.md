@@ -41,7 +41,7 @@ PhoneCam は、**ご自分のカメラとマイクを、配信やビデオ通話
 | iPhone | iOS 17 以上（iPhone 13 で動作確認） |
 | PC | Windows 10 / 11 |
 | ケーブル | USB ケーブル（iPhone に付属のもの） |
-| そのほか | Apple ID（無料のものでOK）。iPhone にアプリを入れるのに使います |
+| そのほか | Apple ID（無料のものでOK）。iPhone にアプリを入れるのに使います。iPhone には **SideStore** で入れます（最初の 1 回だけ PC と USB でつなぎます） |
 
 ## はじめかた（3ステップ）
 
@@ -60,11 +60,11 @@ PhoneCam は、**ご自分のカメラとマイクを、配信やビデオ通話
 **Q. 映像が出ません（真っ黒）**
 iPhone で PhoneCam アプリを開いたまま、USB でつないでいますか？ 受信アプリで「接続」して、映像が流れているか確認してください。Discord は一度カメラをオフ→オンにします。
 
-**Q. iPhone にアプリを入れるときに `AltServer.ServerError 2005` が出ます**
-AltStore の「My Apps」で AltStore を一度 **Refresh** してから、もう一度入れてください。
+**Q. iPhone にアプリを入れたい・更新できません**
+SideStore で入れます。更新するときは、iPhone で **LocalDevVPN** を Connect にして、**Wi-Fi** につないでください（モバイル回線ではできません）。くわしくは [iPhoneアプリの入れ方（SideStore）](https://github.com/syuuga101/phonecam/wiki/iPhone%E3%82%A2%E3%83%97%E3%83%AA%E3%81%AE%E5%85%A5%E3%82%8C%E6%96%B9%EF%BC%88SideStore%EF%BC%89) と [よくある質問とトラブル](https://github.com/syuuga101/phonecam/wiki/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F%E3%81%A8%E3%83%88%E3%83%A9%E3%83%96%E3%83%AB) へ。
 
 **Q. 数日たつとアプリが開かなくなりました**
-無料の Apple ID では、アプリは 7 日で期限が切れます。PC で AltServer を動かして、iPhone と同じ Wi-Fi につなぎ、AltStore の「My Apps」で更新してください。
+無料の Apple ID では、アプリは 7 日で期限が切れます。iPhone で LocalDevVPN を Connect にして Wi-Fi につなぎ、SideStore の「My Apps」で、アプリの右の「7 DAYS」を押して更新してください。
 
 **Q. Wi-Fi でつなぎたい**
 安全のため、Wi-Fi は初期状態でオフです。iPhone アプリで「Wi-Fiからの接続を許可」をオンにし、画面に出る 6 桁のコードを PC に入力します。安定して遅延も小さいのは USB です。
@@ -77,7 +77,7 @@ AltStore の「My Apps」で AltStore を一度 **Refresh** してから、も�
 ## 使い方ガイド
 
 - [はじめに（セットアップ）](https://github.com/syuuga101/phonecam/wiki/%E3%81%AF%E3%81%98%E3%82%81%E3%81%AB%EF%BC%88%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%EF%BC%89)
-- [iPhoneアプリの入れ方（AltStore）](https://github.com/syuuga101/phonecam/wiki/iPhone%E3%82%A2%E3%83%97%E3%83%AA%E3%81%AE%E5%85%A5%E3%82%8C%E6%96%B9%EF%BC%88AltStore%EF%BC%89)
+- [iPhoneアプリの入れ方（SideStore）](https://github.com/syuuga101/phonecam/wiki/iPhone%E3%82%A2%E3%83%97%E3%83%AA%E3%81%AE%E5%85%A5%E3%82%8C%E6%96%B9%EF%BC%88SideStore%EF%BC%89)
 - [OBSで使う](https://github.com/syuuga101/phonecam/wiki/OBS%E3%81%A7%E4%BD%BF%E3%81%86) / [Discordで使う](https://github.com/syuuga101/phonecam/wiki/Discord%E3%81%A7%E4%BD%BF%E3%81%86)
 - [音声（iPhoneのマイク）を使う](https://github.com/syuuga101/phonecam/wiki/%E9%9F%B3%E5%A3%B0%EF%BC%88iPhone%E3%81%AE%E3%83%9E%E3%82%A4%E3%82%AF%EF%BC%89%E3%82%92%E4%BD%BF%E3%81%86)
 - [ショートカットキー](https://github.com/syuuga101/phonecam/wiki/%E3%82%B7%E3%83%A7%E3%83%BC%E3%83%88%E3%82%AB%E3%83%83%E3%83%88%E3%82%AD%E3%83%BC)
