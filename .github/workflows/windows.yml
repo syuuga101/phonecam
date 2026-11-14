@@ -145,7 +145,7 @@ jobs:
           )
           # --exclude-module ではモジュールしか除けないので、.spec を作って、Qt の使わない DLL・プラグイン・翻訳などを
           # 名前で取り除く処理 (.github/scripts/slim_spec.py) を差し込んでからビルドする
-          pyi-makespec --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --collect-data sv_ttk --hidden-import darkdetect --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
+          pyi-makespec --onefile --windowed --icon assets/icon.ico --name PhoneCamReceiver --collect-all av --collect-all qrcode --collect-all zeroconf --collect-all pyvirtualcam --collect-all sounddevice --collect-all _sounddevice_data --exclude-module tkinter --exclude-module _tkinter --hidden-import PIL.ImageDraw --hidden-import _cffi_backend --collect-submodules phonecam --add-data "locales;locales" --add-data "assets;assets" --hidden-import phonecam_setup --hidden-import phonecam_update --hidden-import phonecam_iphone --hidden-import phonecam_qr --hidden-import phonecam_audio --hidden-import phonecam_dshowctl --hidden-import phonecam_hotkeys @qtBins --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtWebEngineWidgets --exclude-module PySide6.Qt3DCore --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtMultimediaWidgets --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtQuickWidgets @bins phonecam_qt.py
           if ($LASTEXITCODE -ne 0) { throw "pyi-makespec に失敗しました" }
           python ../.github/scripts/slim_spec.py PhoneCamReceiver.spec
           if ($LASTEXITCODE -ne 0) { throw "slim_spec.py に失敗しました" }
@@ -213,18 +213,26 @@ jobs:
           else { Write-Host "--selftest 成功" }
           Show-Logs
 
-          # 3. --setup-diagnose (Tk とウィザードの経路の import)。5 秒生きていれば成功、先に終了したときは exit code 0 のみ成功
-          $d = Start-Process -FilePath $exe -ArgumentList "--setup-diagnose" -PassThru
-          Start-Sleep -Seconds 5
-          if ($d.HasExited) {
-            if ($d.ExitCode -ne 0) { Write-Host "::error::--setup-diagnose が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
-            else { Write-Host "--setup-diagnose は正常終了" }
-          } else {
-            Write-Host "--setup-diagnose は動作中 (成功扱い)"
-            Stop-Process -Id $d.Id -Force
+          # 3. --setup-diagnose / --setup-wizard (Qt 版の診断とウィザード)。PHONECAM_SMOKE=1 では、画面を作って 3 秒後に
+          #    「tkinter が読み込まれていないこと」を setup_smoke_<名前>.txt に記録して自分で閉じる (読み込まれていたら exit code 3)
+          foreach ($mode in @("--setup-diagnose", "--setup-wizard")) {
+            $name = $mode -replace '^--setup-', ''
+            $d = Start-Process -FilePath $exe -ArgumentList $mode -PassThru
+            if (-not $d.WaitForExit(60000)) {
+              Stop-Process -Id $d.Id -Force
+              Write-Host "::error::$mode が 60 秒で終わりませんでした (画面が開いて閉じるまでの動作を確認できません)"; $failed = $true
+            }
+            elseif ($d.ExitCode -ne 0) { Write-Host "::error::$mode が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
+            else { Write-Host "$mode は正常終了" }
+            $mark = Join-Path $logDir ("setup_smoke_" + $name + ".txt")
+            if (Test-Path $mark) {
+              $text = (Get-Content $mark -Raw).Trim()
+              Write-Host "$mode : $text"
+              if ($text -notmatch "tkinter loaded: False") { Write-Host "::error::$mode で tkinter が読み込まれています"; $failed = $true }
+            } else { Write-Host "::error::$mode の確認ファイル ($mark) がありません"; $failed = $true }
+            Show-Logs
+            if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
           }
-          Show-Logs
-          if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
 
           if ($failed) { throw "起動テストに失敗しました" }
 

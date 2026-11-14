@@ -50,7 +50,7 @@ from phonecam.core.stats import ThermalLog
 from phonecam.core.stream import StreamController, camera_state_text
 from phonecam.core.vcam import CAM_RELEASE_HOLD_SEC
 from phonecam.i18n import set_language, t
-from phonecam.ui.labels import (
+from phonecam.labels import (
     LENS_LABELS,
     METER_MIN_DB,
     PHONE_NOTE_SECONDS,
@@ -144,6 +144,8 @@ class Controller:
         self._update_started = 0.0
         self._dismissed_update = None
         self._setup_process = None
+        self._setup_open = False
+        self.setup_requested = CallbackList()   # emit(diagnose, after_update)  画面 (Qt) が同じプロセスのダイアログでセットアップを開く
         self._next_update = time.monotonic() + 3
         self._results = SimpleQueue()
         self.frozen = bool(getattr(sys, "frozen", False))
@@ -343,12 +345,23 @@ class Controller:
             self.toast.emit(t("audio.vbcable.openfail", err=error), "error")
 
     def open_setup(self, diagnose=False, after_update=None):
-        if self.demo or self._setup_process is not None:
+        group = getattr(self, "camera_group", None)
+        if group is not None and group.primary is not self:
+            return group.primary.open_setup(diagnose, after_update)   # セットアップは本体 (カメラ 1) の設定を使う
+        if self.demo or self._setup_process is not None or self._setup_open:
             return
         self.save_now()
+        if self.setup_requested._cbs:
+            # 画面があるとき: 別プロセスではなく、同じプロセスのダイアログで開く。閉じたら setup_dialog_closed() が呼ばれる
+            self._setup_open = True
+            try:
+                self.setup_requested.emit(bool(diagnose), after_update)
+            except Exception:
+                self._setup_open = False
+            return
         args = [sys.executable]
         if not self.frozen:
-            args.append(str(Path(__file__).resolve().parents[1] / "phonecam_receiver.py"))
+            args.append(str(Path(__file__).resolve().parents[1] / "phonecam_qt.py"))
         args.append("--setup-diagnose" if diagnose else "--setup-wizard")
         if after_update:
             args.extend(("--after-update", after_update))
@@ -358,6 +371,11 @@ class Controller:
             self.run_background(process.wait, lambda result: self._setup_finished(process))
         except OSError as error:
             self.toast.emit(t("settings.setup.launch_error", error=error), "error")
+
+    def setup_dialog_closed(self):
+        """同じプロセスのセットアップ (ウィザード / 診断) が閉じた: 仮想カメラの登録状態を取り直す。"""
+        self._setup_open = False
+        self.refresh_all_camera_registrations()
 
     def _setup_finished(self, process):
         if self._setup_process is not process:
@@ -735,7 +753,7 @@ class Controller:
             self._show_update_status("update.status.error", time=time.strftime("%m/%d %H:%M"),
                                      error=t("update.status.failed_short"))
         if not self.secondary and not self.demo and phonecam_update and now >= self._next_update:
-            if self._setup_process is not None:
+            if self._setup_process is not None or self._setup_open:
                 self._next_update = now + 1.0
             else:
                 self._next_update = now + phonecam_update.CHECK_INTERVAL_SEC

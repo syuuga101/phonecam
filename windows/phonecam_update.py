@@ -4,7 +4,7 @@
 - GitHub Releases の最新版を確認する
 - PhoneCamReceiver.exe をダウンロードして検証する (https のみ・サイズ・SHA-256)
 - 動いている exe を「名前変更 → 新しいファイルを元の名前へ」で入れ替える
-画面は phonecam_receiver.py 側。ここは純粋な関数とクラスだけにしてテストしやすくしている。
+画面は phonecam/qt 側。ここは純粋な関数とクラスだけにしてテストしやすくしている。
 """
 
 import hashlib
