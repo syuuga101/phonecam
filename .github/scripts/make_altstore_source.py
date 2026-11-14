@@ -11,7 +11,7 @@ sidestore-source.json (SideStore 向けの名前) の2つで出す。違うの�
       --out out/altstore-source.json --also-out out/sidestore-source.json
 
 downloadURL は、そのタグの Release に添付した PhoneCam.ipa の URL にする。
-ソース自体は releases/latest/download/altstore-source.json から配る (常に最新のリリースを指す)。
+ソース自体は releases/latest/download/sidestore-source.json から配る (常に最新のリリースを指す)。
 """
 
 import argparse

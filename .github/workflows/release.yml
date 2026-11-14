@@ -88,6 +88,7 @@ jobs:
             echo
             echo "- **Windows**: \`PhoneCamReceiver.exe\` をダウンロードして、古い exe と置き換えるだけです（初めての方はそのまま起動するとセットアップが始まります）。"
             echo "- **iPhone**: SideStore を開き、LocalDevVPN をオンにして Wi-Fi につないだ状態で、「My Apps」の PhoneCam を更新します（ソースは自動で最新になります）。"
+            echo "- SideStore に追加する配布元: \`https://github.com/${{ github.repository }}/releases/latest/download/sidestore-source.json\` （これまでの \`altstore-source.json\` も引き続き使えます）"
             echo "- くわしい手順は [使い方ガイド](https://github.com/${{ github.repository }}/wiki) を見てください。"
             echo
             echo "---"

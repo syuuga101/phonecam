@@ -186,7 +186,7 @@ def test_auto_advance_only_usb_and_trust_once():
 
 
 def test_source_url_and_sidestore_deeplink():
-    assert iphone.source_url("owner/repo") == "https://github.com/owner/repo/releases/latest/download/altstore-source.json"
+    assert iphone.source_url("owner/repo") == "https://github.com/owner/repo/releases/latest/download/sidestore-source.json"
     assert iphone.source_deeplink("owner/repo") == "sidestore://source?url=" + iphone.source_url("owner/repo")
     assert iphone.source_url("") is None and iphone.source_deeplink("nope") is None
 

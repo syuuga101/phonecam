@@ -24,7 +24,7 @@ PHONE_PORT = 5555
 CLIENT = {"ClientVersionString": "phonecam", "ProgName": "phonecam"}
 
 # 配布元のファイル (AltStore 形式。SideStore も同じ形式を読む)
-SOURCE_FILE = "altstore-source.json"
+SOURCE_FILE = "sidestore-source.json"
 APP_BUNDLE_ID = "com.example.phonecam"  # ios/project.yml の PRODUCT_BUNDLE_IDENTIFIER と同じ
 
 # 状態

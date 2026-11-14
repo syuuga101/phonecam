@@ -87,10 +87,10 @@ PhoneCam は、SideStore の **ソース**（アプリの配布元のリスト�
 3. 次の URL を貼り付けて、追加します。
 
 ```
-https://github.com/syuuga101/phonecam/releases/latest/download/altstore-source.json
+https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.json
 ```
 
-> ファイル名は `altstore-source.json` のままですが、SideStore でもそのまま使えます（SideStore は AltStore から分かれて作られたため、同じ形式です）。
+> 同じ内容の `altstore-source.json`（AltStore 用の同じ内容のファイル。旧 URL も引き続き使えます）もあります。
 
 4. 追加したソースを開き、**PhoneCam** の入手ボタンを押して入れます。
 5. 終わったら、PhoneCam を開きます。

@@ -43,7 +43,7 @@ phonecam/
 
 ワークフローの流れ: XcodeGen で Xcode プロジェクトを作成 → 署名なしでビルド（`MARKETING_VERSION` は `VERSION` ファイル、`CURRENT_PROJECT_VERSION` は実行番号）→ アドホック署名とエンタイトルメント（`get-task-allow`）を付けて IPA にまとめる。署名なしのままだと SideStore などが読み込めないことがあるため仮署名を付けています。実際の署名は SideStore 側でやり直されます。
 
-> ソース（`altstore-source.json`。SideStore と AltStore で共通の形式）の `appPermissions` にも `get-task-allow` を書く必要があります。書いていないと SideStore（AltStore 系）が「requires additional permissions not specified by the source」で拒否します。
+> ソース（`sidestore-source.json`。`altstore-source.json` は AltStore 用の同じ内容のファイルで、旧 URL も引き続き使えます）の `appPermissions` にも `get-task-allow` を書く必要があります。書いていないと SideStore（AltStore 系）が「requires additional permissions not specified by the source」で拒否します。
 
 ### Windows 受信アプリ（exe）
 
@@ -94,7 +94,7 @@ GitHub Actions では Windows の pytest ジョブに失敗すると exe ビル�
    - `make_altstore_source.py` で `altstore-source.json` を作成
    - `PhoneCam.ipa` / `PhoneCamReceiver.exe` / `altstore-source.json` を添付してリリースを公開
 
-`workflow_dispatch` で手動実行もできます。SideStore のソース URL（`https://github.com/syuuga101/phonecam/releases/latest/download/altstore-source.json`）は常に最新リリースを指します。
+`workflow_dispatch` で手動実行もできます。SideStore のソース URL（`https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.json`）は常に最新リリースを指します。
 
 ワークフローで使うサードパーティの Action（`softprops/action-gh-release`）は、コミット SHA で固定しています。更新するときは、新しいタグの SHA を調べて書き換えてください。
 
