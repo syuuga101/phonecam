@@ -480,6 +480,11 @@ def language_shots(app, ctrl, win, out, scale):
             for item in untranslated_texts(win.current_page()):
                 failed.append(("language_en_" + key, "translation key shown: %s %s %r" % item))
             for expander in win.current_page().findChildren(Expander):
+                for part, text in (("description", expander.description_label.text_full()),
+                                   ("summary", expander.summary_label.text_full())):
+                    if any("\u3040" <= ch <= "\u30ff" or "\u4e00" <= ch <= "\u9fff" for ch in text):
+                        failed.append(("language_en_" + key, "expander %s is still Japanese: %r" % (part, text)))
+            for expander in win.current_page().findChildren(Expander):
                 expander.set_expanded(False, animate=False, save=False)
         for theme in THEMES:
             ctrl.set_theme(theme)
