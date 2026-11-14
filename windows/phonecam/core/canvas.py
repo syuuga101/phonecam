@@ -99,8 +99,7 @@ def build_control(settings, group, frame_size=None):
     if group in ("all", "mic"):
         # sounddevice が無いと再生できないので、iPhone側でも有効にしない
         c["mic"] = {"enabled": bool(settings["mic_enabled"]) and AUDIO_AVAILABLE}
-    if group in ("all", "micMuted"):
-        c["micMuted"] = bool(settings.get("mic_muted", False))
+    # micMuted は送らない: PC のミュートは PC の中 (AudioEngine) で止める。iPhone のミュートは iPhone 側の操作で、PC は読むだけ。
     return c
 
 

@@ -277,11 +277,11 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             "sampleRate": rate
         ] as [String: Any]
         s["micPath"] = llActive ? "lowLatency" : "capture"
-        s["micMuted"] = micMuted
+        s["micMuted"] = userMuted   // iPhone で設定したミュートだけを返す (PC からの pcMuted は含めない)
         s["phoneEdit"] = [
             "seq": phoneEditSeq,
             "lens": activeLens,
-            "micMuted": micMuted,
+            "micMuted": userMuted,
             "zoom": fin(zoom),
             "torch": torch
         ] as [String: Any]
@@ -466,7 +466,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
                 json["zoom"] = NSNumber(value: 1.0)
                 bump = true
             }
-            if let m = newMuted, m != self.micMuted {
+            if let m = newMuted, m != self.userMuted {
                 json["micMuted"] = NSNumber(value: m)
                 bump = true
             }
@@ -488,7 +488,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     /// PC は接続後の最初の status の seq を基準にし、その後に増えたときだけ取り込むため、少し待ってから進める。
     func announceMuteIfNeeded() {
         sessionQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            guard let self = self, self.micMuted else { return }
+            guard let self = self, self.userMuted else { return }
             self.phoneEditSeq += 1
             self.publishState()
         }

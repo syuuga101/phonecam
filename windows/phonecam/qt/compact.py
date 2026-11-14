@@ -193,8 +193,7 @@ SUMMARIES = {
                                       _labeled("compact.sum.strength", v.text("effects.background.strength.label"))]),
     "effects_color": lambda v: [t("compact.sum.color.changed" if _color_changed(v) else "compact.sum.color.default")],
     "audio_mic": lambda v: ([t("compact.sum.mic.off")] if v.on("audio.mic.use") is False else
-                            [t("compact.sum.mic.muted" if v.on("audio.mute.label") else "compact.sum.mic.on"),
-                             t("compact.sum.mic.pcmuted") if v.on("audio.pcmute.label") else ""]),
+                            [t("compact.sum.mic.muted" if v.on("audio.mute.label") else "compact.sum.mic.on")]),
     "audio_output": lambda v: [v.text("audio.device.label"), _labeled("compact.sum.volume", v.text("audio.volume.label"))],
     "rec_control": lambda v: [v.text("recording.state.label")],
     "rec_quality": lambda v: [v.text("recording.preset.label"),

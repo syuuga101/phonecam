@@ -654,8 +654,8 @@ class Controller:
             self.set_lens(lens)
             return t("shortcuts.toast.camera", name=dict(LENS_LABELS)[lens])
         if action == "mic":
-            muted = not self.get("mic_muted")
-            self.changed("mic_muted", muted, "micMuted")
+            muted = not self.get("mic_mute")   # PC のミュート (iPhone へは頼まない)
+            self.changed("mic_mute", muted)
             return t("shortcuts.toast.mic_muted" if muted else "shortcuts.toast.mic_unmuted")
         if action == "blur":
             enabled = self.get("bg_mode") == "off"

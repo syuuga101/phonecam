@@ -109,8 +109,8 @@ DEFAULT_SETTINGS = {
     "mic_enabled": False,
     "mic_device": "",
     "mic_volume": 100,
-    "mic_mute": False,           # PC側だけの消音 (iPhoneからは音が送られ続ける)
-    "mic_muted": False,          # iPhoneのマイクミュート (オンの間は音声が送られない)。iPhone側の操作も取り込む
+    "mic_mute": False,           # PCでミュート: PCが受け取った音をPCの中で無音にする (iPhoneからは音が送られ続ける)
+    "mic_muted": False,          # iPhone側でミュート中か (読み取り専用の反映。PCからは変更を頼まない)
     "mic_delay_ms": 0,
     # ショートカットキー (v1.5): どのアプリを使っていても効く。動作名 → "ctrl+alt+c" (空文字=なし)
     "hotkeys_enabled": True,

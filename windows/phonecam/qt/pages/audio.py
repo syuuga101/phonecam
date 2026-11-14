@@ -8,7 +8,7 @@ from phonecam.core.audio_engine import SYSTEM_DEFAULT_KEY, find_vbcable_control_
 from phonecam.core.settings import AUDIO_AVAILABLE
 from phonecam.i18n import NO_VALUE, t
 from phonecam.qt.widgets import Card, Combo, Page, Row, bound_combo, bound_slider, bound_switch, button, error_color, separator_color
-from phonecam.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS
+from phonecam.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS, phone_mic_text
 
 
 class _Meter(QWidget):
@@ -86,9 +86,8 @@ def build(ctrl):
     mic = page.add_section(t("audio.mic.section"))
     enabled = bound_switch(ctrl, "mic_enabled", group="mic", on_change=apply)
     mic.add_row("mic", t("audio.mic.use")).addControl(enabled)
-    mute_row = mic.add_row("volume", t("audio.mute.label"))
-    mute_row.addControl(bound_switch(ctrl, "mic_muted", group="micMuted"))
-    mic.add_row("speaker", t("audio.pcmute.label"), t("audio.pcmute.hint")).addControl(bound_switch(ctrl, "mic_mute"))
+    mic.add_row("volume", t("audio.mute.label"), t("audio.mute.hint")).addControl(bound_switch(ctrl, "mic_mute"))
+    phone_row = mic.add_row("mic", t("audio.phonemic.label"))   # iPhone 側のミュート状態 (読み取り専用)
 
     output = page.add_section(t("audio.output.section"))
     try:
@@ -135,7 +134,7 @@ def build(ctrl):
         mic = mic if isinstance(mic, dict) else {}
         snapshot = ctrl.state.snapshot()
         on = ctrl.get("mic_enabled")
-        mute_row.setHint(t("shell.phone_muted") if status.phone_muted else "")
+        phone_row.setHint(phone_mic_text(status.connected, status.phone_muted))
         info = t("shell.sync.output", name=audio.device_name) if audio.running and on and not audio.error else ""
         if info and mic.get("sampleRate"):
             info = t("shell.sync.output_detail", name=audio.device_name, hz=int(mic["sampleRate"]),
