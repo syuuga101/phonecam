@@ -208,6 +208,9 @@ jobs:
           # ウィザード・更新確認が出ないように設定を事前に置く
           '{"setup_done": true, "setup_shown_version": "", "update_check": false}' | Set-Content -Path (Join-Path $logDir "phonecam_settings.json") -Encoding utf8
           $failed = $false
+          # 0. exe の中にカメラ 1〜4 の softcam DLL が入っているか (足りないとカメラ 2 以降が OBS に出ない)
+          python .github/scripts/check_softcam_bundle.py $exe
+          if ($LASTEXITCODE -ne 0) { $failed = $true }
           function Show-Logs {
             foreach ($n in @("phonecam_crash.log", "phonecam_error.log", "selftest.txt")) {
               $f = Join-Path $logDir $n
