@@ -1783,24 +1783,24 @@
         }
       }
     },
-    "AltStoreで更新" : {
+    "SideStoreで更新" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Update with AltStore"
+            "value" : "Update with SideStore"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AltStoreで更新"
+            "value" : "SideStoreで更新"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "AltStoreで更新"
+            "value" : "SideStoreで更新"
           }
         }
       }
@@ -2615,6 +2615,94 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "「横で固定」では、iPhone を左右どちらに倒しても横向きのままになります。"
+          }
+        }
+      }
+    },
+    "読み込んでいます…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込んでいます…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "読み込んでいます…"
+          }
+        }
+      }
+    },
+    "更新内容を取得できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the release notes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新内容を取得できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "更新内容を取得できませんでした"
+          }
+        }
+      }
+    },
+    "リリースページを開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the release page"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリースページを開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "リリースページを開く"
+          }
+        }
+      }
+    },
+    "Windows 向けの変更" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows changes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows 向けの変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Windows 向けの変更"
           }
         }
       }
