@@ -110,6 +110,7 @@ def configure(app, ctrl):
     """スタイル・フォント・テーマを設定し、theme の変更に追従させる。"""
     configure_basic(app, ctrl.get("theme", "system"))
     ctrl.settings_changed.connect(lambda k, v: apply_theme(app, v) if k == "theme" else None)
+    ctrl.language_changed.connect(lambda language: apply_font(app, language))   # 言語の切り替えですぐ、その言語に合う書体にする
 
 
 def _smoke_hook(result, name, close):

@@ -5,6 +5,8 @@
 import threading
 from collections import deque
 
+from phonecam.i18n import NO_VALUE, t
+
 
 class LatencyTracker:
     """ping/pong で iPhone と PC の時計のずれ(offset)を推定し、フレームごとの遅延を集計する。
@@ -99,7 +101,7 @@ def format_mmss(seconds):
     try:
         t = max(0, int(seconds))
     except Exception:
-        return "-"
+        return NO_VALUE
     if t >= 3600:
         return "%d:%02d:%02d" % (t // 3600, t % 3600 // 60, t % 60)
     return "%02d:%02d" % (t // 60, t % 60)
@@ -149,16 +151,16 @@ def fps_runs(window, min_fps=0.5):
 def range_label(minutes, fraction=1.0):
     """時間軸の「◯分前」。fraction=0.5 なら半分の位置。"""
     m = minutes * fraction
-    return "%d分前" % m if abs(m - round(m)) < 1e-9 else "%.1f分前" % m
+    return t("status.graph.ago", n="%d" % m if abs(m - round(m)) < 1e-9 else "%.1f" % m)
 
 
 def format_bytes(n):
     try:
         n = float(n)
     except Exception:
-        return "-"
+        return NO_VALUE
     if n < 0:
-        return "-"
+        return NO_VALUE
     if n >= 1024 ** 3:
         return "%.2f GB" % (n / 1024 ** 3)
     return "%.1f MB" % (n / 1024 ** 2)
@@ -177,6 +179,6 @@ PRESSURE_FACTOR_LABELS = {
 
 def format_pressure_factors(factors):
     if not isinstance(factors, (list, tuple)):
-        return "-"
+        return NO_VALUE
     names = [PRESSURE_FACTOR_LABELS[f] for f in factors if f in PRESSURE_FACTOR_LABELS]
-    return "、".join(names) if names else "-"
+    return "、".join(names) if names else NO_VALUE

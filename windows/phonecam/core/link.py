@@ -7,6 +7,7 @@ import socket
 import threading
 import time
 from phonecam.core.crashlog import log_error
+from phonecam.i18n import t as tr
 from phonecam.core.profiling import PROFILE
 from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, flip_image, packed_image, pad_color_for
 from phonecam.core.decoder import (
@@ -39,8 +40,8 @@ from phonecam.core.protocol import (
     read_msg,
 )
 from phonecam.core.settings import (
-    AUTH_FAIL_TEXT,
-    AUTH_REFUSED_TEXT,
+    auth_fail_text,
+    auth_refused_text,
     auth_failure_kind,
     auth_status_effect,
     build_auth_control,
@@ -130,7 +131,7 @@ class Link:
         if t is None or not t.is_alive():
             self._thread = None
             self.vcam.park()
-        self.state.update(status_text="停止中", connected=False, recv_fps=0.0, rx_fps=0.0, decode_ms=0.0, resolution="-",
+        self.state.update(status_text=tr("core.link.stopped"), connected=False, recv_fps=0.0, rx_fps=0.0, decode_ms=0.0, resolution="-",
                           codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="", transport="", peer="")
         self._decoder_key = None
         self.latency.reset()
@@ -225,7 +226,7 @@ class Link:
         if mode == "usb":
             if self.routes is None:
                 return mode, ip, None
-            raise PhoneCamError("iPhoneがUSBで見つかりません。ケーブルとロック解除・このコンピュータを信頼を確認")
+            raise PhoneCamError(tr("core.link.no_usb"))
         if mode == "wifi" and self.routes is None:
             return mode, ip, None
         target = self.settings.get("target_device")
@@ -235,7 +236,7 @@ class Link:
             if not known:
                 if ip and valid_pair_code(self.settings.get("pair_code", "")) and allowed(ip):
                     return "wifi", ip, None
-                raise PhoneCamError("選んだ iPhone が登録から外れています。接続ページで選び直してください")
+                raise PhoneCamError(tr("core.link.unregistered"))
             # Refresh the address of the selected device, never switch to another UUID.
             if self._last_wifi and allowed(self._last_wifi[0]):
                 return "wifi", self._last_wifi[0], known[0].code
@@ -245,7 +246,7 @@ class Link:
                     if allowed(address) and self._probe(address):
                         self._last_wifi = (address, d.code)
                         return "wifi", address, d.code
-            raise PhoneCamError("選んだ iPhone が見つかりません。PhoneCam を開いて同じ Wi-Fi につないでください")
+            raise PhoneCamError(tr("core.link.chosen_not_found"))
         if mode == "wifi":
             return mode, ip, None
         if self._last_wifi and allowed(self._last_wifi[0]):
@@ -264,8 +265,8 @@ class Link:
                     if d.code and a in live and allowed(a):
                         self._last_wifi = (a, d.code)
                         return "wifi", a, d.code
-            raise PhoneCamError("登録済みの iPhone が見つかりません。USB でつなぐか、PhoneCam を開いて同じ Wi-Fi につないでください")
-        raise PhoneCamError("iPhone が見つかりません。USB でつなぐか、「iPhoneを追加」で登録してください")
+            raise PhoneCamError(tr("core.link.known_not_found"))
+        raise PhoneCamError(tr("core.link.none_found"))
 
     @staticmethod
     def _probe(ip):
@@ -279,7 +280,7 @@ class Link:
         """auto で Wi-Fi につないでいる間、USB が挿されたら Wi-Fi を切って USB につなぎ直す。"""
         while not stop.is_set() and not ping_stop.wait(2.0):
             if time.monotonic() >= self._usb_retry_after and self._eligible_usb(stop):
-                self.state.update(status_text="USBがつながりました。切り替えます…")
+                self.state.update(status_text=tr("core.link.usb_switch"))
                 self._last_wifi = None
                 try:
                     sock.shutdown(socket.SHUT_RDWR)
@@ -321,14 +322,14 @@ class Link:
     def _run(self):
         stop = self._stop
         while not stop.is_set():
-            self.state.update(status_text="接続中…", connected=False)
+            self.state.update(status_text=tr("core.link.connecting"), connected=False)
             try:
                 self._mode, self._ip, self._code = self._resolve()
                 self.state.update(transport=self._mode, peer=self._ip if self._mode == "wifi" else "")
                 if self.routes is not None:
                     resource = ("usb", self._usb_serial) if self._mode == "usb" else ("wifi", self._ip)
                     if stop.is_set() or not self.routes.claim(self, resource):
-                        raise PhoneCamError("この iPhone は別のカメラ出力で使われています")
+                        raise PhoneCamError(tr("core.link.used_by_other"))
                     self._claimed = resource
                 info = {}
                 sock = self._connect(info=info)
@@ -339,7 +340,7 @@ class Link:
                     self._usb_retry_after = time.monotonic() + 5
                 self._release_route()
                 self._last_wifi = None
-                self.state.update(status_text="待機中（再接続を試行します）", error_text=str(e), connected=False)
+                self.state.update(status_text=tr("core.link.standby"), error_text=str(e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
             except Exception as e:
@@ -347,7 +348,7 @@ class Link:
                     self._usb_retry_after = time.monotonic() + 5
                 self._release_route()
                 self._last_wifi = None
-                self.state.update(status_text="待機中（再接続を試行します）", error_text="接続エラー: %s" % e, connected=False)
+                self.state.update(status_text=tr("core.link.standby"), error_text=tr("core.link.connect_error", error=e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
 
@@ -366,7 +367,7 @@ class Link:
                 self._session(sock, stop)
             except Exception as e:
                 if not stop.is_set():
-                    self.state.update(error_text="切断: %s" % e)
+                    self.state.update(error_text=tr("core.link.disconnected_error", error=e))
                     if not isinstance(e, (OSError, ConnectionError, PhoneCamError)):
                         log_error("link session")  # 想定外の例外だけ記録する (通常の切断は記録しない)
             finally:
@@ -383,8 +384,8 @@ class Link:
             kind = auth_failure_kind(self._mode, self._authed, self._saw_required)
             if kind == "code":
                 # コード違い: 何度も再接続すると iPhone に締め出されるので、コードを直す/接続を押すまで待つ
-                self.state.update(status_text="認証できません（ペアリングコードを確認してください）",
-                                  error_text=AUTH_FAIL_TEXT, auth_state="failed")
+                self.state.update(status_text=tr("core.link.auth_failed"),
+                                  error_text=auth_fail_text(), auth_state="failed")
                 self._auth_blocked = True
                 self._auth_wake.clear()
                 while not stop.is_set() and not self._auth_wake.wait(0.3):
@@ -395,11 +396,11 @@ class Link:
                 self.state.update(auth_state="")
                 continue
             if kind == "refused":
-                self.state.update(status_text="iPhoneに接続を断られました。しばらくしてから再接続します…",
-                                  error_text=AUTH_REFUSED_TEXT, auth_state="refused")
+                self.state.update(status_text=tr("core.link.refused"),
+                                  error_text=auth_refused_text(), auth_state="refused")
                 stop.wait(max(RECONNECT_SEC, AUTH_REFUSED_RETRY_SEC - (time.monotonic() - session_t0)))
                 continue
-            self.state.update(status_text="切断されました。再接続します…")
+            self.state.update(status_text=tr("core.link.reconnecting"))
             stop.wait(RECONNECT_SEC)
         self.vcam.park()
 
@@ -410,10 +411,10 @@ class Link:
 
     def _session(self, sock, stop):
         if av is None or np is None:
-            raise PhoneCamError("av / numpy がインストールされていません。install.bat を実行してください")
+            raise PhoneCamError(tr("core.link.need_av"))
         decoders = DecoderManager(make_decoder, hw=self._hw_wanted())
         self._decoder_key = None
-        self.state.update(status_text="接続済み", connected=self._mode == "usb", error_text="", audio_path="shared",
+        self.state.update(status_text=tr("core.link.connected"), connected=self._mode == "usb", error_text="", audio_path="shared",
                           thin_total=0, thin_last=0.0, phone_status={})  # 前の接続のステータス (phoneEdit の seq など) を持ち越さない
 
         # 最初にペアリングコードを送る (Wi-Fi で必須。USB では iPhone が無視する)。USB は認証不要なので音声チャンネルもすぐ開く
@@ -474,12 +475,12 @@ class Link:
         effect = auth_status_effect(st)
         if effect == "required":
             self._saw_required = True
-            self.state.update(auth_state="required", status_text="ペアリングコードを確認中…")
+            self.state.update(auth_state="required", status_text=tr("core.link.checking_code"))
         elif effect == "ok":
             was_waiting = self._saw_required and not self._authed
             self._authed = True
             if not self.state.connected or self.state.auth_state:
-                self.state.update(connected=True, auth_state="", status_text="接続済み")
+                self.state.update(connected=True, auth_state="", status_text=tr("core.link.connected"))
             self._auth_ok.set()
             if was_waiting:
                 try:
@@ -546,7 +547,7 @@ class Link:
         kind = "hw" if decoders.hw_active else "sw"
         note = ""
         if not decoders.hw_active and self.settings.get("hw_decode", True):
-            note = decoders.hw_error or "ハードウェアデコードを使えないため、ソフトウェアで処理しています"
+            note = decoders.hw_error or tr("core.link.sw_decode")
         key = (codec_name, kind, note)
         if key != self._decoder_key:
             self._decoder_key = key
@@ -605,7 +606,7 @@ class Link:
                     if not decoders.hw_active:
                         raise
                     # ハードウェアのフレームを変換できない: ソフトウェアに切り替えて続ける
-                    decoders.disable_hw("ハードウェアのフレームを変換できませんでした")
+                    decoders.disable_hw(tr("core.link.hw_frame"))
                     self.hw_disabled = True
                     self.request_keyframe(force=True)
                     continue
@@ -633,7 +634,7 @@ class Link:
                     if (frame.width, frame.height) == (out_w, out_h):
                         res_text = "%dx%d" % (out_w, out_h)
                     else:
-                        res_text = "受信 %dx%d → 出力 %dx%d" % (frame.width, frame.height, out_w, out_h)
+                        res_text = tr("core.link.resolution", w=frame.width, h=frame.height, out_w=out_w, out_h=out_h)
                     self.state.update(
                         recv_fps=self._fps_count / (now - self._fps_t0),
                         decode_ms=self._decode_avg,
@@ -734,7 +735,7 @@ class Link:
                     except Exception:
                         pass
                     if not identity_ok:
-                        raise PhoneCamError("つながった iPhone は別のカメラに割り当てられています")
+                        raise PhoneCamError(tr("core.link.assigned_elsewhere"))
                     now_m = time.monotonic()   # 届いた数/秒 (iPhone の送出と、PC の出力の中間)。約1秒ごとの status で更新
                     if now_m - self._rx_t0 >= 0.9:
                         self.state.update(rx_fps=(self._rx_count - self._rx_last) / (now_m - self._rx_t0))

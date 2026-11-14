@@ -6,6 +6,7 @@ import plistlib
 import socket
 import struct
 from phonecam.core.protocol import PHONE_PORT, PhoneCamError, USBMUX_ADDR, read_exact
+from phonecam.i18n import t
 
 
 # ---------------------------------------------------------------------------
@@ -31,10 +32,7 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
     try:
         sock = socket.create_connection(mux_addr, timeout=timeout)
     except OSError:
-        raise PhoneCamError(
-            "Apple Mobile Device Service に接続できません。"
-            "Apple Devicesアプリ（またはiTunes）をインストールしてください"
-        )
+        raise PhoneCamError(t("core.usb.no_service"))
     try:
         sock.settimeout(timeout)
         base = {"ClientVersionString": "phonecam", "ProgName": "phonecam"}
@@ -48,13 +46,11 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
         if serial is not None:
             devices = [d for d in devices if d.get("Properties", {}).get("SerialNumber") == serial]
         if not devices:
-            raise PhoneCamError(
-                "iPhoneがUSBで見つかりません。ケーブルとロック解除・このコンピュータを信頼を確認"
-            )
+            raise PhoneCamError(t("core.link.no_usb"))
         ids = [d["DeviceID"] for d in devices]
         if device_id is None or device_id not in ids:
             if device_id is not None:
-                raise PhoneCamError("iPhoneがUSBで見つかりません")
+                raise PhoneCamError(t("core.usb.not_found"))
             device_id = ids[0]
         if info is not None:
             info["device_id"] = device_id
@@ -70,17 +66,15 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
         number = resp.get("Number", -1)
         if number != 0:
             if number == 3:
-                raise PhoneCamError(
-                    "iPhoneのPhoneCamアプリに接続できません。アプリを起動して前面に表示してください"
-                )
-            raise PhoneCamError("USB接続に失敗しました（エラー番号 %s）" % number)
+                raise PhoneCamError(t("core.usb.app_closed"))
+            raise PhoneCamError(t("core.usb.failed", number=number))
         return sock
     except PhoneCamError:
         sock.close()
         raise
     except (OSError, ConnectionError, plistlib.InvalidFileException, struct.error, ValueError):
         sock.close()
-        raise PhoneCamError("USBでの通信中にエラーが発生しました。ケーブルを抜き差しして再試行してください")
+        raise PhoneCamError(t("core.usb.io_error"))
 
 
 def usbmux_devices(mux_addr=USBMUX_ADDR):
@@ -105,8 +99,6 @@ def wifi_connect(ip, port=PHONE_PORT, timeout=3.0):
     try:
         sock = socket.create_connection((ip, port), timeout=timeout)
     except OSError:
-        raise PhoneCamError(
-            "%s:%d に接続できません。IPアドレスと、iPhoneでアプリが起動していることを確認してください" % (ip, port)
-        )
+        raise PhoneCamError(t("core.usb.tcp_failed", ip=ip, port=port))
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     return sock

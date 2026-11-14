@@ -393,13 +393,17 @@ JOB_TIMEOUT_MS = 20 * 60 * 1000
 
 # 表示順 (「必要なソフトの確認」の並び)
 COMPONENTS = [
-    {"id": "camera", "name": t("setup.wizard.components_1"), "purpose": t("setup.wizard.components_2"), "required": True},
-    {"id": "vcredist", "name": t("setup.wizard.components_3"), "purpose": t("setup.wizard.components_4"), "required": True},
-    {"id": "itunes", "name": t("setup.wizard.components_5"), "purpose": t("setup.wizard.components_6"), "required": True},
-    {"id": "icloud", "name": "iCloud", "purpose": t("setup.wizard.components_7"), "required": False},
-    {"id": "altserver", "name": "AltServer", "purpose": t("setup.wizard.components_8"), "required": False, "default_on": True},
-    {"id": "vbcable", "name": "VB-CABLE", "purpose": t("setup.wizard.components_9"), "required": False},
+    {"id": "camera", "required": True},
+    {"id": "vcredist", "required": True},
+    {"id": "itunes", "required": True},
+    {"id": "icloud", "name": "iCloud", "required": False},
+    {"id": "altserver", "name": "AltServer", "required": False, "default_on": True},
+    {"id": "vbcable", "name": "VB-CABLE", "required": False},
 ]
+# 表示する文言 (言語を切り替えたら localize() で入れ直す)。COMPONENTS の各項目に name / purpose を足す
+_COMPONENT_TEXT = {
+    "camera": (1, 2), "vcredist": (3, 4), "itunes": (5, 6), "icloud": (None, 7), "altserver": (None, 8), "vbcable": (None, 9),
+}
 COMPONENT_BY_ID = {c["id"]: c for c in COMPONENTS}
 # インストールする順番
 INSTALL_ORDER = ["vcredist", "itunes", "icloud", "altserver", "vbcable", "camera"]
@@ -433,13 +437,7 @@ SOURCES = {
     },
 }
 
-MANUAL_TEXT = {
-    "vcredist": t("setup.wizard.manual_text_1"),
-    "itunes": t("setup.wizard.manual_text_2"),
-    "icloud": t("setup.wizard.manual_text_3"),
-    "altserver": t("setup.wizard.manual_text_4"),
-    "vbcable": t("setup.wizard.manual_text_5"),
-}
+MANUAL_TEXT = {}   # localize() が入れる
 
 DEFAULT_MIN_BYTES = 100 * 1024
 MAX_UNZIPPED_BYTES = 1024 * 1024 * 1024   # zip 爆弾対策 (展開後の合計)
@@ -614,7 +612,7 @@ def detect_itunes(entries=None):
 # Microsoft Store 版のパッケージ名。公式サイト版と共存できず、AltServer は公式サイト版が必要なので入れ替える
 # itunes には「Appleデバイス」アプリも含める。入っていると iTunes でiPhoneを扱えず、AltServer がiPhoneを見つけられない (エラー2003)
 STORE_PACKAGES = {"icloud": ["AppleInc.iCloud"], "itunes": ["AppleInc.iTunes", "AppleInc.AppleDevices"]}
-STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes", "AppleInc.AppleDevices": t("setup.wizard.store_labels_1")}
+STORE_LABELS = {"AppleInc.iCloud": "iCloud", "AppleInc.iTunes": "iTunes"}   # localize() が AppleDevices を足す
 
 
 APPX_REPO_KEY = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
@@ -1281,45 +1279,65 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
 GUIDED_IDS = ("itunes", "icloud", "altserver", "vbcable")
 SLOW_SECONDS = 180          # インストーラーがこれより長く動いているとき、隠れていないか確認を促す
 AUTO_CHECK_SECONDS = 5.0    # インストーラーの実行中に、導入済みになったか裏で確かめる間隔
-SLOW_HINT = t("setup.wizard.slow_hint_1")
-MISSING_COMMON = (t("setup.wizard.missing_common_1"))
+SLOW_HINT = ""
+MISSING_COMMON = ""
+GUIDE = {}
 
-GUIDE = {
-    "itunes": {
-        "steps": [t("setup.wizard.guide_1"),
-                  t("setup.wizard.guide_2"),
-                  t("setup.wizard.guide_3"),
-                  t("setup.wizard.guide_4")],
-        "note": t("setup.wizard.guide_5"),
-        "missing": t("setup.wizard.guide_6"),
-    },
-    "icloud": {
-        "steps": [t("setup.wizard.guide_7"),
-                  t("setup.wizard.guide_8"),
-                  t("setup.wizard.guide_3"),
-                  t("setup.wizard.guide_9")],
-        "note": t("setup.wizard.guide_10"),
-        "missing": t("setup.wizard.guide_11"),
-    },
-    "altserver": {
-        "steps": [t("setup.wizard.guide_12"),
-                  t("setup.wizard.guide_13"),
-                  t("setup.wizard.guide_3"),
-                  t("setup.wizard.guide_14"),
-                  t("setup.wizard.guide_15")],
-        "note": t("setup.wizard.guide_16"),
-        "missing": t("setup.wizard.guide_17"),
-    },
-    "vbcable": {
-        "steps": [t("setup.wizard.guide_18"),
-                  t("setup.wizard.guide_3"),
-                  t("setup.wizard.guide_19"),
-                  t("setup.wizard.guide_20"),
-                  t("setup.wizard.guide_21")],
-        "note": t("setup.wizard.guide_22"),
-        "missing": t("setup.wizard.guide_23"),
-    },
-}
+
+def localize():
+    """画面に出す文言を今の言語で作り直す (import 時と、言語を切り替えたとき)。"""
+    global SLOW_HINT, MISSING_COMMON, GUIDE
+    for comp in COMPONENTS:
+        name_n, purpose_n = _COMPONENT_TEXT[comp["id"]]
+        if name_n:
+            comp["name"] = t("setup.wizard.components_%d" % name_n)
+        comp["purpose"] = t("setup.wizard.components_%d" % purpose_n)
+    MANUAL_TEXT.clear()
+    MANUAL_TEXT.update({cid: t("setup.wizard.manual_text_%d" % n)
+                        for cid, n in (("vcredist", 1), ("itunes", 2), ("icloud", 3), ("altserver", 4), ("vbcable", 5))})
+    STORE_LABELS["AppleInc.AppleDevices"] = t("setup.wizard.store_labels_1")
+    SLOW_HINT = t("setup.wizard.slow_hint_1")
+    MISSING_COMMON = t("setup.wizard.missing_common_1")
+    GUIDE.clear()
+    GUIDE.update({
+        "itunes": {
+            "steps": [t("setup.wizard.guide_1"),
+                      t("setup.wizard.guide_2"),
+                      t("setup.wizard.guide_3"),
+                      t("setup.wizard.guide_4")],
+            "note": t("setup.wizard.guide_5"),
+            "missing": t("setup.wizard.guide_6"),
+        },
+        "icloud": {
+            "steps": [t("setup.wizard.guide_7"),
+                      t("setup.wizard.guide_8"),
+                      t("setup.wizard.guide_3"),
+                      t("setup.wizard.guide_9")],
+            "note": t("setup.wizard.guide_10"),
+            "missing": t("setup.wizard.guide_11"),
+        },
+        "altserver": {
+            "steps": [t("setup.wizard.guide_12"),
+                      t("setup.wizard.guide_13"),
+                      t("setup.wizard.guide_3"),
+                      t("setup.wizard.guide_14"),
+                      t("setup.wizard.guide_15")],
+            "note": t("setup.wizard.guide_16"),
+            "missing": t("setup.wizard.guide_17"),
+        },
+        "vbcable": {
+            "steps": [t("setup.wizard.guide_18"),
+                      t("setup.wizard.guide_3"),
+                      t("setup.wizard.guide_19"),
+                      t("setup.wizard.guide_20"),
+                      t("setup.wizard.guide_21")],
+            "note": t("setup.wizard.guide_22"),
+            "missing": t("setup.wizard.guide_23"),
+        },
+    })
+
+
+localize()
 
 
 def split_ids(ids):

@@ -40,6 +40,57 @@ def _settle(app, ms=350):
     app.processEvents()
 
 
+# ---------------------------------------------------------------------------
+# 翻訳キーがそのまま画面に出ていないかの検査 (pytest の Qt テストと共用)
+# ---------------------------------------------------------------------------
+
+_KEY_RE = None
+_NOT_KEYS = {"setup.exe", "setup.msi"}
+
+
+def untranslated_texts(root):
+    """root の下のすべてのウィジェットの文字 (ラベル・ボタン・選択肢・ツールチップ・見出しなど) のうち、
+    翻訳キー (例: status.iphone.hot) がそのまま残っているものを [(部品, 種類, 文字)] で返す。"""
+    global _KEY_RE
+    import re
+    from PySide6.QtWidgets import (QAbstractButton, QComboBox, QGroupBox, QLabel, QLineEdit, QListWidget,
+                                   QWidget)
+    from phonecam.i18n import _load
+    if _KEY_RE is None:
+        _KEY_RE = re.compile(r"(?<![\w./-])([a-z][a-z0-9_]*(?:\.[A-Za-z0-9_]+)+)(?![\w])")
+    prefixes = {key.split(".")[0] for key in _load("ja")}
+    found = []
+
+    def check(owner, kind, text):
+        for match in _KEY_RE.finditer(text or ""):
+            token = match.group(1)
+            if token.split(".")[0] in prefixes and token not in _NOT_KEYS:
+                found.append((type(owner).__name__, kind, text))
+                return
+
+    widgets = [root] + root.findChildren(QWidget)
+    for widget in widgets:
+        check(widget, "toolTip", widget.toolTip())
+        check(widget, "accessibleName", widget.accessibleName())
+        if widget.isWindow():
+            check(widget, "windowTitle", widget.windowTitle())
+        if isinstance(widget, QLabel):
+            check(widget, "text", widget.text())
+        if isinstance(widget, QAbstractButton):
+            check(widget, "text", widget.text())
+        if isinstance(widget, QGroupBox):
+            check(widget, "title", widget.title())
+        if isinstance(widget, QLineEdit):
+            check(widget, "placeholder", widget.placeholderText())
+        if isinstance(widget, QComboBox):
+            for index in range(widget.count()):
+                check(widget, "item", widget.itemText(index))
+        if isinstance(widget, QListWidget):
+            for index in range(widget.count()):
+                check(widget, "item", widget.item(index).text())
+    return found
+
+
 def _sample_frame():
     """プレビュー用のサンプル映像 (横グラデーション + 丸)。numpy が無ければ None。"""
     try:
@@ -313,11 +364,86 @@ def setup_shots(app, ctrl, win, out, scale):
     return failed
 
 
+def language_shots(app, ctrl, win, out, scale):
+    """言語をすぐ切り替える: 英語にした直後の確認ダイアログと、英語表示の状態ページ (「iPhone」の折りたたみを開いた状態) を
+    x {ライト, ダーク} 撮る。英語の全ページに翻訳キーが残っていないことと、時間切れで元の言語に戻ることも確かめる。
+    失敗の一覧 [(名前, 理由)] を返す。最後は日本語に戻す。"""
+    from PySide6.QtCore import QTimer, Qt
+    from phonecam.i18n import get_language, t
+    from phonecam.qt.language_dialog import LanguageConfirmDialog
+    from phonecam.qt.main_window import NAV_ITEMS
+    from phonecam.qt.widgets import Expander
+
+    failed = []
+    status_row = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "status")
+    win.select_camera(0)
+    ctrl.language_trial.disconnect(win._language_trial)   # 確認のダイアログは下で自分で出す (実際の流れは pytest が確かめる)
+    try:
+        ctrl.set_language("en")
+        win.retranslate()
+        _settle(app, 500)
+        if get_language() != "en" or not ctrl.language_trial_active or ctrl.settings["language"] != "ja":
+            failed.append(("language", "choosing English did not switch at once without saving"))
+        for row, (key, _icon) in enumerate(NAV_ITEMS):
+            if win.nav.item(row).isHidden():
+                continue
+            win.select(row)
+            _settle(app, 150)
+            for expander in win.current_page().findChildren(Expander):
+                expander.set_expanded(True, animate=False, save=False)
+            _settle(app, 100)
+            for item in untranslated_texts(win.current_page()):
+                failed.append(("language_en_" + key, "translation key shown: %s %s %r" % item))
+            for expander in win.current_page().findChildren(Expander):
+                expander.set_expanded(False, animate=False, save=False)
+        for theme in THEMES:
+            ctrl.set_theme(theme)
+            _settle(app)
+            dialog = LanguageConfirmDialog(win, "ja", autostart=False)
+            dialog.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+            dialog.show()
+            _settle(app, 300)
+            dialog.grab()
+            _settle(app, 150)
+            dialog.grab().save(os.path.join(out, "lang_dialog_en_%s_x%s.png" % (theme, scale)))
+            for item in untranslated_texts(dialog):
+                failed.append(("language_dialog", "translation key shown: %s %s %r" % item))
+            dialog.close()
+            dialog.deleteLater()
+            win.resize(W, H)
+            win.select(status_row)
+            _settle(app, 250)
+            for expander in win.current_page().findChildren(Expander):
+                expander.set_expanded(expander.key.endswith("status.iphone.title"), animate=False, save=False)
+            _settle(app, 250)
+            win.current_page().verticalScrollBar().setValue(0)
+            _settle(app, 150)
+            win.grab()
+            _settle(app, 150)
+            win.grab().save(os.path.join(out, "lang_en_status_iphone_%s_x%s.png" % (theme, scale)))
+            for expander in win.current_page().findChildren(Expander):
+                expander.set_expanded(False, animate=False, save=False)
+        # 時間切れ (保存されないまま 10 秒): 元の言語に戻り、設定は変わらない
+        dialog = LanguageConfirmDialog(win, "ja", seconds=2, autostart=False)
+        QTimer.singleShot(0, dialog.tick)
+        QTimer.singleShot(0, dialog.tick)
+        win.ask_language("ja", dialog)
+        win.retranslate()
+        _settle(app, 300)
+        if get_language() != "ja" or ctrl.settings["language"] != "ja" or ctrl.language_trial_active:
+            failed.append(("language", "the language did not return to Japanese when the time ran out"))
+        if win.nav.item(status_row).text() != t("nav.status"):
+            failed.append(("language", "the navigation was not rebuilt after reverting"))
+    finally:
+        ctrl.language_trial.connect(win._language_trial)
+    return failed
+
+
 def child(scale, out):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
     from phonecam.i18n import set_language
-    set_language("ja")   # ui/labels.py は import 時に t() を評価するので、Controller を読む前に言語を決める
+    set_language("ja")
     from phonecam.controller import Controller
     from phonecam.qt.app import configure
     from phonecam.qt.main_window import NAV_ITEMS, MainWindow
@@ -600,6 +726,7 @@ def child(scale, out):
                     win.grab().save(os.path.join(out, "cam2_%02d_%s_checked_%s_x%s.png" % (i, key, theme, scale)))
     failed += list(win.page_errors)
     failed += setup_shots(app, ctrl, win, out, scale)
+    failed += language_shots(app, ctrl, win, out, scale)
     win.close()
     if failed:
         for key, err in failed:

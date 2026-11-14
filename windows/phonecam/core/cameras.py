@@ -3,31 +3,13 @@
 from threading import RLock
 import time
 
+from phonecam.core.callbacks import CallbackList
 from phonecam.core.profiling import PROFILE
 from phonecam.core.settings import DEFAULT_SETTINGS, sanitize_settings
 from phonecam.core.softcam_reg import CAMERA_SLOTS
 from phonecam.core.usbmux import usbmux_connect, usbmux_devices
 from phonecam.core.wireless import device_id, read_device
 from phonecam.i18n import t
-
-
-class CallbackList:
-    """Qt を使わない簡易シグナル (controller.CallbackList と同じ振る舞い)。"""
-
-    def __init__(self):
-        self._cbs = []
-
-    def connect(self, fn):
-        if fn not in self._cbs:
-            self._cbs.append(fn)
-        return fn
-
-    def emit(self, *args):
-        for fn in list(self._cbs):
-            try:
-                fn(*args)
-            except Exception:
-                pass
 
 
 class DeviceRoutes:

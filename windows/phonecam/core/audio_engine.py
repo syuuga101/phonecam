@@ -8,6 +8,7 @@ import time
 from collections import deque
 from phonecam.core.deps import np, sd
 from phonecam.core.protocol import parse_audio
+from phonecam.i18n import t
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +145,8 @@ AUDIO_LAT_SAMPLES = 50
 AUDIO_PRIORITIES = ("low", "stable")   # 低遅延優先 / 安定優先
 
 
-EXCLUSIVE_FALLBACK_NOTICE = "排他モードを使えなかったため共有モードで再生中"
+def exclusive_fallback_notice():
+    return t("core.audio.fallback")
 
 
 EXCLUSIVE_RATES_FIRST = 48000
@@ -487,10 +489,10 @@ class AudioEngine:
     def _open_exclusive(self, dev):
         """WASAPI 排他モードで開く。成功なら (stream, rate, ch, dtype, blocksize)、だめなら例外。"""
         if "WASAPI" not in str(dev.get("api", "")).upper():
-            raise RuntimeError("WASAPI のデバイスではありません")
+            raise RuntimeError(t("core.audio.not_wasapi"))
         extra = self.make_wasapi_settings(True)
         if extra is None:
-            raise RuntimeError("この sounddevice は WASAPI 排他モードに対応していません")
+            raise RuntimeError(t("core.audio.no_exclusive"))
         rates = []
         for r in (EXCLUSIVE_RATES_FIRST, int(dev["rate"])):
             if r and r not in rates:
@@ -506,14 +508,14 @@ class AudioEngine:
                 for dtype in EXCLUSIVE_DTYPES:
                     for blocksize in (max(32, rate // 200), 0):
                         if time.monotonic() > deadline:
-                            raise last or RuntimeError("時間切れ")
+                            raise last or RuntimeError(t("core.audio.timeout"))
                         self._out_dtype = dtype
                         self.setup(rate)
                         try:
                             return self._make_stream(dev, rate, ch, dtype, blocksize, extra), rate, ch, dtype, blocksize
                         except Exception as e:
                             last = e
-        raise last or RuntimeError("開けませんでした")
+        raise last or RuntimeError(t("core.audio.open_failed"))
 
     def _open_shared(self, dev):
         """共有モード (従来どおり: float32、5ms ブロック)。成功なら (stream, rate, ch, 'float32', blocksize)。"""
@@ -531,7 +533,7 @@ class AudioEngine:
                     return self._make_stream(dev, dev["rate"], ch, "float32", blocksize, None), dev["rate"], ch, "float32", blocksize
                 except Exception as e:  # 次のブロックサイズ / チャンネル数で再挑戦
                     last = e
-        raise last or RuntimeError("開けませんでした")
+        raise last or RuntimeError(t("core.audio.open_failed"))
 
     def start(self, saved_device, exclusive=None):
         """ストリームを開く。成功なら True。失敗時は self.error に日本語の理由を入れる。
@@ -542,7 +544,7 @@ class AudioEngine:
         self.mode = ""
         self.mode_detail = ""
         if sd is None or np is None:
-            self.error = "sounddevice がインストールされていません"
+            self.error = t("core.audio.no_sounddevice")
             return False
         try:
             devices = list_output_devices()
@@ -550,7 +552,7 @@ class AudioEngine:
             if dev is None:
                 idx = sd.default.device[1]
                 if idx is None or idx < 0:
-                    raise RuntimeError("出力デバイスが見つかりません")
+                    raise RuntimeError(t("core.audio.no_device"))
                 info = sd.query_devices(idx)
                 try:
                     api = sd.query_hostapis()[info["hostapi"]]["name"]
@@ -565,14 +567,14 @@ class AudioEngine:
                     opened = self._open_exclusive(dev)
                     self.mode = "exclusive"
                 except Exception:
-                    self.notice = EXCLUSIVE_FALLBACK_NOTICE
+                    self.notice = exclusive_fallback_notice()
                     opened = None
             if opened is None:
                 opened = self._open_shared(dev)
                 self.mode = "shared"
             stream, rate, ch, dtype, blocksize = opened
         except Exception as e:
-            self.error = "音声の出力先を開けませんでした。別のデバイスを選ぶか、他のアプリが占有していないか確認してください（%s）" % e
+            self.error = t("core.audio.output_failed", error=e)
             self.mode = ""
             with self._lock:
                 self.ring = None
@@ -581,7 +583,7 @@ class AudioEngine:
         self.channels = ch
         self.device_name = dev["name"]
         self.mode_detail = "%d Hz / %dch / %s / %s" % (
-            rate, ch, dtype, ("%.0f ms" % (blocksize * 1000.0 / rate)) if blocksize else "自動")
+            rate, ch, dtype, ("%.0f ms" % (blocksize * 1000.0 / rate)) if blocksize else t("core.audio.block_auto"))
         self.underruns = 0
         self.dropped_samples = 0
         self.dead = False

@@ -35,9 +35,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from phonecam.i18n import NO_VALUE
 from phonecam.qt import icons
 
-NO_VALUE = "—"       # 値がないときの表示 (言語に依らない記号)
 MAX_CONTENT_W = 760   # 内容列の最大幅 (論理px)
 PAGE_PAD_X = 24
 
@@ -236,6 +236,36 @@ class IconLabel(QLabel):
         self._render()
 
 
+VALUE_MAX_W = 300   # 行の右側の値の最大幅 (論理px)。これより長い値だけ折り返す
+
+
+class _ValueLabel(QLabel):
+    """行の右側に出す値。1 行に収まる長さなら折り返さず、全文の幅をとる (「つながっていま / せん」のような 2 行折り返しを防ぐ)。
+    VALUE_MAX_W を超える長い文だけ、その幅で折り返す (wrap=False なら折り返さず、超えた分は切る)。"""
+
+    def __init__(self, text="", wrap=True, parent=None):
+        super().__init__("", parent)
+        self._may_wrap = bool(wrap)
+        self.setMaximumWidth(VALUE_MAX_W)
+        self.setText(text)
+
+    def setText(self, text):
+        super().setText(text)
+        text = text or ""
+        metrics = self.fontMetrics()
+        width = max((metrics.horizontalAdvance(line) for line in text.split("\n")), default=0) + 2
+        wrapped = self._may_wrap and width > VALUE_MAX_W
+        self.setWordWrap(wrapped)
+        self.setMinimumWidth(VALUE_MAX_W if wrapped else min(width, VALUE_MAX_W))
+        if not wrapped:
+            self.setMinimumHeight(0)
+        _fit_wrapped_height(self)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        _fit_wrapped_height(self)
+
+
 class StatusValue(QWidget):
     """A status value with a theme-aware icon when its severity is known."""
 
@@ -246,9 +276,7 @@ class StatusValue(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
-        self.label = QLabel(text)
-        self.label.setWordWrap(wrap)   # False: 短い値を折り返さず 1 行で出す
-        self.label.setMaximumWidth(300)
+        self.label = _ValueLabel(text, wrap)   # wrap=False: どんなに長くても折り返さない。True: 長いときだけ折り返す
         self.icon = QLabel()
         self.icon.setFixedSize(16, 16)
         self.icon.hide()
@@ -259,6 +287,9 @@ class StatusValue(QWidget):
 
     def text(self):
         return self.label.text()
+
+    def setText(self, text):
+        self.set_status(text, self.level)
 
     def set_status(self, text, level=None, tip=None):
         if self.label.text() != text:

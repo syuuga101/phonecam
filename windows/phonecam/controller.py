@@ -12,6 +12,7 @@ docs: scratchpad/qt_contract.md
 """
 
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -40,7 +41,6 @@ from phonecam.core.settings import (
     valid_pair_code,
 )
 from phonecam.core.softcam_shmem import (
-    AUTO_UNSUPPORTED_NOTE,
     ConsumerWatcher,
     SoftcamMemoryReader,
     WATCH_INTERVAL_MS,
@@ -49,13 +49,15 @@ from phonecam.core.state import SharedState
 from phonecam.core.stats import ThermalLog
 from phonecam.core.stream import StreamController, camera_state_text
 from phonecam.core.vcam import CAM_RELEASE_HOLD_SEC
-from phonecam.i18n import set_language, t
+from phonecam.core.callbacks import CallbackList
+from phonecam.i18n import NO_VALUE, get_language, resolve_language, set_language, t
 from phonecam.labels import (
+    auto_unsupported_note,
     LENS_LABELS,
     METER_MIN_DB,
     PHONE_NOTE_SECONDS,
     SHUTTER_VALUES,
-    THERMAL_WARNING,
+    thermal_warning,
     THROTTLE_MS,
     is_thermal_warning,
     watch_text,
@@ -66,32 +68,8 @@ POLL_SEC = 0.1             # status の更新間隔
 HOUSEKEEP_SEC = 1.0
 STATUS_JITTER_SEC = 0.5     # 下の STATUS_JITTER_KEYS だけが変わったときの反映間隔
 STATUS_JITTER_KEYS = frozenset(("latency_text", "audio_summary", "decode_ms"))
+LANGUAGE_CHOICES = ("system", "ja", "en")
 PREVIEW_STALE_SEC = 1.5    # これより古い映像は「映像なし」
-
-
-class CallbackList:
-    """Qt を使わない簡易シグナル。connect(fn) で登録、emit(*args) で全員に通知 (例外は握りつぶす)。"""
-
-    def __init__(self):
-        self._cbs = []
-
-    def connect(self, fn):
-        if fn not in self._cbs:
-            self._cbs.append(fn)
-        return fn
-
-    def disconnect(self, fn):
-        try:
-            self._cbs.remove(fn)
-        except ValueError:
-            pass
-
-    def emit(self, *args, **kw):
-        for fn in list(self._cbs):
-            try:
-                fn(*args, **kw)
-            except Exception:
-                pass
 
 
 class Status(dict):
@@ -138,6 +116,10 @@ class Controller:
         self.update_changed = CallbackList()    # emit(banner)        banner: None か dict(text, actions=[(label, fn)])
 
         self.update_status_changed = CallbackList()
+        self.language_changed = CallbackList()      # emit(言語)   表示言語が切り替わった (画面は文言を作り直す)
+        self.language_trial = CallbackList()        # emit(新しい言語, 元の言語)   確認のダイアログを出す合図
+        self._language_trial = None                 # 試し中: {"old": 設定の値, "new": 選んだ値, "old_language": 元の表示言語}
+        self._banner_factory = None
         self.update_action = CallbackList()
         self._update_status = ("update.status.never", {})
         self.update_check_busy = False
@@ -192,10 +174,10 @@ class Controller:
         self._meter_t = time.monotonic()
         self._preview = None                    # (img, fmt, t, seq)
         self._preview_seq = 0
-        self.stream_state_text = "-"
-        self.camera_state = "-"
+        self.stream_state_text = NO_VALUE
+        self.camera_state = NO_VALUE
         self.run_note = ""
-        self.watch_state_text = "-"
+        self.watch_state_text = NO_VALUE
         if not self.demo:
             self.apply_audio()
         self.poll()
@@ -210,6 +192,8 @@ class Controller:
         """設定値。特別キー "mirror_current" は現在のレンズに対応する左右反転。"""
         if key == "mirror_current":
             key = mirror_key(self.settings)
+        if key == "language" and self._language_trial is not None:
+            return self._language_trial["new"]      # 試している間は、選んだ言語を見せる (保存するまで設定は変えない)
         return self.settings.get(key, default)
 
     def changed(self, key, value, group=None):
@@ -247,8 +231,53 @@ class Controller:
         self.changed("theme", mode if mode in ("system", "light", "dark") else "system", None)
 
     def set_language(self, lang):
-        """言語を保存する (文言は次回起動で切り替わる)。"""
-        self.changed("language", lang, None)
+        """言語を選んだ: すぐに全体の表示をその言語にする。保存はまだしない。
+        見た目が変わるときは language_trial を発火して、画面が「保存 / 元に戻す」のダイアログを出す
+        (keep_language() で保存、revert_language() か時間切れで元の言語に戻す。Windows の解像度の変更と同じ流れ)。"""
+        lang = lang if lang in LANGUAGE_CHOICES else "system"
+        trial = self._language_trial
+        old = trial["old"] if trial else self.settings.get("language", "system")
+        if lang == old:
+            if trial:
+                self.revert_language()       # 試している途中で元の言語を選び直した
+            return
+        if trial is None:
+            if resolve_language(lang) == get_language():
+                self.changed("language", lang, None)   # 表示は変わらない (「システムに合わせる」で同じ言語になる、など): そのまま保存
+                return
+            trial = self._language_trial = {"old": old, "old_language": get_language()}
+        trial["new"] = lang
+        self._apply_language(lang)
+        self.language_trial.emit(lang, trial["old_language"])
+
+    def keep_language(self):
+        """試している言語を設定に保存する。"""
+        trial, self._language_trial = self._language_trial, None
+        if trial is not None:
+            self.changed("language", trial["new"], None)
+
+    def revert_language(self):
+        """試している言語をやめて、元の言語に戻す (設定は変えない)。"""
+        trial, self._language_trial = self._language_trial, None
+        if trial is not None:
+            self._apply_language(trial["old"])
+
+    @property
+    def language_trial_active(self):
+        return self._language_trial is not None
+
+    def _apply_language(self, lang):
+        """表示言語を切り替えて、画面に作り直させる。"""
+        set_language(lang)
+        if self._banner_factory is not None and self.update_banner:
+            self.update_banner = self._banner_factory()
+            self.update_changed.emit(self.update_banner)
+        if self.demo and self.status and self.status.connected:
+            self.stream_state_text = t("connection.stream.live")
+            self.camera_state = t("connection.camera.running")
+        self.language_changed.emit(get_language())
+        self._last_emit = 0.0
+        self.poll()      # 状態の文言 (つながっていません など) を新しい言語で作り直す
 
     # ------------------------------------------------------------------
     # 接続・配信
@@ -554,18 +583,20 @@ class Controller:
         def dismiss():
             self._dismissed_update = tag
             self.update_banner = None
+            self._banner_factory = None
             self.update_changed.emit(None)
 
         def skip():
             self.changed("update_skip_version", version)
             dismiss()
 
-        self.update_banner = {
+        self._banner_factory = lambda: {
             "text": t("update.banner.title", version=version),
             "actions": [(t("update.banner.now"), lambda: self.update_action.emit("install", result)),
                         (t("update.banner.notes"), lambda: self.update_action.emit("notes", result)),
                         (t("update.banner.later"), dismiss), (t("update.banner.skip"), skip)],
         }
+        self.update_banner = self._banner_factory()
         self.update_changed.emit(self.update_banner)
 
     def _apply_hotkeys(self):
@@ -806,7 +837,7 @@ class Controller:
         st = snap["phone_status"] if connected else {}
         self.stream_state_text = self.stream.state_text(connected, st, now)
         self.camera_state = camera_state_text(connected, st)
-        self.run_note = AUTO_UNSUPPORTED_NOTE if self.stream.auto_unsupported() else ""
+        self.run_note = auto_unsupported_note() if self.stream.auto_unsupported() else ""
 
     # ------------------------------------------------------------------
     # iPhone 側の操作の取り込み
@@ -903,17 +934,18 @@ class Controller:
             status_text = self._phone_note[0]
 
         res = snap["resolution"] or "-"
-        if "→" in res:
-            res = res.split("→", 1)[1].replace("出力", "").strip()
+        if "→" in res:    # 「受信 1920x1080 → 出力 1280x720」(言語によって語が違う) から出力側の大きさだけ取り出す
+            size = re.search(r"\d+\s*x\s*\d+", res.split("→", 1)[1])
+            res = size.group(0) if size else res.split("→", 1)[1].strip()
         fps = snap["recv_fps"]
-        res_fps = "%s · %.0ffps" % (res, fps) if connected and res != "-" else "-"
+        res_fps = "%s · %.0ffps" % (res, fps) if connected and res != "-" else NO_VALUE
         if self.demo and self.demo_latency_ms is not None and connected:
             lat = self.demo_latency_ms
         else:
             lat = self.link.latency.averages().get("total") if connected else None
         thermal = st.get("thermalState")
-        thermal_text = t("connection.thermal." + thermal) if thermal in ("nominal", "fair", "serious", "critical") else "-"
-        battery = "-"
+        thermal_text = t("connection.thermal." + thermal) if thermal in ("nominal", "fair", "serious", "critical") else NO_VALUE
+        battery = NO_VALUE
         if "batteryLevel" in st:
             try:
                 lv = float(st.get("batteryLevel", -1))
@@ -940,11 +972,11 @@ class Controller:
             recv_fps=fps,
             rx_fps=snap.get("rx_fps", 0.0),
             decode_ms=snap["decode_ms"],
-            latency_text="%d ms" % round(lat) if lat is not None else "-",
+            latency_text="%d ms" % round(lat) if lat is not None else NO_VALUE,
             thermal=thermal,
             thermal_text=thermal_text,
             battery_text=battery,
-            warn_text=THERMAL_WARNING if (connected and is_thermal_warning(thermal)) else "",
+            warn_text=thermal_warning() if (connected and is_thermal_warning(thermal)) else "",
             phone_muted=bool(connected and st.get("micMuted")),
             stream_text=self.stream_state_text,
             camera_text=self.camera_state,
@@ -1034,7 +1066,7 @@ class Controller:
             phone_status={"deviceName": "iPhone 13", "thermalState": "nominal", "batteryLevel": 0.82,
                           "batteryState": "unplugged", "cameraRunning": True, "streamActive": True})
         c.stream.mode_changed()
-        c.stream_state_text = "配信中"
-        c.camera_state = "動作中"
+        c.stream_state_text = t("connection.stream.live")
+        c.camera_state = t("connection.camera.running")
         c.poll()
         return c

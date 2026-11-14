@@ -5,6 +5,7 @@
 import threading
 from collections import deque
 from phonecam.core.deps import av
+from phonecam.i18n import t
 from phonecam.core.protocol import MSG_VIDEO, MSG_VIDEO_HEVC
 
 
@@ -205,7 +206,7 @@ class DecoderManager:
             return False
         self._fail += 1
         if self._ok == 0 and self._fail >= HW_MAX_FAILS:
-            return self.disable_hw("ハードウェアデコードで映像を出せませんでした")
+            return self.disable_hw(t("core.decoder.hw_failed"))
         return False
 
     def disable_hw(self, reason):
@@ -264,14 +265,14 @@ def make_decoder(codec="h264", hw=False, info=None):
         try:
             cls = _hwaccel_class()
             if cls is None:
-                raise RuntimeError("PyAV がハードウェアデコードに対応していません")
+                raise RuntimeError(t("core.decoder.no_pyav_hw"))
             ctx = av.CodecContext.create(codec, "r", hwaccel=cls(device_type=HW_DEVICE_TYPE, allow_software_fallback=False))
             _tune_decoder(ctx, threads=False)
             ctx.open()  # デバイスが作れないならここで例外になる
             info["hw"] = True
             return ctx
         except Exception as e:
-            info["hw_error"] = "ハードウェアデコードを開始できませんでした (%s)" % e
+            info["hw_error"] = t("core.decoder.hw_start_failed", error=e)
     ctx = av.CodecContext.create(codec, "r")
     _tune_decoder(ctx)
     return ctx

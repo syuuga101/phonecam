@@ -78,3 +78,100 @@ def test_stale_phone_edit_does_not_lower_the_last_seen_sequence():
     ctrl._apply_phone_edit({"phoneEdit": {"seq": 2, "zoom": 2.0}})
     ctrl._apply_phone_edit({"phoneEdit": {"seq": 3, "zoom": 2.5}})
     assert ctrl.get("zoom") == 3.0
+
+
+def _language_controller():
+    ctrl = receiver.Controller(persist=False, demo=True)
+    ctrl.settings["language"] = "ja"
+    from phonecam import i18n
+    i18n.set_language("ja")
+    return ctrl
+
+
+def test_language_choice_switches_at_once_and_saves_only_when_kept():
+    from phonecam import i18n
+    ctrl = _language_controller()
+    changed, trials, saved = Mock(), Mock(), Mock()
+    ctrl.language_changed.connect(changed)
+    ctrl.language_trial.connect(trials)
+    ctrl.settings_changed.connect(saved)
+    ctrl.set_language("en")
+    assert i18n.get_language() == "en"                       # すぐ切り替わる
+    assert ctrl.settings["language"] == "ja"                 # 保存はまだ
+    assert ctrl.get("language") == "en"                      # 画面の選択肢は選んだ言語を見せる
+    changed.assert_called_with("en")
+    trials.assert_called_once_with("en", "ja")
+    assert ctrl.language_trial_active
+    ctrl.keep_language()
+    assert ctrl.settings["language"] == "en" and i18n.get_language() == "en"
+    saved.assert_called_with("language", "en")
+    assert not ctrl.language_trial_active
+
+
+def test_language_revert_restores_language_and_setting():
+    from phonecam import i18n
+    ctrl = _language_controller()
+    ctrl.set_language("en")
+    ctrl.revert_language()
+    assert i18n.get_language() == "ja"
+    assert ctrl.settings["language"] == "ja" and ctrl.get("language") == "ja"
+    assert not ctrl.language_trial_active
+    ctrl.revert_language()      # 何度呼んでも壊れない
+    ctrl.keep_language()
+    assert ctrl.settings["language"] == "ja"
+
+
+def test_language_choice_that_changes_nothing_is_saved_without_asking():
+    ctrl = _language_controller()
+    trials = Mock()
+    ctrl.language_trial.connect(trials)
+    ctrl.set_language("system")         # 日本語の環境なら「システムに合わせる」でも見た目は同じ
+    from phonecam import i18n
+    if i18n.system_language() == "ja":
+        trials.assert_not_called()
+        assert ctrl.settings["language"] == "system"
+
+
+def test_picking_the_old_language_again_cancels_the_trial():
+    from phonecam import i18n
+    ctrl = _language_controller()
+    ctrl.set_language("en")
+    ctrl.set_language("ja")
+    assert not ctrl.language_trial_active and i18n.get_language() == "ja"
+    assert ctrl.settings["language"] == "ja"
+
+
+def test_language_change_rebuilds_status_text_in_the_new_language():
+    from phonecam import i18n
+    ctrl = _language_controller()
+    ctrl.poll()
+    ja = ctrl.status.state_text
+    ctrl.set_language("en")
+    assert ctrl.status.state_text == i18n.t("connection.state.off")
+    assert ctrl.status.state_text != ja
+    ctrl.revert_language()
+    assert ctrl.status.state_text == ja
+
+
+def test_callbacks_connected_while_building_a_page_can_be_dropped_together():
+    from phonecam.core.callbacks import CallbackList
+    signal = CallbackList()
+    outside, inside, other = Mock(), Mock(), Mock()
+    signal.connect(outside)
+    scope, other_scope = object(), object()
+    CallbackList.scope = scope
+    try:
+        signal.connect(inside)
+    finally:
+        CallbackList.scope = None
+    CallbackList.scope = other_scope
+    try:
+        signal.connect(other)
+    finally:
+        CallbackList.scope = None
+    CallbackList.drop_scope(None)       # 目印なしでは何も外さない
+    signal.emit(1)
+    assert outside.call_count == inside.call_count == other.call_count == 1
+    CallbackList.drop_scope(scope)
+    signal.emit(2)
+    assert outside.call_count == 2 and other.call_count == 2 and inside.call_count == 1
