@@ -213,18 +213,26 @@ jobs:
           else { Write-Host "--selftest 成功" }
           Show-Logs
 
-          # 3. --setup-diagnose (Tk とウィザードの経路の import)。5 秒生きていれば成功、先に終了したときは exit code 0 のみ成功
-          $d = Start-Process -FilePath $exe -ArgumentList "--setup-diagnose" -PassThru
-          Start-Sleep -Seconds 5
-          if ($d.HasExited) {
-            if ($d.ExitCode -ne 0) { Write-Host "::error::--setup-diagnose が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
-            else { Write-Host "--setup-diagnose は正常終了" }
-          } else {
-            Write-Host "--setup-diagnose は動作中 (成功扱い)"
-            Stop-Process -Id $d.Id -Force
+          # 3. --setup-diagnose / --setup-wizard (Qt 版の診断とウィザード)。PHONECAM_SMOKE=1 では、画面を作って 3 秒後に
+          #    「tkinter が読み込まれていないこと」を setup_smoke_<名前>.txt に記録して自分で閉じる (読み込まれていたら exit code 3)
+          foreach ($mode in @("--setup-diagnose", "--setup-wizard")) {
+            $name = $mode -replace '^--setup-', ''
+            $d = Start-Process -FilePath $exe -ArgumentList $mode -PassThru
+            if (-not $d.WaitForExit(60000)) {
+              Stop-Process -Id $d.Id -Force
+              Write-Host "::error::$mode が 60 秒で終わりませんでした (画面が開いて閉じるまでの動作を確認できません)"; $failed = $true
+            }
+            elseif ($d.ExitCode -ne 0) { Write-Host "::error::$mode が異常終了しました (exit code $($d.ExitCode))"; $failed = $true }
+            else { Write-Host "$mode は正常終了" }
+            $mark = Join-Path $logDir ("setup_smoke_" + $name + ".txt")
+            if (Test-Path $mark) {
+              $text = (Get-Content $mark -Raw).Trim()
+              Write-Host "$mode : $text"
+              if ($text -notmatch "tkinter loaded: False") { Write-Host "::error::$mode で tkinter が読み込まれています"; $failed = $true }
+            } else { Write-Host "::error::$mode の確認ファイル ($mark) がありません"; $failed = $true }
+            Show-Logs
+            if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
           }
-          Show-Logs
-          if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
 
           if ($failed) { throw "起動テストに失敗しました" }
 

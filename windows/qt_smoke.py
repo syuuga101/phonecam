@@ -8,6 +8,9 @@
 window.grab() で PNG にする。倍率は QT_SCALE_FACTOR を変えた子プロセスで切り替える。
 各ページについて、スクロール位置を中ほどにした画像 (*_scroll.png) も撮る。
 ページの build が失敗していたら終了コード 1 (画像は撮れた分だけ残す)。
+最後に、セットアップのウィザード (ようこそ / 確認 / インストール / iPhone の 7 段階) と AltServer の診断も、
+サンプルの検出結果で x {ライト, ダーク} 撮る (setup_*.png)。本体から開く経路 (同じプロセスのダイアログ) と、
+tkinter が読み込まれないことも確かめる。
 カメラが 1 台のときは「カメラ」ページとカメラの切り替えが出ないことを確かめ、2 台にしたあとは
 カメラページ・2 台目の接続ページ・音声ページ・「カメラを追加」ウィザード (3 ステップ)・iPhone の選択ダイアログも撮る。
 """
@@ -52,6 +55,262 @@ def _sample_frame():
     mask = (x - w * 0.5) ** 2 + (y - h * 0.45) ** 2 < (h * 0.28) ** 2
     img[mask] = (235, 200, 170)
     return img
+
+
+# ---------------------------------------------------------------------------
+# セットアップ (ウィザード・診断)
+# ---------------------------------------------------------------------------
+
+def _footer_visible(dlg):
+    """下のボタン行 (次へ) が、ウィンドウの中に見えている。"""
+    from PySide6.QtCore import QPoint
+    btn = dlg.next_btn
+    if not btn.isVisibleTo(dlg):
+        return True   # このページでは次へを出さない
+    top = btn.mapTo(dlg, QPoint(0, 0)).y()
+    return top >= 0 and top + btn.height() <= dlg.height()
+
+
+def _overflow(dlg):
+    """本文の中で、右端が表示幅からはみ出している部品 (文字切れの疑い)。"""
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QWidget
+    body = dlg.scroll.widget()
+    width = dlg.scroll.viewport().width()
+    bad = []
+    for w in body.findChildren(QWidget):
+        if not w.isVisibleTo(body):
+            continue
+        right = w.mapTo(body, QPoint(w.width(), 0)).x()
+        if right > width + 1:
+            bad.append("%s right=%d > %d" % (type(w).__name__, right, width))
+    return bad
+
+
+def setup_shots(app, ctrl, win, out, scale):
+    """ウィザード全段階と診断ダイアログ x {ライト, ダーク} を撮る。失敗の一覧 [(名前, 理由)] を返す。"""
+    import tempfile
+    import threading
+    from PySide6.QtCore import Qt
+    import phonecam_setup as ps
+    from phonecam.i18n import t
+    from phonecam.qt.setup_common import Fold, QtRoot
+    from phonecam.qt.setup_diag import DiagnosticsDialog
+    from phonecam.qt.setup_wizard import SetupWizardDialog
+
+    failed = []
+    tk_before = "tkinter" in sys.modules
+    iphone = ps.iphone
+    fake_snap = {"service": True, "usb": ["00008110-001A2B3C4D5E6F01"], "trusted": True}
+    saved = (iphone.query_usbmux, iphone.altserver_running, iphone.probe_phonecam, ps.find_altserver, ps.find_itunes,
+             dict(ps._host))
+    iphone.query_usbmux = lambda *a, **k: fake_snap
+    iphone.altserver_running = lambda *a, **k: False
+    iphone.probe_phonecam = lambda *a, **k: False
+    ps.find_altserver = lambda: r"C:\Program Files (x86)\AltServer\AltServer.exe"
+    ps.find_itunes = lambda: None
+    ps.bind(is_frozen=lambda: True, link_connected=lambda: False)
+    tmp = tempfile.mkdtemp(prefix="pcsetup")
+    S_OK, S_MISS, S_WARN = ps.STATE_OK, ps.STATE_MISSING, ps.STATE_WARN
+    statuses = {
+        "camera": {"state": S_MISS, "detail": ""},
+        "vcredist": {"state": S_OK, "detail": ""},
+        "itunes": {"state": S_WARN, "detail": t("setup.wizard.detect_itunes_3")},
+        "icloud": {"state": S_MISS, "detail": ""},
+        "altserver": {"state": S_MISS, "detail": ""},
+        "vbcable": {"state": S_MISS, "detail": ""},
+    }
+
+    def make_controller():
+        c = ps.SetupController(QtRoot(), detector=lambda: statuses,
+                               engine=ps.SetupEngine(directory=tmp, detector=lambda: statuses))
+        c.statuses = dict(statuses)
+        c.checked = True
+        c.apply_defaults()
+        return c
+
+    def make_flow(phase, ids=("itunes", "icloud", "altserver")):
+        flow = ps.GuidedFlow(list(ids), tmp, detector=lambda: statuses)
+        flow.phase = phase
+        flow.statuses = dict(statuses)
+        flow.job = {"path": os.path.join(tmp, "x.exe"), "args": [], "cwd": tmp, "sha256": "0"}
+        return flow
+
+    def settle_dialog(dlg, ms=350):
+        _settle(app, ms)
+        dlg.grab()      # 1 回目は保留中のレイアウトを確定させるだけ
+        _settle(app, 200)
+
+    def snap(dlg, name, theme, check_scroll=False):
+        settle_dialog(dlg)
+        dlg.grab().save(os.path.join(out, "%s_%s_x%s.png" % (name, theme, scale)))
+        if not _footer_visible(dlg):
+            failed.append((name, "footer button is outside the window"))
+        for line in _overflow(dlg):
+            failed.append((name, "overflow: " + line))
+        if check_scroll:
+            # 低いウィンドウでスクロール: ヘッダとボタン行は動かず、本文だけが動く
+            dlg.resize(720, 440)
+            settle_dialog(dlg, 250)
+            bar = dlg.scroll.verticalScrollBar()
+            bar.setValue(bar.maximum() // 2)
+            _settle(app, 150)
+            dlg.grab().save(os.path.join(out, "%s_scroll_%s_x%s.png" % (name, theme, scale)))
+            if not _footer_visible(dlg):
+                failed.append((name, "scrolled: footer button is outside the window"))
+            if bar.maximum() <= 0:
+                failed.append((name, "scrolled: body does not scroll at a low window (max=%d)" % bar.maximum()))
+            dlg.resize(720, 760)
+            _settle(app, 250)
+
+    def new_dialog(controller, **kw):
+        dlg = SetupWizardDialog(controller, None, **kw)
+        dlg.auto_fit = False
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        dlg._visited.update(step["id"] for step in iphone.IPHONE_STEPS)   # 自動で次へ進めない (全段階を順に撮る)
+        dlg.resize(720, 760)
+        dlg.show()
+        _settle(app, 250)
+        return dlg
+
+    def show(dlg, page):
+        """ページを開く。検出・時計のタイマーは止める (撮るたびに内容が変わらないように)。"""
+        dlg.show_page(page)
+        dlg._pump_timer.stop()
+        dlg._guided_timer.stop()
+        dlg._hop_timer.stop()
+
+    def close_dialog(dlg):
+        dlg._end(lambda: None)
+        dlg.deleteLater()
+        _settle(app, 100)
+
+    try:
+        for theme in THEMES:
+            ctrl.set_theme(theme)
+            _settle(app)
+            # 0 ようこそ / 1 必要なソフトの確認 (マイクの選択つき)
+            c = make_controller()
+            dlg = new_dialog(c, update_version="2.8.0")
+            snap(dlg, "setup_00_welcome", theme)
+            show(dlg, ps.PAGE_CHECK)
+            snap(dlg, "setup_01_check", theme, check_scroll=True)
+            dlg.mic_cb.setChecked(True)   # VB-CABLE も選ぶ
+            _settle(app, 200)
+            snap(dlg, "setup_01_check_mic", theme)
+            # 2 インストール: ダウンロード中 -> 手順つき (開く待ち) -> 手順つき (実行中・長い) -> 結果
+            c.busy = True
+            c.stage = t("setup.wizard.prepare_prog_1", name="Visual C++ Runtime", done="12.3 MB", total="24.0 MB")
+            c.progress = 0.45
+            c.log_lines = ["Visual C++ Runtime: downloaded", "PhoneCam camera: registered"]
+            show(dlg, ps.PAGE_INSTALL)
+            snap(dlg, "setup_02_install_progress", theme)
+            c.busy = False
+            c.outcome = {"results": {"camera": {"ok": True, "detail": "", "code": 0},
+                                     "vcredist": {"ok": False, "detail": t("setup.wizard.explain_exit_code_2"),
+                                                  "code": 1603, "technical": "exit code 1603"}},
+                         "manual": [], "reboot": False, "error": "", "statuses": {}, "ids": ["camera", "vcredist"]}
+            c.guided = make_flow(ps.GuidedFlow.READY)
+            c.guided.notice = t("setup.wizard.guidedflow_prepare_7")
+            show(dlg, ps.PAGE_INSTALL)
+            snap(dlg, "setup_02_install_guided_ready", theme, check_scroll=True)
+            c.guided.phase = ps.GuidedFlow.RUNNING
+            c.guided.notice = ""
+            c.guided.launched_at = c.guided.clock() - 200
+            c.guided.detected = True
+            show(dlg, ps.PAGE_INSTALL)
+            snap(dlg, "setup_02_install_guided_running", theme)
+            c.guided.finished = True
+            c.guided.results = {"itunes": {"ok": True, "skipped": False, "detail": ""},
+                                "icloud": {"ok": False, "skipped": True, "detail": t("setup.wizard.guidedflow_skip_1")},
+                                "altserver": {"ok": True, "skipped": False, "detail": ""}}
+            c.outcome["results"].update({k: dict(v, code=None) for k, v in c.guided.results.items()})
+            c.outcome["ids"] += ["itunes", "icloud", "altserver"]
+            c.outcome["reboot"] = True
+            show(dlg, ps.PAGE_INSTALL)
+            snap(dlg, "setup_02_install_done", theme)
+            # 3〜9 iPhone の手順 (全 7 段階)
+            for i, step in enumerate(iphone.IPHONE_STEPS):
+                show(dlg, ps.PAGE_IPHONE + i)
+                dlg.snap = fake_snap
+                dlg._render_chip()
+                name = "setup_step%d_%s" % (i + 1, step["id"])
+                snap(dlg, name, theme, check_scroll=step["id"] in ("altstore", "phonecam"))
+                if step["id"] == "itunes":
+                    dlg.confirm_cb.setChecked(True)   # 「済んだ」
+                    _settle(app, 200)
+                    snap(dlg, name + "_confirmed", theme)
+                if step["id"] == "altstore":
+                    folds = dlg.findChildren(Fold)
+                    if len(folds) != 2:
+                        failed.append((name, "expected 2 folds (requirements / error 2003), got %d" % len(folds)))
+                    for fold in folds:
+                        fold.set_open(True)
+                    _settle(app, 250)
+                    snap(dlg, name + "_folds", theme, check_scroll=True)
+            close_dialog(dlg)
+            # 診断ダイアログ (実行中 -> 結果)
+            gate = threading.Event()
+            results = [ps._diag("usb", "Apple Mobile Device Service", ps.DIAG_OK, "起動しています"),
+                       ps._diag("altserver", "AltServer", ps.DIAG_NG, "起動していません", "タスクトレイから AltServer を起動してください"),
+                       ps._diag("vpn", "VPN", ps.DIAG_WARN, "Tailscale が見つかりました", "VPN をオフにしてもう一度試してください")]
+
+            def runner(progress=None):
+                if progress:
+                    progress("ネットワークの設定を確認しています…")
+                gate.wait(10)
+                return results
+
+            diag = DiagnosticsDialog(None, runner=runner)
+            diag.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+            diag.resize(720, 760)
+            diag.show()
+            snap_diag = lambda name: (settle_dialog(diag), diag.grab().save(os.path.join(out, "%s_%s_x%s.png" % (name, theme, scale))))
+            _settle(app, 500)
+            snap_diag("setup_diag_running")
+            gate.set()
+            _settle(app, 900)
+            if diag.results is None:
+                failed.append(("setup_diag", "diagnostics did not finish"))
+            snap_diag("setup_diag")
+            diag.resize(720, 440)
+            _settle(app, 300)
+            bar = diag.scroll.verticalScrollBar()
+            bar.setValue(bar.maximum() // 2)
+            _settle(app, 150)
+            diag.grab().save(os.path.join(out, "setup_diag_scroll_%s_x%s.png" % (theme, scale)))
+            if bar.maximum() <= 0:
+                failed.append(("setup_diag", "body does not scroll at a low window"))
+            diag.close()
+            diag.deleteLater()
+            _settle(app, 100)
+        # 本体から開く経路: controller.setup_requested -> 同じプロセスのダイアログ。閉じたら再判定 (setup_dialog_closed) が走る
+        ctrl._setup_open = True
+        ctrl.setup_requested.emit(False, None)
+        _settle(app, 500)
+        dialogs = win.findChildren(SetupWizardDialog)
+        if len(dialogs) != 1:
+            failed.append(("setup_open", "expected one in-process wizard dialog, got %d" % len(dialogs)))
+        else:
+            dialogs[0].auto_fit = False
+            dialogs[0]._skip()
+            _settle(app, 300)
+            if ctrl._setup_open:
+                failed.append(("setup_open", "closing the dialog did not call setup_dialog_closed"))
+            if not ctrl.get("setup_done"):
+                failed.append(("setup_open", "closing the dialog did not mark setup_done"))
+        if not tk_before and "tkinter" in sys.modules:
+            failed.append(("setup", "tkinter was imported by the setup wizard / diagnostics"))
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        failed.append(("setup", "exception while building the setup screens"))
+    finally:
+        (iphone.query_usbmux, iphone.altserver_running, iphone.probe_phonecam, ps.find_altserver, ps.find_itunes,
+         host) = saved
+        ps._host.clear()
+        ps._host.update(host)
+    return failed
 
 
 def child(scale, out):
@@ -340,6 +599,7 @@ def child(scale, out):
                         failed.append((key, "update check button stays disabled after click"))
                     win.grab().save(os.path.join(out, "cam2_%02d_%s_checked_%s_x%s.png" % (i, key, theme, scale)))
     failed += list(win.page_errors)
+    failed += setup_shots(app, ctrl, win, out, scale)
     win.close()
     if failed:
         for key, err in failed:
