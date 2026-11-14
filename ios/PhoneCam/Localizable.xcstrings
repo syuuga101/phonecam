@@ -309,28 +309,6 @@
         }
       }
     },
-    "翻訳に参加する" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Help translate"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻訳に参加する"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "翻訳に参加する"
-          }
-        }
-      }
-    },
     "画面" : {
       "localizations" : {
         "en" : {
