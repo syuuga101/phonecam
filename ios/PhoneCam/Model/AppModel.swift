@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     @Published var torchAvailable = false
     /// ピンチ中は、遅れて届くステータスの zoom で画面の値を戻さない
     var zoomGestureActive = false
-    @Published var micMuted = false
+    @Published var micMuted = UserDefaults.standard.bool(forKey: "micMuted")   // iPhone で設定した値を覚えている
     @Published var outputCanvas: OutputCanvas?
     @Published var cameraSize = CGSize(width: 1920, height: 1080)   // カメラ素の向き (横長) のサイズ
     @Published var previewAngle = 90                                 // プレビュー接続の回転角 (0/90/180/270)
@@ -304,6 +304,7 @@ final class AppModel: ObservableObject {
             self.encoder.requestKeyframe()
             self.updateCameraRunning()
             self.sendFullStatus()
+            self.camera.announceMuteIfNeeded()   // iPhone でミュート中なら PC に知らせる
             self.camera.requestPublish()   // 最新のカメラ状態は sessionQueue で作って onApplied で届く
             DispatchQueue.main.async {
                 self.streamActiveUI = true
@@ -708,6 +709,86 @@ final class AppModel: ObservableObject {
     }
 
     private var lastZoomSend = 0.0
+
+    // MARK: ズームの表示 (ピンチの HUD / ダイヤル)
+
+    @Published var zoomHUDVisible = false
+    /// プレビューの全画面表示 (ContentView がレイアウトごと切り替える。fullScreenCover は使わない)
+    @Published var previewFullscreen = false
+
+    func setPreviewFullscreen(_ on: Bool) {
+        if on { previewEnabled = true }
+        previewFullscreen = on
+    }
+    @Published var zoomDialActive = false
+    private var zoomHUDWork: DispatchWorkItem?
+    private var dialBase: Double?
+    private var dialLastDisplay = 1.0
+    private var dialCloseWork: DispatchWorkItem?
+    /// ダイヤルで 2 倍にするのに必要なドラッグ量 (pt)
+    static let dialPointsPerOctave: CGFloat = 120
+    static let dialMajorStops: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 20]
+
+    /// 画面に出す倍率 (超広角レンズの videoZoomFactor 1.0 は純正カメラの 0.5×)
+    var zoomDisplayFactor: Double { lens == "ultrawide" ? 0.5 : 1.0 }
+    var zoomText: String { String(format: "%.1f×", zoom * zoomDisplayFactor) }
+
+    /// ピンチの HUD ("2.0×") を出し、少ししたら消す
+    func flashZoomHUD() {
+        zoomHUDWork?.cancel()
+        zoomHUDVisible = true
+        let w = DispatchWorkItem { [weak self] in self?.zoomHUDVisible = false }
+        zoomHUDWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: w)
+    }
+
+    func holdZoomHUD() {
+        zoomHUDWork?.cancel()
+        zoomHUDVisible = true
+    }
+
+    /// ダイヤルのドラッグ (dx = ドラッグ開始からの横移動。左へ動かすと倍率が上がる)
+    func dialDrag(_ dx: CGFloat) {
+        dialCloseWork?.cancel()
+        if !zoomDialActive {
+            zoomDialActive = true
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        if dialBase == nil {
+            dialBase = zoom
+            zoomGestureActive = true
+            dialLastDisplay = zoom * zoomDisplayFactor
+        }
+        guard let base = dialBase else { return }
+        setZoom(base * pow(2.0, Double(-dx / AppModel.dialPointsPerOctave)), final: false)
+        let now = zoom * zoomDisplayFactor
+        let prev = dialLastDisplay
+        dialLastDisplay = now
+        for m in AppModel.dialMajorStops where (prev - m) * (now - m) < 0 || (now == m && prev != m) {
+            UISelectionFeedbackGenerator().selectionChanged()
+            break
+        }
+    }
+
+    /// 指を離した。最後の値を必ず送り、約 2 秒操作がなければダイヤルを閉じる
+    func dialEnd() {
+        if dialBase != nil {
+            dialBase = nil
+            setZoom(zoom, final: true)
+            zoomGestureActive = false
+        }
+        dialCloseWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.zoomDialActive = false }
+        dialCloseWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: w)
+    }
+
+    /// VoiceOver の増減用
+    func dialStep(_ up: Bool) {
+        dialCloseWork?.cancel()
+        setZoom(zoom * (up ? 1.1 : 1.0 / 1.1), final: true)
+        dialEnd()
+    }
 
     func toggleMute() {
         let v = !micMuted

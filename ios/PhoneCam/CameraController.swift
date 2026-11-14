@@ -36,7 +36,10 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private var audioInput: AVCaptureDeviceInput?
     private var audioOutputAdded = false
     private var micWanted = false          // PC からの "mic"
-    private var micMuted = false           // ミュート (true の間は音声パケットを一切送らない)。sessionQueue 上
+    private var micMuted = false           // 実効ミュート = userMuted || pcMuted (true の間は音声パケットを一切送らない)。sessionQueue 上
+    // iPhone 側で操作したミュート (UserDefaults に保存し、音声が始まる前から有効。PC の micMuted=false では解除されない)
+    private var userMuted = UserDefaults.standard.bool(forKey: "micMuted")
+    private var pcMuted = false            // PC 側からのミュート (保存しない)
     private var phoneEditSeq = 0           // iPhone 側で操作するたびに増やす (sessionQueue 上)
     private var recAudioWanted = false     // 録画に音声を入れる
     private var audioRequestPending = false
@@ -104,6 +107,7 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
 
     override init() {
         super.init()
+        micMuted = userMuted
         NotificationCenter.default.addObserver(
             forName: .AVCaptureSessionRuntimeError,
             object: session,
@@ -344,7 +348,8 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         return def
     }
 
-    private func applyOnQueue(_ json: [String: Any]) {
+    /// fromPhone = iPhone 側の操作 (phoneChange)。false は PC からの制御。
+    private func applyOnQueue(_ json: [String: Any], fromPhone: Bool = false) {
         var parts = Set<String>()
         var needReconfigure = false
 
@@ -399,8 +404,17 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         }
 
         // PC / iPhone からのミュート (seq は applyOnQueue の呼び出し側 = phoneChange だけが増やす)
+        // iPhone の操作: ミュート / 解除とも両方の状態を揃える。PC からの制御: PC 側のミュートだけを更新し、
+        // iPhone で設定済みのミュート (userMuted) は PC の micMuted=false では解除しない。
         if let mm = json["micMuted"] as? NSNumber {
-            micMuted = mm.boolValue
+            if fromPhone {
+                userMuted = mm.boolValue
+                pcMuted = false
+                UserDefaults.standard.set(userMuted, forKey: "micMuted")
+            } else {
+                pcMuted = mm.boolValue
+            }
+            micMuted = userMuted || pcMuted
             updateSendFlag()
         }
 
@@ -466,7 +480,17 @@ final class CameraController: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             }
             guard !json.isEmpty else { return }
             if bump { self.phoneEditSeq += 1 }
-            self.applyOnQueue(json)
+            self.applyOnQueue(json, fromPhone: true)
+        }
+    }
+
+    /// 接続直後、iPhone 側でミュート中なら PC に知らせる (phoneEdit.seq を 1 つ進めて publish)。
+    /// PC は接続後の最初の status の seq を基準にし、その後に増えたときだけ取り込むため、少し待ってから進める。
+    func announceMuteIfNeeded() {
+        sessionQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self = self, self.micMuted else { return }
+            self.phoneEditSeq += 1
+            self.publishState()
         }
     }
 
