@@ -7,7 +7,8 @@ import socket
 import threading
 import time
 from phonecam.core.crashlog import log_error
-from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, flip_image, pad_color_for
+from phonecam.core.profiling import PROFILE
+from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, flip_image, packed_image, pad_color_for
 from phonecam.core.decoder import (
     BacklogGuard,
     DecoderManager,
@@ -556,7 +557,7 @@ class Link:
         canvas = canvas_size(self.settings)
         self.last_frame_size = (frame.width, frame.height)
         if canvas is None or canvas == (frame.width, frame.height):
-            return frame.to_ndarray(format=fmt)
+            return packed_image(frame.reformat(format=fmt))
         return fitter.process(frame, fmt, canvas, self.settings.get("fit", "pad"), pad_color_for(self.settings))
 
     def _ping_loop(self, ping_stop):
@@ -567,6 +568,12 @@ class Link:
                 break
 
     def _note_thinned(self, mailbox, guard):
+        if PROFILE is not None:
+            slot = self.vcam.slot
+            previous_guard, previous_mailbox = self._profile_skips
+            PROFILE.count(slot, "guard_skipped", guard.skipped - previous_guard)
+            PROFILE.count(slot, "mailbox_overwritten", mailbox.skipped - previous_mailbox)
+            self._profile_skips = guard.skipped, mailbox.skipped
         total = guard.skipped + mailbox.skipped
         if total != self.state.thin_total:
             self.state.update(thin_total=total, thin_last=time.monotonic())
@@ -582,10 +589,18 @@ class Link:
                         break
                     continue
                 frame, timing, t_recv = item
+                if PROFILE is not None:
+                    slot = self.vcam.slot
+                    started = time.perf_counter()
+                    PROFILE.add(slot, "receive_to_output", (started - t_recv) * 1000)
                 self.vcam.apply_pending_reset()
                 fmt = self.vcam.frame_format()
                 try:
+                    if PROFILE is not None:
+                        start_convert = time.perf_counter()
                     img = self._frame_to_image(frame, fmt, fitter)
+                    if PROFILE is not None:
+                        PROFILE.add(slot, "convert_fit", (time.perf_counter() - start_convert) * 1000)
                 except Exception:
                     if not decoders.hw_active:
                         raise
@@ -595,10 +610,20 @@ class Link:
                     self.request_keyframe(force=True)
                     continue
                 decoders.note_ok()
+                if PROFILE is not None:
+                    start_flip = time.perf_counter()
                 img = flip_image(img, bool(self.settings.get(mirror_key(self.settings))),
                                  bool(self.settings.get("rotate180")))
                 fps_val = self.state.phone_status.get("fps", 60) or 60
+                if PROFILE is not None:
+                    before_send = time.perf_counter()
+                    PROFILE.add(slot, "flip", (before_send - start_flip) * 1000)
                 self.vcam.send(img, fps_val)
+                if PROFILE is not None:
+                    done = time.perf_counter()
+                    PROFILE.add(slot, "output_send", (done - before_send) * 1000)
+                    PROFILE.add(slot, "output_total", (done - started) * 1000)
+                    PROFILE.count(slot, "output_frames")
                 if timing is not None:
                     self.latency.add_frame(timing[0], timing[1], t_recv, time.perf_counter())
                 self._fps_count += 1
@@ -630,12 +655,16 @@ class Link:
         self._rx_count, self._rx_last, self._rx_t0 = 0, 0, time.monotonic()
         mailbox = FrameMailbox()
         guard = BacklogGuard()
+        if PROFILE is not None:
+            self._profile_skips = (0, 0)
         worker = threading.Thread(target=self._output_loop, args=(mailbox, decoders, fitter),
                                   name="phonecam-output", daemon=True)
         worker.start()
         prev_capture = None
         try:
             while not stop.is_set():
+                if PROFILE is not None:
+                    before_read = time.perf_counter()
                 msg_type, payload = read_msg(sock, stop)
                 t_recv = time.perf_counter()
                 if self._out_error is not None:
@@ -643,6 +672,9 @@ class Link:
                 codec_name = codec_for_msg(msg_type)
                 if codec_name is not None:
                     self._rx_count += 1
+                    if PROFILE is not None:
+                        PROFILE.add(self.vcam.slot, "receive_wait", (t_recv - before_read) * 1000)
+                        PROFILE.count(self.vcam.slot, "received_frames")
                     timing, pending_timing = pending_timing, None
                     # フレームを作る間隔と、通信の遅れ (時計のずれ込み) を見積もる
                     interval_ms = 1000.0 / float(self.state.phone_status.get("fps", 30) or 30)
@@ -673,6 +705,9 @@ class Link:
                         continue
                     dt = (time.perf_counter() - t0) * 1000.0
                     self._decode_avg = dt if self._decode_avg == 0.0 else self._decode_avg * 0.9 + dt * 0.1
+                    if PROFILE is not None:
+                        PROFILE.add(self.vcam.slot, "decode", dt)
+                        PROFILE.count(self.vcam.slot, "decoded_frames", len(frames))
                     guard.note_decode(dt, interval_ms)
                     if guard.behind() and not guard.lagging:
                         self.request_keyframe()  # 遅れ始めた: 次のパケットから省略に入るので、先にキーフレームを要求
@@ -691,6 +726,11 @@ class Link:
                                     identity_ok = self.routes.note_identity(self, st.get("deviceId"))
                                 if identity_ok:
                                     self.state.update(phone_status=st)
+                                    if PROFILE is not None:
+                                        PROFILE.describe(self.vcam.slot, transport=self._mode,
+                                                         decoder=self.state.decoder, sent_fps=st.get("sentFps"),
+                                                         camera_drops=st.get("cameraDroppedFrames"),
+                                                         network_drops=st.get("networkDroppedFrames"))
                     except Exception:
                         pass
                     if not identity_ok:

@@ -16,6 +16,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import time
+
+from phonecam.core.profiling import PROFILE
 from phonecam.core.deps import np
 from phonecam.core.softcam_shmem import IDLE_STOP_LABELS as _IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import t
@@ -212,6 +215,8 @@ class PreviewView(QWidget):
         w, h = self._rect_size()
         dpr = self.devicePixelRatioF()
         pw, ph = max(2, int((w - 2) * dpr)), max(2, int((h - 2) * dpr))
+        if PROFILE is not None:
+            started = time.perf_counter()
         qi = frame_to_image(img, fmt, pw, ph)
         if qi is None:
             return
@@ -222,6 +227,8 @@ class PreviewView(QWidget):
         pm = QPixmap.fromImage(qi)
         pm.setDevicePixelRatio(dpr)
         self._pix = pm
+        if PROFILE is not None:
+            PROFILE.add(self.ctrl.link.vcam.slot, "preview", (time.perf_counter() - started) * 1000)
         self.update()
 
     # -- ドラッグで拡縮 -----------------------------------------------------------

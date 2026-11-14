@@ -3,6 +3,7 @@
 from threading import RLock
 import time
 
+from phonecam.core.profiling import PROFILE
 from phonecam.core.settings import DEFAULT_SETTINGS, sanitize_settings
 from phonecam.core.softcam_reg import CAMERA_SLOTS
 from phonecam.core.usbmux import usbmux_connect, usbmux_devices
@@ -348,13 +349,21 @@ class CameraGroup:
         camera.link.send_control(camera.link.controls("mic"))
 
     def tick(self):
+        if PROFILE is not None:
+            started = time.perf_counter()
         for camera in self.cameras:
+            if PROFILE is not None:
+                camera_started = time.perf_counter()
             camera.tick()
+            if PROFILE is not None:
+                PROFILE.add(camera.link.vcam.slot, "gui_camera_tick", (time.perf_counter() - camera_started) * 1000)
         for camera in list(self.retired):
             camera.tick()
             if not camera.camera_registration_busy:
                 self.retired.remove(camera)
                 camera.close()
+        if PROFILE is not None:
+            PROFILE.add(0, "gui_tick", (time.perf_counter() - started) * 1000)
 
     def close(self):
         for camera in reversed(self.cameras + self.retired):
