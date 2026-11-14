@@ -1,3 +1,4 @@
+import codecs
 import json
 import subprocess
 
@@ -217,6 +218,12 @@ class _Done:
 
 @pytest.mark.parametrize("enc", ["cp932", "utf-8"])
 def test_run_text_decodes_cp932_and_utf8(monkeypatch, enc):
+    try:
+        oem = codecs.lookup("oem").name  # Windows only; the OEM code page is cp932 on a Japanese PC
+    except LookupError:
+        oem = None
+    if enc == "cp932" and oem not in (None, "cp932"):
+        pytest.skip("OEM code page of this machine is %s, not cp932" % oem)
     raw = netsh_ja("AltServer", ALT, "プライベート").encode(enc)
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Done(raw))
     rc, txt = ps.run_text(["netsh", "advfirewall"])
