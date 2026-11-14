@@ -41,6 +41,13 @@ def camera_namespace(slot):
     return "PhoneCam" if slot == 1 else f"PhoneCam{slot}"
 
 
+def camera_display_name(slot):
+    """OBS などの DirectShow 一覧に出る名前。softcam_ext/build-slots.ps1 の $display と同じ規則
+    (スロット 1 は "PhoneCam"、2 以降は "PhoneCam 2"…)。画面に出す「OBS での名前」はすべてここから取る。"""
+    camera_namespace(slot)
+    return "PhoneCam" if slot == 1 else "PhoneCam %d" % slot
+
+
 def camera_clsid(slot):
     camera_namespace(slot)
     return PHONECAM_CLSID if slot == 1 else "{BD7AEDAC-501F-4685-9B20-BC10F70BD1%02X}" % (0x43 + slot)

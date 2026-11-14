@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """複数カメラの UI 部品。
 
-考え方は 1 つ: 「カメラ」= OBS に出る仮想カメラ (PhoneCam カメラ N)。それぞれのカメラに iPhone を 1 台割り当てる。
+考え方は 1 つ: 「カメラ」= OBS に出る仮想カメラ (PhoneCam, PhoneCam 2…)。それぞれのカメラに iPhone を 1 台割り当てる。
 割り当て (カメラ ↔ iPhone) は core/cameras.py の CameraGroup.assign() だけが書き換える。
 
   Segmented        ページ見出しの右の「カメラ 1 | カメラ 2」切り替え

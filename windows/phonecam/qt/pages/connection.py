@@ -400,7 +400,7 @@ class ConnectionPage(Page):
 
     # -- Wi-Fi ----------------------------------------------------------------------
     def _build_camera_card(self):
-        """上のカードの下の 1 枚: 「OBS での名前: PhoneCam カメラ 2 ✓ 準備済み」(未登録なら「準備する」) と、
+        """上のカードの下の 1 枚: 「OBS での名前: PhoneCam 2 ✓ 準備済み」(未登録なら「準備する」) と、
         このカメラの iPhone (2 台以上のとき)。割り当てを変えるのは「変更…」だけ。"""
         group = getattr(self.ctrl, "camera_group", None)
         self.camera_group = group
@@ -461,7 +461,7 @@ class ConnectionPage(Page):
         if not self.ctrl.frozen:
             return ""
         try:
-            from phonecam.core.softcam_reg import CAMERA_SLOTS, slot_report
+            from phonecam.core.softcam_reg import CAMERA_SLOTS, camera_display_name, slot_report
             words = {"ok": t("multi.vcam.ready"), "missing": t("multi.vcam.missing"),
                      "outdated": t("multi.vcam.outdated"), "unavailable": t("multi.vcam.tip.unavailable")}
             none = t("multi.vcam.tip.none")
@@ -472,7 +472,7 @@ class ConnectionPage(Page):
                 report = slot_report(slot)
                 if slot == mine:
                     current = report
-                lines.append(t("multi.vcam.tip.camera", n=slot, state=words.get(report["status"], report["status"]),
+                lines.append(t("multi.vcam.tip.camera", n=slot, obs=camera_display_name(slot), state=words.get(report["status"], report["status"]),
                                name=report["name"][0] or none))
             if current is not None:
                 lines.append(t("multi.vcam.tip.clsid", clsid=current["clsid"]))

@@ -208,7 +208,8 @@ class CameraGroup:
         return t("multi.camera_number", n=self.slot_of(camera))
 
     def obs_name(self, camera):
-        return t("multi.obs_name_value", n=self.slot_of(camera))
+        from phonecam.core.softcam_reg import camera_display_name
+        return camera_display_name(self.slot_of(camera))
 
     def users(self):
         """{iPhone の id: カメラ}。割り当て済みの iPhone だけ。"""

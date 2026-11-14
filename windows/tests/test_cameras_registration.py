@@ -91,3 +91,19 @@ def test_registration_uses_revision_path(monkeypatch, tmp_path, registered, inst
     assert softcam_reg.registration_status(2) == expected
     assert softcam_reg._same_path(f'"{wanted}"', str(wanted))
     winreg.OpenKey.assert_called_once_with(1, f"CLSID\\{softcam_reg.camera_clsid(2)}\\InprocServer32", 0, 2)
+
+
+def test_obs_display_names_match_build_slots_script():
+    """画面に出す「OBS での名前」は、build-slots.ps1 が DLL に埋め込む DirectShow 名と一致する。"""
+    import re
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "softcam_ext" / "build-slots.ps1").read_text(encoding="utf-8")
+    match = re.search(r'\$display\s*=\s*if\s*\(\s*\$slot\s*-eq\s*1\s*\)\s*\{\s*"([^"]+)"\s*\}\s*else\s*\{\s*"([^"$]+)\$slot"\s*\}', script)
+    assert match, "build-slots.ps1 の $display の書き方が変わった"
+    first, prefix = match.group(1), match.group(2)
+    group = cameras.CameraGroup(Controller(persist=False, demo=True))
+    for slot in softcam_reg.CAMERA_SLOTS:
+        expected = first if slot == 1 else prefix + str(slot)
+        assert softcam_reg.camera_display_name(slot) == expected
+        assert group.obs_name({"camera_slot": slot}) == expected
+    assert [softcam_reg.camera_display_name(s) for s in softcam_reg.CAMERA_SLOTS] == ["PhoneCam", "PhoneCam 2", "PhoneCam 3", "PhoneCam 4"]

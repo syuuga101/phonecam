@@ -1,7 +1,8 @@
 from unittest.mock import Mock
 
 import pytest
-from PySide6.QtWidgets import QApplication
+pytest.importorskip("PySide6.QtWidgets")
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 import phonecam_setup as setup
 from phonecam.controller import Controller
