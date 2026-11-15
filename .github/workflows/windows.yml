@@ -266,6 +266,28 @@ jobs:
             if (Has-Traceback) { Write-Host "::error::Traceback があります"; $failed = $true }
           }
 
+          # 4. 初回起動 (設定ファイルなし・PHONECAM_SMOKE なし): ダウンロードした exe を初めて開いたときの経路。
+          #    自動更新では既存の設定が残るので、この経路は通らない (v2.11.0 はここで動かなかった)。
+          #    ウィザード (メインウィンドウ内) が開くところまで通し、15 秒生きていて Traceback が無ければ成功とする。
+          #    UAC・ネットワークが要る処理はウィザードを開くだけでは動かないので、環境変数での回避は不要。
+          Remove-Item Env:\PHONECAM_SMOKE -ErrorAction SilentlyContinue
+          $first = Join-Path $env:RUNNER_TEMP "firstrun-appdata"
+          Remove-Item -Recurse -Force $first -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $first | Out-Null
+          $env:APPDATA = $first
+          $logDir = Join-Path $first "PhoneCam"
+          $f = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($f.HasExited) {
+            Write-Host "::error::初回起動 (設定なし) の exe が 15 秒以内に終了しました (exit code $($f.ExitCode))"
+            $failed = $true
+          } else {
+            Write-Host "初回起動の exe は 15 秒後も動作中 (pid $($f.Id))"
+            Stop-Process -Id $f.Id -Force
+          }
+          Show-Logs
+          if (Has-Traceback) { Write-Host "::error::初回起動でクラッシュ/エラーログに Traceback があります"; $failed = $true }
+
           if ($failed) { throw "起動テストに失敗しました" }
 
       - name: Upload exe
