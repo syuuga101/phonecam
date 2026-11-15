@@ -32,6 +32,12 @@ jobs:
           swiftc PhoneCam/PairRequest.swift PhoneCam/Packet.swift Tests/PairRequestChecks.swift -o "$RUNNER_TEMP/phonecam-pair-checks"
           "$RUNNER_TEMP/phonecam-pair-checks"
 
+      - name: Test recording session rules
+        working-directory: ios
+        run: |
+          swiftc PhoneCam/RecordingSession.swift Tests/RecordingSessionChecks.swift -o "$RUNNER_TEMP/phonecam-recording-checks"
+          "$RUNNER_TEMP/phonecam-recording-checks"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -66,6 +72,8 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/PhoneCam.app Payload/PhoneCam.app
           # 署名なしのままだと SideStore / AltStore が読み込めないことがあるため、
           # アドホック署名 (仮署名) とエンタイトルメントを付けておく。実際の署名は SideStore (AltStore) 側でやり直される
+          # get-task-allow は外さない: 再署名後の値は SideStore (AltSign) が使うプロファイル由来で、AltSign は元アプリが持つこの値を必ず残す実装のため、
+          # ここで外しても無料証明書の再署名後の値は変わらず、外す利点を確認できていない (2026-11 の監査 #22 の調査結果。PR を参照)
           cat > ent.plist <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
