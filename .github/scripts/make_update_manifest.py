@@ -19,6 +19,11 @@ import phonecam_update as update  # noqa: E402  (標準ライブラリだけで�
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):   # Windows の既定の文字コード (cp1252 など) でも、日本語のメッセージで落ちない
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
     ap.add_argument("--version", required=True)

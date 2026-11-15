@@ -19,22 +19,30 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # --- #5 管理者ヘルパーのジョブ ----------------------------------------------------------
 
-def _winget_job(tmp_path, **over):
+@pytest.fixture
+def setup_dir(tmp_path):
+    """管理者ヘルパーが受け付ける作業フォルダ (Windows では PhoneCamSetup という名前のフォルダだけ)。"""
+    d = tmp_path / "PhoneCamSetup"
+    d.mkdir()
+    return d
+
+
+def _winget_job(setup_dir, **over):
     pkg = sorted(ps.ALLOWED_WINGET)[0]
-    job = {"version": 1, "result": str(tmp_path / "result.json"), "progress": str(tmp_path / "progress.log"),
+    job = {"version": 1, "result": str(setup_dir / "result.json"), "progress": str(setup_dir / "progress.log"),
            "steps": [{"id": "vcredist", "type": "winget", "title": "x", "pkg": pkg, "timeout": 60}]}
     job.update(over)
     return job
 
 
-def _write_job(tmp_path, job):
-    path = tmp_path / "job.json"
+def _write_job(setup_dir, job):
+    path = setup_dir / "job.json"
     path.write_text(json.dumps(job), encoding="utf-8")
     return path, hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_job_is_read_once_and_parsed_from_the_hashed_bytes(tmp_path, monkeypatch):
-    path, sha = _write_job(tmp_path, _winget_job(tmp_path))
+def test_job_is_read_once_and_parsed_from_the_hashed_bytes(setup_dir, monkeypatch):
+    path, sha = _write_job(setup_dir, _winget_job(setup_dir))
     opens = []
     real_open = open
 
@@ -54,13 +62,13 @@ def test_job_is_read_once_and_parsed_from_the_hashed_bytes(tmp_path, monkeypatch
     runner = Mock(return_value=Mock(returncode=0))
     assert ps.run_job(str(path), expected_sha=sha, runner=runner) == 0
     assert len(opens) == 1
-    result = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
+    result = json.loads((setup_dir / "result.json").read_text(encoding="utf-8"))
     assert [s["id"] for s in result["steps"]] == ["vcredist"] and result["steps"][0]["ok"]
     runner.assert_called_once()
 
 
-def test_job_without_or_with_wrong_hash_is_not_run(tmp_path):
-    path, sha = _write_job(tmp_path, _winget_job(tmp_path))
+def test_job_without_or_with_wrong_hash_is_not_run(setup_dir):
+    path, sha = _write_job(setup_dir, _winget_job(setup_dir))
     runner = Mock(return_value=Mock(returncode=0))
     assert ps.run_job(str(path), expected_sha=None, runner=runner) == 1
     assert ps.run_job(str(path), expected_sha="0" * 64, runner=runner) == 1
@@ -76,18 +84,18 @@ def test_job_without_or_with_wrong_hash_is_not_run(tmp_path):
     lambda j, d: j["steps"][0].update(timeout=10 ** 9),
     lambda j, d: j["steps"][0].update(id="camera", type="register_camera") or j["steps"].append({"id": "x", "type": "exe"}),
 ])
-def test_job_outside_allowlist_is_rejected(tmp_path, mutate):
-    job = _winget_job(tmp_path)
-    mutate(job, tmp_path)
-    path, sha = _write_job(tmp_path, job)
+def test_job_outside_allowlist_is_rejected(setup_dir, mutate):
+    job = _winget_job(setup_dir)
+    mutate(job, setup_dir)
+    path, sha = _write_job(setup_dir, job)
     runner = Mock(return_value=Mock(returncode=0))
     assert ps.run_job(str(path), expected_sha=sha, runner=runner) == 1
     runner.assert_not_called()
 
 
-def _exe_step(tmp_path, cid="vcredist", **over):
+def _exe_step(setup_dir, cid="vcredist", **over):
     name = ps._allowed_exe_steps()[cid][0]
-    exe = tmp_path / name
+    exe = setup_dir / name
     exe.write_bytes(b"MZ" + b"0" * 200)
     step = {"id": cid, "type": "exe", "title": "t", "path": str(exe), "args": list(ps._allowed_exe_steps()[cid][1]),
             "sha256": hashlib.sha256(exe.read_bytes()).hexdigest(), "ok_codes": [0], "timeout": 60}
@@ -95,14 +103,14 @@ def _exe_step(tmp_path, cid="vcredist", **over):
     return step
 
 
-def test_validate_job_accepts_what_the_app_builds(tmp_path):
-    exe = tmp_path / "vc_redist.x64.exe"
+def test_validate_job_accepts_what_the_app_builds(setup_dir):
+    exe = setup_dir / "vc_redist.x64.exe"
     exe.write_bytes(b"MZ" + b"0" * 200)
     steps = [ps.step_register_camera(),
              ps.step_exe("vcredist", "t", str(exe), ps.SOURCES["vcredist"]["args"], ok_codes=ps.SOURCES["vcredist"]["ok_codes"]),
              ps.step_winget("itunes", "t", ps.SOURCES["itunes"]["winget"])]
-    job = ps.build_job(steps, str(tmp_path / "result.json"), str(tmp_path / "progress.log"))
-    clean = ps.validate_job(json.loads(json.dumps(job)), str(tmp_path / "job.json"))
+    job = ps.build_job(steps, str(setup_dir / "result.json"), str(setup_dir / "progress.log"))
+    clean = ps.validate_job(json.loads(json.dumps(job)), str(setup_dir / "job.json"))
     assert [s["type"] for s in clean["steps"]] == ["register_camera", "exe", "winget"]
 
 
@@ -116,22 +124,22 @@ def test_validate_job_accepts_what_the_app_builds(tmp_path):
     {"ok_codes": [0, 5]},
     {"stage_dir": "OUTSIDE"},
 ])
-def test_validate_job_rejects_unlisted_exe_steps(tmp_path, over):
-    inside = tmp_path / "setup"
-    inside.mkdir()
+def test_validate_job_rejects_unlisted_exe_steps(setup_dir, over):
+    inside, outside_dir = setup_dir, setup_dir.parent
+    job = {"version": 1, "result": str(inside / "result.json"), "progress": str(inside / "progress.log")}
+    ps.validate_job(dict(job, steps=[_exe_step(inside)]), str(inside / "job.json"))      # 何も変えなければ通る (対照)
     step = _exe_step(inside)
     for k, v in list(over.items()):
         if v == "OUTSIDE":
-            outside = tmp_path / ps._allowed_exe_steps()["vcredist"][0]
+            outside = outside_dir / ps._allowed_exe_steps()["vcredist"][0]
             outside.write_bytes(b"MZ" + b"1" * 200)
-            over[k] = str(outside) if k == "path" else str(tmp_path)
+            over[k] = str(outside) if k == "path" else str(outside_dir)
         elif v == "RENAMED":
             (inside / "other.exe").write_bytes(b"MZ")
             over[k] = str(inside / "other.exe")
     step.update(over)
-    job = {"version": 1, "result": str(inside / "result.json"), "progress": str(inside / "progress.log"), "steps": [step]}
     with pytest.raises(ps.JobRejected):
-        ps.validate_job(job, str(inside / "job.json"))
+        ps.validate_job(dict(job, steps=[step]), str(inside / "job.json"))
 
 
 # --- #6 仮想カメラの登録解除 -----------------------------------------------------------
