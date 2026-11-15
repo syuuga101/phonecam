@@ -80,6 +80,20 @@ GROUPS = {
 }
 
 
+def join_summary(parts):
+    return " · ".join(part for part in parts if part)
+
+
+def fps_summary(value):
+    return f"{value}fps" if value else ""
+
+
+def mic_summary(enabled, muted):
+    if not enabled:
+        return t("compact.sum.mic.off")
+    return t("compact.sum.mic.muted" if muted else "compact.sum.mic.on")
+
+
 def _row_value(row):
     label = row.title_label.text()
     controls = tuple(row.controls())
@@ -87,7 +101,7 @@ def _row_value(row):
         if isinstance(control, QComboBox):
             value = control.currentText()
             if label == t("video.fps.label"):
-                return f"{value}fps"
+                return fps_summary(value)
             if label == t("video.outsize.label") and "×" in value:
                 return value.split(maxsplit=1)[0]
             return value
@@ -192,8 +206,7 @@ SUMMARIES = {
                                      [v.text("effects.background.mode.label"),
                                       _labeled("compact.sum.strength", v.text("effects.background.strength.label"))]),
     "effects_color": lambda v: [t("compact.sum.color.changed" if _color_changed(v) else "compact.sum.color.default")],
-    "audio_mic": lambda v: ([t("compact.sum.mic.off")] if v.on("audio.mic.use") is False else
-                            [t("compact.sum.mic.muted" if v.on("audio.mute.label") else "compact.sum.mic.on")]),
+    "audio_mic": lambda v: [mic_summary(v.on("audio.mic.use") is not False, v.on("audio.mute.label"))],
     "audio_output": lambda v: [v.text("audio.device.label"), _labeled("compact.sum.volume", v.text("audio.volume.label"))],
     "rec_control": lambda v: [v.text("recording.state.label")],
     "rec_quality": lambda v: [v.text("recording.preset.label"),
@@ -220,7 +233,7 @@ def _set_summary(expander, values, summary):
         parts = summary(values)
     except Exception:   # 要約の失敗で画面を止めない。要約なしにする
         parts = []
-    expander.set_summary(" · ".join(part for part in parts if part))
+    expander.set_summary(join_summary(parts))
 
 
 def compact_page(page, ctrl, key):

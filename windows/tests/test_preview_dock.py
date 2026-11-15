@@ -84,6 +84,7 @@ def test_audio_page_shows_level_and_mute_only_there(app, window):
     win.select(row_of("audio"))
     app.processEvents()
     assert win.dock.audio_row.isVisible()
+    win.ctrl.changed("mic_enabled", True)
     win.ctrl.changed("mic_mute", True)
     win.dock._refresh_info()
     assert win.dock.mic_label.text() == preview_dock.t("compact.sum.mic.muted")
@@ -106,6 +107,14 @@ def test_dock_does_not_draw_while_hidden(app, window, monkeypatch):
     win.dock._tick()
     assert len(calls) == 1
     win.select(row_of("video"))
+    win.showMinimized()
+    app.processEvents()
+    assert not win.dock._timer.isActive()
+    win.dock._tick()
+    assert len(calls) == 1
+    win.showNormal()
+    app.processEvents()
+    assert win.dock._timer.isActive()
     win.dock_toggle.switch.setChecked(False)  # ドック非表示
     app.processEvents()
     assert not win.dock._timer.isActive()

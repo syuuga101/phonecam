@@ -14,12 +14,14 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from phonecam.core.profiling import PROFILE
+from phonecam.core.settings import PREVIEW_FPS_CHOICES
 from phonecam.i18n import t
 from phonecam.labels import LENS_LABELS, METER_MIN_DB
+from phonecam.qt.compact import fps_summary, join_summary, mic_summary
+from phonecam.qt.pages.audio import InputLevelMeter
 from phonecam.qt.pages.connection import frame_to_image
 from phonecam.qt.widgets import (
-    _THEME_EVENTS, Switch, border_color, card_color, error_color, ref_palette, secondary_color, separator_color,
-    text_color,
+    _THEME_EVENTS, Switch, border_color, card_color, ref_palette, secondary_color,
 )
 
 DOCK_PAGES = ("video", "quality", "effects", "audio")   # ドックを出すページ
@@ -34,21 +36,14 @@ def dock_text(camera):
     lens = dict(LENS_LABELS).get(camera.get("lens"), "")
     res = camera.get("resolution")
     fps = camera.get("fps")
-    return " · ".join(str(v) for v in (lens, res, "%sfps" % fps if fps else "") if v)
-
-
-def mic_state_key(camera):
-    if not camera.get("mic_enabled", True):
-        return "compact.sum.mic.off"
-    return "compact.sum.mic.muted" if camera.get("mic_mute") else "compact.sum.mic.on"
+    return join_summary((lens, res, fps_summary(fps)))
 
 
 class PreviewSurface(QWidget):
     """16:9 の映像面。描くのは active のときだけ。"""
 
-    def __init__(self, dock):
+    def __init__(self):
         super().__init__()
-        self.dock = dock
         self._pix = None
         self._seq = -1
         self._label = ""
@@ -76,7 +71,6 @@ class PreviewSurface(QWidget):
         img, fmt, seq = item
         if seq == self._seq:
             return
-        self._seq = seq
         dpr = self.devicePixelRatioF()
         pw, ph = max(2, int((self.width() - 2) * dpr)), max(2, int((self.height() - 2) * dpr))
         started = time.perf_counter() if PROFILE is not None else 0.0
@@ -90,6 +84,7 @@ class PreviewSurface(QWidget):
         pm = QPixmap.fromImage(qi)
         pm.setDevicePixelRatio(dpr)
         self._pix = pm
+        self._seq = seq
         if PROFILE is not None:
             PROFILE.add(camera.link.vcam.slot, "preview", (time.perf_counter() - started) * 1000)
         self.update()
@@ -130,57 +125,25 @@ class PreviewSurface(QWidget):
         p.end()
 
 
-class LevelBar(QWidget):
-    """入力レベルの細いバー (音声ページ用)。"""
-
-    def __init__(self):
-        super().__init__()
-        self.db = METER_MIN_DB
-        self.setFixedHeight(20)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-    def set_db(self, db):
-        if abs(db - self.db) >= 0.5:
-            self.db = db
-            self.update()
-
-    def changeEvent(self, e):
-        super().changeEvent(e)
-        if e.type() in _THEME_EVENTS:
-            self.update()
-
-    def paintEvent(self, e):
-        p = QPainter(self)
-        pal = ref_palette(self)
-        bar = QRectF(0, (self.height() - 6) / 2, self.width(), 6)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(separator_color(pal))
-        p.drawRoundedRect(bar, 3, 3)
-        frac = min(1.0, max(0.0, (self.db - METER_MIN_DB) / -METER_MIN_DB))
-        if frac > 0:
-            fill = QRectF(bar.x(), bar.y(), bar.width() * frac, bar.height())
-            p.setBrush(error_color(pal) if self.db >= -3 else text_color(self))
-            p.drawRoundedRect(fill, 3, 3)
-        p.end()
-
-
 class PreviewDock(QWidget):
     def __init__(self, ctrl):
         super().__init__()
-        self.main_ctrl = ctrl          # 設定 preview_fps はアプリ全体の設定
         self.camera = None
         self.wide = False
         self.audio = False
         self.active = False            # 出す状態 (ページが対象で、トグルが入っているとき)
         self._lay = QVBoxLayout(self)
         self._lay.setSpacing(6)
-        self.surface = PreviewSurface(self)
+        self.surface = PreviewSurface()
         self._lay.addWidget(self.surface, 0, Qt.AlignmentFlag.AlignHCenter)
         self.audio_row = QWidget()
         arow = QHBoxLayout(self.audio_row)
         arow.setContentsMargins(0, 0, 0, 0)
         arow.setSpacing(10)
-        self.level = LevelBar()
+        self.level = InputLevelMeter()
+        self.level.setMinimumWidth(100)
+        self.level.setAccessibleName(t("audio.level.label"))
+        self.level.setFixedHeight(20)
         self.mic_label = QLabel()
         self.mic_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         arow.addWidget(self.level, 1)
@@ -206,9 +169,9 @@ class PreviewDock(QWidget):
     def _apply_fps(self, fps):
         try:
             fps = int(fps)
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             fps = 30
-        if fps not in (15, 30, 60):
+        if fps not in PREVIEW_FPS_CHOICES:
             fps = 30
         self._timer.setInterval(max(1, int(round(1000.0 / fps))))
 
@@ -217,6 +180,7 @@ class PreviewDock(QWidget):
         if camera is not self.camera:
             self.camera = camera
             self.surface.reset()
+            self.level.set_db(METER_MIN_DB)
         self._refresh_info()
 
     def set_audio(self, on):
@@ -293,8 +257,7 @@ class PreviewDock(QWidget):
         if self.camera is None:
             return
         self.surface.set_label(dock_text(self.camera))
-        key = mic_state_key(self.camera)
-        text = t(key)
+        text = mic_summary(self.camera.get("mic_enabled", True), self.camera.get("mic_mute"))
         if text != self.mic_label.text():
             self.mic_label.setText(text)
 
@@ -310,7 +273,6 @@ class PreviewDock(QWidget):
             self._sync_timers()
             return
         self.level.set_db(self.camera.meter_db())
-        self._refresh_info()
 
 
 def make_toggle(ctrl):

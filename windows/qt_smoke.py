@@ -895,6 +895,7 @@ def child(scale, out):
 
 
 def dock_shots(app, ctrl, win, out, scale):
+    from phonecam.i18n import t
     from phonecam.qt.main_window import NAV_ITEMS
     from phonecam.qt.preview_dock import WIDE_W
     from phonecam.qt.widgets import Expander
@@ -909,7 +910,10 @@ def dock_shots(app, ctrl, win, out, scale):
             win.select(rows[page])
             _settle(app, 450)
             for expander in win.current_page().findChildren(Expander):
-                expander.set_expanded(True, animate=False, save=False)
+                expander.set_expanded(
+                    expander.title_label.text() == t("compact.video.input"),
+                    animate=False, save=False,
+                )
             win.current_page().verticalScrollBar().setValue(0)
             _settle(app, 450)
             dock = win.dock
@@ -922,6 +926,8 @@ def dock_shots(app, ctrl, win, out, scale):
                 failed.append((name, "preview dock shows no frame"))
             elif dock.audio_row.isVisible() != (page == "audio"):
                 failed.append((name, "level row visibility is wrong"))
+            elif win.width() != width:
+                failed.append((name, "window could not resize to the requested width"))
             win.grab().save(os.path.join(out, name + ".png"))
     win.select(rows["connection"])
     win.resize(W, H)

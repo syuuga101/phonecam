@@ -11,11 +11,33 @@ from phonecam.qt.widgets import Card, Combo, Page, Row, bound_combo, bound_slide
 from phonecam.labels import AUDIO_PATH_LABELS, METER_MIN_DB, MIC_PATH_LABELS, phone_mic_text
 
 
-class _Meter(QWidget):
+class InputLevelMeter(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.db = METER_MIN_DB
+
+    def set_db(self, db):
+        if db != self.db:
+            self.db = db
+            self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        palette = self.palette()
+        width = max(0, self.width() - 84)
+        bar = QRectF(0, (self.height() - 8) / 2, width, 8)
+        painter.fillRect(bar, separator_color(palette))
+        bar.setWidth(width * min(1, max(0, (self.db - METER_MIN_DB) / -METER_MIN_DB)))
+        hot = self.db >= -3   # Tk 版と同じ: -3dB 以上は警告色
+        painter.fillRect(bar, error_color(palette) if hot else palette.color(QPalette.ColorRole.Highlight))
+        painter.setPen(palette.color(QPalette.ColorRole.WindowText))
+        painter.drawText(width + 8, int((self.height() + self.fontMetrics().ascent()) / 2) - 1, f"{self.db:.0f} dBFS")
+
+
+class _Meter(InputLevelMeter):
     def __init__(self, ctrl):
         super().__init__()
         self.ctrl = ctrl
-        self.db = METER_MIN_DB
         self.setMinimumSize(280, 26)
         self.timer = QTimer(self)
         self.timer.setInterval(50)
@@ -30,20 +52,8 @@ class _Meter(QWidget):
         super().hideEvent(event)
 
     def _sample(self):
-        self.db = self.ctrl.meter_db()
-        self.update()
+        self.set_db(self.ctrl.meter_db())
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        palette = self.palette()
-        width = max(0, self.width() - 84)
-        bar = QRectF(0, (self.height() - 8) / 2, width, 8)
-        painter.fillRect(bar, separator_color(palette))
-        bar.setWidth(width * min(1, max(0, (self.db - METER_MIN_DB) / -METER_MIN_DB)))
-        hot = self.db >= -3   # Tk 版と同じ: -3dB 以上は警告色
-        painter.fillRect(bar, error_color(palette) if hot else palette.color(QPalette.ColorRole.Highlight))
-        painter.setPen(palette.color(QPalette.ColorRole.WindowText))
-        painter.drawText(width + 8, int((self.height() + self.fontMetrics().ascent()) / 2) - 1, f"{self.db:.0f} dBFS")
 
 
 def _build_source(page, ctrl):

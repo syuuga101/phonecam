@@ -362,11 +362,6 @@ class MainWindow(QMainWindow):
         self.dock.setVisible(want)
         self.dock.set_active(want)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if hasattr(self, "dock") and (self.width() >= WIDE_W) != self._dock_wide:
-            self._sync_dock()
-
     # -- ページ --------------------------------------------------------------------
     def current_camera(self):
         return self.cameras.cameras[self.camera_index]
@@ -799,6 +794,8 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
+        if hasattr(self, "dock") and (self.width() >= WIDE_W) != self._dock_wide:
+            self._sync_dock()
         if hasattr(self, "toast_label") and self.toast_label.isVisible():
             self._place_toast()
 
