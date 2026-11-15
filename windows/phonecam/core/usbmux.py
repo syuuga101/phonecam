@@ -13,6 +13,14 @@ from phonecam.i18n import t
 # usbmux
 # ---------------------------------------------------------------------------
 
+class UsbError(PhoneCamError):
+    """USB でつなげなかった理由の種類つき。kind: "app" (アプリ側が待ち受けていない) / "trust" (ほかの失敗。信頼やロックの確認が要る)"""
+
+    def __init__(self, message, kind):
+        super().__init__(message)
+        self.kind = kind
+
+
 def usbmux_pack(payload_dict, tag):
     body = plistlib.dumps(payload_dict, fmt=plistlib.FMT_XML)
     return struct.pack("<IIII", 16 + len(body), 1, 8, tag) + body
@@ -66,15 +74,15 @@ def usbmux_connect(port=PHONE_PORT, mux_addr=USBMUX_ADDR, timeout=5.0, device_id
         number = resp.get("Number", -1)
         if number != 0:
             if number == 3:
-                raise PhoneCamError(t("core.usb.app_closed"))
-            raise PhoneCamError(t("core.usb.failed", number=number))
+                raise UsbError(t("core.usb.app_closed"), "app")      # つながりを断られた: アプリが起動していない/前面にない
+            raise UsbError(t("core.usb.failed", number=number), "trust")   # それ以外: 「信頼」前・ロック中など
         return sock
     except PhoneCamError:
         sock.close()
         raise
     except (OSError, ConnectionError, plistlib.InvalidFileException, struct.error, ValueError):
         sock.close()
-        raise PhoneCamError(t("core.usb.io_error"))
+        raise UsbError(t("core.usb.io_error"), "trust")
 
 
 def usbmux_devices(mux_addr=USBMUX_ADDR):
@@ -89,6 +97,25 @@ def usbmux_devices(mux_addr=USBMUX_ADDR):
                 if (props := d.get("Properties", {})).get("ConnectionType") == "USB" and props.get("SerialNumber")]
     except Exception:
         return []
+
+
+IDENTITY_PORT = 5557
+
+
+def usbmux_probe(serial, mux_addr=USBMUX_ADDR, timeout=1.5):
+    """USB の iPhone の「到達確認」。映像のポート (5555) には触れず、読み取り専用の識別ポート (5557) だけにつなぎ、
+    iPhone アプリの端末 ID を返す (古いアプリで ID が読めなければ "")。
+    iPhone は映像の接続を 1 本しか受けず、新しい接続が来ると今の接続 (Wi-Fi) を切って乗り換えてしまう。
+    そのため Wi-Fi 中に 5555 を試しにつなぐことはできない。つなげないときは PhoneCamError (usbmux_connect と同じ文言)。"""
+    sock = usbmux_connect(port=IDENTITY_PORT, mux_addr=mux_addr, timeout=timeout, serial=serial)
+    try:
+        sock.settimeout(timeout)
+        with sock.makefile("rb") as stream:
+            return stream.readline(37).decode("ascii", "replace").strip()
+    except (OSError, ConnectionError):
+        return ""
+    finally:
+        sock.close()
 
 
 def usbmux_available(mux_addr=USBMUX_ADDR):

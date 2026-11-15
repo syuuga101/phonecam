@@ -965,6 +965,7 @@ class Controller:
             sub=sub,
             error_text=snap["error_text"],
             auth_state=snap["auth_state"],
+            usb_note=snap.get("usb_note", ""),
             peer=snap.get("peer", ""),
             transport=snap.get("transport") or ("wifi" if self.settings.get("mode") == "wifi" else "usb"),
             res_fps=res_fps,

@@ -369,12 +369,17 @@ class ConnectionPage(Page):
         if s.connected:
             name = (s.get("phone") or {}).get("deviceName") or (s.get("phone") or {}).get("name") \
                 or t("connection.device.default")
+            sub = s.sub
+            if s.get("transport") == "wifi" and s.get("usb_note"):
+                sub = s.usb_note   # Wi-Fi 中で USB へ乗り換え待ち (準備中 / 信頼を押す、など)
             return t("connection.card.connected", name=self.wireless.display_name(s.get("peer"), name), way=way), \
-                s.sub, True
+                sub, True
         if not auto:
             return s.state_text, s.sub, False
         if not s.wanted:
             return t("connection.card.off"), t("connection.card.off_hint"), False
+        if s.get("usb_note"):
+            return t("connection.card.none"), s.usb_note, False
         if s.error_text and s.get("auth_state") not in ("failed", "refused"):
             return t("connection.card.none"), t("connection.card.none_hint"), False
         return t("connection.card.searching"), "", False

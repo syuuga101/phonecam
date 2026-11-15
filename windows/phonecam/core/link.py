@@ -49,9 +49,14 @@ from phonecam.core.settings import (
     valid_pair_code,
 )
 from phonecam.core.stats import LatencyTracker
-from phonecam.core.usbmux import usbmux_available, usbmux_connect, wifi_connect
-from phonecam.core.wireless import discover, local_ipv4, merge_devices, read_device
+from phonecam.core.usbmux import usbmux_available, usbmux_connect, usbmux_devices, usbmux_probe, wifi_connect
+from phonecam.core.wireless import device_id, discover, local_ipv4, merge_devices, read_device
 from phonecam.core.vcam import VirtualCamOutput
+
+# Wi-Fi でつないでいる間に USB を試して失敗したとき、同じ iPhone で次に試すまでの待ち時間 (回数が増えるほど伸びる)。
+# USB を抜き差しした (usbmux の端末一覧が変わった) ら最初からやり直す。
+USB_BACKOFF_SEC = (30.0, 60.0, 300.0)
+USB_WATCH_SEC = 2.0
 
 
 class Link:
@@ -67,6 +72,12 @@ class Link:
         self.audio_enabled = lambda: True
         self._usb_serial = None
         self._usb_retry_after = 0.0
+        self._usb_fail = {}        # USB シリアル -> [Wi-Fi 中の乗り換えに失敗した回数, 次に試してよい時刻 (monotonic)]
+        self._usb_seen = None      # 前回見た usbmux の端末一覧 (変わったら待ち時間をリセット)
+        self._usb_confirmed = False  # この USB 接続で iPhone の status まで届いた
+        self._from_wifi = False    # この USB 接続は Wi-Fi からの乗り換え
+        self._handover = None      # Wi-Fi 中に先につないでおいた USB 接続 (serial, socket, info)
+        self._clock = time.monotonic
         self._claimed = None
         self._thread = None
         self._stop = threading.Event()
@@ -107,6 +118,9 @@ class Link:
             return False
         self._last_wifi = None
         self._usb_retry_after = 0.0
+        self._usb_fail = {}
+        self._usb_seen = None
+        self._drop_handover()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="phonecam-link", daemon=True)
         self._thread.start()
@@ -132,7 +146,7 @@ class Link:
             self._thread = None
             self.vcam.park()
         self.state.update(status_text=tr("core.link.stopped"), connected=False, recv_fps=0.0, rx_fps=0.0, decode_ms=0.0, resolution="-",
-                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="", transport="", peer="")
+                          codec_in_use="-", decoder="-", decoder_note="", audio_path="-", auth_state="", transport="", peer="", usb_note="")
         self._decoder_key = None
         self.latency.reset()
 
@@ -220,6 +234,12 @@ class Link:
     def _resolve(self):
         """今回つなぐ方式と相手を決める -> (方式, ip, コード)。設定が auto なら USB 優先、なければ Wi-Fi。"""
         mode, ip = self.get_mode_ip()
+        handover = self._handover
+        if handover is not None:
+            if mode == "auto":
+                self._usb_serial = handover[0]
+                return "usb", "", None
+            self._drop_handover()   # 乗り換えの準備をしたあとで方式が変えられた
         self._usb_serial = self._eligible_usb(self._stop) if mode == "usb" or (mode == "auto" and time.monotonic() >= self._usb_retry_after) else None
         if self._usb_serial:
             return "usb", "", None
@@ -276,17 +296,92 @@ class Link:
         except OSError:
             return False
 
+    def _drop_handover(self):
+        handover, self._handover = self._handover, None
+        if handover is not None:
+            try:
+                handover[1].close()
+            except Exception:
+                pass
+
+    def _set_usb_note(self, text):
+        if text != self.state.usb_note:   # 同じ文を何度も書かない (画面がちらつかない)
+            self.state.update(usb_note=text)
+
+    def _note_usb_devices(self, serials):
+        seen = frozenset(serials)
+        if self._usb_seen is not None and seen != self._usb_seen:
+            self._usb_fail.clear()   # 抜き差しされた: 待ち時間をリセット
+            self._set_usb_note("")
+        self._usb_seen = seen
+
+    def _note_usb_failure(self, serial, kind, backoff=True):
+        """USB でつなげなかった。kind は表示用 ("app" / "trust" / "" = 表示なし)。backoff なら次に試すまで待つ。"""
+        if backoff:
+            count = self._usb_fail.get(serial, [0, 0.0])[0] + 1
+            self._usb_fail[serial] = [count, self._clock() + USB_BACKOFF_SEC[min(count, len(USB_BACKOFF_SEC)) - 1]]
+        self._set_usb_note({"app": tr("core.link.usb_app"), "trust": tr("core.link.usb_trust")}.get(kind, ""))
+
+    def _usb_candidate(self, serials, stop):
+        if self.routes is None:
+            return serials[0] if serials else None
+        return self._eligible_usb(stop)
+
+    def _try_usb_switch(self, sock, stop):
+        """Wi-Fi でつないだまま USB へ乗り換えられるか確かめ、乗り換えられるなら Wi-Fi を切って True を返す。
+        iPhone は映像の接続を 1 本しか受けず、新しい接続が来ると今の接続を切る。だから次の順で進める:
+        (1) 識別ポートで到達と端末 ID だけ確認 (今の接続には触れない) (2) 同じ iPhone だと分かったら USB で本接続
+        (3) 本接続できたときだけ Wi-Fi を閉じる。失敗したら Wi-Fi のまま待ち時間を置く。"""
+        serials = usbmux_devices()
+        self._note_usb_devices(serials)
+        serial = self._usb_candidate(serials, stop) if serials else None
+        if not serial:
+            self._set_usb_note("")
+            return False
+        fail = self._usb_fail.get(serial)
+        if fail and self._clock() < fail[1]:
+            return False
+        try:
+            usb_id = device_id(usbmux_probe(serial))
+        except PhoneCamError as e:
+            self._note_usb_failure(serial, getattr(e, "kind", "trust"))
+            return False
+        wifi_id = device_id(self.state.phone_status.get("deviceId"))
+        if not wifi_id:
+            self._set_usb_note(tr("core.link.usb_preparing"))   # Wi-Fi 側の status がまだ。次の周期で
+            return False
+        if not usb_id or usb_id != wifi_id:
+            self._note_usb_failure(serial, "")   # 別の iPhone か、ID が読めない: 勝手に乗り換えない
+            return False
+        info = {}
+        try:
+            usb_sock = usbmux_connect(serial=serial, info=info)
+        except PhoneCamError as e:
+            self._note_usb_failure(serial, getattr(e, "kind", "trust"))
+            return False
+        except Exception:
+            self._note_usb_failure(serial, "trust")
+            return False
+        if stop.is_set():
+            usb_sock.close()
+            return False
+        self._handover = (serial, usb_sock, info)
+        self.state.update(status_text=tr("core.link.usb_switch"))
+        self._last_wifi = None
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except Exception:
+            pass
+        return True
+
     def _watch_usb(self, sock, stop, ping_stop):
-        """auto で Wi-Fi につないでいる間、USB が挿されたら Wi-Fi を切って USB につなぎ直す。"""
-        while not stop.is_set() and not ping_stop.wait(2.0):
-            if time.monotonic() >= self._usb_retry_after and self._eligible_usb(stop):
-                self.state.update(status_text=tr("core.link.usb_switch"))
-                self._last_wifi = None
-                try:
-                    sock.shutdown(socket.SHUT_RDWR)
-                except Exception:
-                    pass
-                return
+        """auto で Wi-Fi につないでいる間、USB が挿されたら USB へ乗り換える (_try_usb_switch)。"""
+        while not stop.is_set() and not ping_stop.wait(USB_WATCH_SEC):
+            try:
+                if self._try_usb_switch(sock, stop):
+                    return
+            except Exception:
+                log_error("usb watch")
 
     def _connect(self, port=PHONE_PORT, info=None):
         mode, ip = self._mode, self._ip
@@ -332,12 +427,20 @@ class Link:
                         raise PhoneCamError(tr("core.link.used_by_other"))
                     self._claimed = resource
                 info = {}
-                sock = self._connect(info=info)
+                handover, self._handover = self._handover, None
+                self._from_wifi = False
+                if handover is not None and self._mode == "usb" and handover[0] == self._usb_serial:
+                    sock, info, self._from_wifi = handover[1], handover[2], True   # Wi-Fi 中に先につないだ USB 接続
+                else:
+                    if handover is not None:
+                        handover[1].close()
+                    sock = self._connect(info=info)
                 self._device_id = info.get("device_id")
                 self.state.update(usb_serial=info.get("usb_serial", ""))
             except PhoneCamError as e:
                 if self._mode == "usb":
                     self._usb_retry_after = time.monotonic() + 5
+                    self._note_usb_failure(self._usb_serial, getattr(e, "kind", ""), backoff=False)
                 self._release_route()
                 self._last_wifi = None
                 self.state.update(status_text=tr("core.link.standby"), error_text=str(e), connected=False)
@@ -346,6 +449,7 @@ class Link:
             except Exception as e:
                 if self._mode == "usb":
                     self._usb_retry_after = time.monotonic() + 5
+                    self._note_usb_failure(self._usb_serial, "trust", backoff=False)
                 self._release_route()
                 self._last_wifi = None
                 self.state.update(status_text=tr("core.link.standby"), error_text=tr("core.link.connect_error", error=e), connected=False)
@@ -362,6 +466,7 @@ class Link:
             self._authed = False
             self._saw_required = False
             self._auth_ok.clear()
+            self._usb_confirmed = False
             session_t0 = time.monotonic()
             try:
                 self._session(sock, stop)
@@ -380,6 +485,8 @@ class Link:
             self.state.update(connected=False, recv_fps=0.0, rx_fps=0.0)
             if stop.is_set():
                 break
+            if self._mode == "usb" and self._from_wifi and not self._usb_confirmed:
+                self._note_usb_failure(self._usb_serial, "trust")   # 乗り換えたのに iPhone の status まで届かなかった
             self._last_wifi = None
             kind = auth_failure_kind(self._mode, self._authed, self._saw_required)
             if kind == "code":
@@ -722,6 +829,10 @@ class Link:
                         st = json.loads(payload.decode("utf-8"))
                         if isinstance(st, dict):
                             self._note_auth_status(st)
+                            if self._authed and self._mode == "usb" and not self._usb_confirmed:
+                                self._usb_confirmed = True
+                                self._usb_fail.pop(self._usb_serial, None)   # USB が通った: 待ち時間を捨てる
+                                self._set_usb_note("")
                             if self._authed:
                                 if self.routes is not None:
                                     identity_ok = self.routes.note_identity(self, st.get("deviceId"))
