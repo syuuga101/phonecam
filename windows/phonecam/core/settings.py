@@ -10,6 +10,7 @@ import threading
 from phonecam.core.audio_engine import AUDIO_PRIORITIES
 from phonecam.core.deps import np, phonecam_audio, phonecam_hotkeys, sd
 from phonecam.core.paths import _app_dir, _appdata_dir
+from phonecam.core.secure import sanitize_identity
 from phonecam.core.softcam_reg import softcam_path
 from phonecam.core.wireless import device_id, read_device
 from phonecam.i18n import t
@@ -103,8 +104,10 @@ DEFAULT_SETTINGS = {
     "rec_container": "mp4",      # mp4 / mov
     "rec_audio": True,
     "rec_photos": True,
-    # Wi-Fi 接続のペアリングコード (iPhoneの画面に出る6桁。LAN内だけで使う。設定に保存してよい唯一の秘密)
+    # v1 の Wi-Fi ペアリングコード。v2 では送らない (v2 でペアリングした時点で消す)。古い版へ戻しても使えるように残している
     "pair_code": "",
+    # この PC の長期鍵 (v2)。秘密鍵は DPAPI (ユーザースコープ) で包んである。core/secure.py
+    "identity": {},
     # iPhoneのマイク
     "mic_enabled": False,
     "mic_device": "",
@@ -236,34 +239,8 @@ def valid_pair_code(value):
     return isinstance(value, str) and len(value) == PAIR_CODE_LEN and value.isascii() and value.isdigit()
 
 
-def build_auth_control(settings):
-    """接続直後に最初に送る認証メッセージ。USB (ループバック) では iPhone が無視するので送っても無害。"""
-    return {"auth": {"code": normalize_pair_code(settings.get("pair_code"))}}
-
-
-def auth_fail_text():
-    return t("core.auth.wrong_code")
-
-
 def auth_refused_text():
     return t("core.auth.refused")
-
-
-def auth_status_effect(st):
-    """iPhone のステータスから認証の状態を読む: "required" (認証待ち) / "ok" (認証済み・認証不要) / None。
-    authRequired を出さない古いiPhoneアプリは認証不要として扱う。"""
-    if not isinstance(st, dict):
-        return None
-    if st.get("authRequired") and not st.get("authOk"):
-        return "required"
-    return "ok"
-
-
-def auth_failure_kind(mode, authed, saw_required):
-    """接続が閉じたときの原因: "code" (コード違い) / "refused" (Wi-Fi拒否など) / None (認証とは無関係)。"""
-    if mode != "wifi" or authed:
-        return None
-    return "code" if saw_required else "refused"
 
 
 def rec_effective_resolution(settings):
@@ -367,6 +344,7 @@ def sanitize_settings(s):
     if s.get("rec_container") not in REC_CONTAINERS:
         s["rec_container"] = DEFAULT_SETTINGS["rec_container"]
     s["pair_code"] = normalize_pair_code(s.get("pair_code"))
+    s["identity"] = sanitize_identity(s.get("identity"))
     for key, (lo, hi) in INT_RANGES.items():
         try:
             v = int(round(float(s.get(key))))

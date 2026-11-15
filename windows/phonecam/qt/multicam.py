@@ -643,8 +643,8 @@ def build_entries(group, camera, discovered, usb):
     by_id = {ident: serial for serial, ident in usb.items() if ident}
     entries, seen = [], set()
     for device in merge_devices(group.known_devices(), discovered):
-        if not device.code:
-            continue   # 登録していない端末は、QR で追加してから選ぶ
+        if not device.paired:
+            continue   # 登録していない (または v1 の登録で再ペアリングが要る) 端末は、ペアリングしてから選ぶ
         live = [ip for ip in device.addresses if ip in found_ips]
         serial = by_id.get(device.id, "")
         ways = []
@@ -655,7 +655,7 @@ def build_entries(group, camera, discovered, usb):
         detail = " · ".join(part for part in (device.model, " / ".join(ways) or t("multi.pick.registered")) if part)
         owner = users.get(device.id) or (usb_users.get(serial) if serial else None)
         entries.append(PickEntry(device.id, device.title or t("wireless.unknown_device"), detail, device,
-                                 live[0] if live else device.addresses[0], serial, owner,
+                                 live[0] if live else (device.addresses[0] if device.addresses else ""), serial, owner,
                                  owner is camera and camera is not None, bool(ways)))
         if serial:
             seen.add(serial)
@@ -835,19 +835,14 @@ class DevicePicker(QWidget):
     # -- 新しい iPhone を QR で追加 ---------------------------------------------------------------
     def _pair(self):
         from phonecam.qt.wireless import PairDialog
-        dialog = PairDialog(self.window())
+        root = self.group.primary
+        dialog = PairDialog(self.window(), root.identity())
         dialog.exec()
         device = dialog.device
         dialog.deleteLater()
         if not device:
             return
-        known = self.group.known_devices()
-        old = next((item for item in known if item.id == device.id), None)
-        if old and old.alias:
-            device = replace(device, alias=old.alias)
-        root = self.group.primary
-        root.changed("known_devices", [item.stored() for item in [device, *(i for i in known if i.id != device.id)][:64]])
-        root.save_now()
+        device = root.add_known_device(device)
         self._rebuild(select_key=device.id)
 
 

@@ -97,7 +97,8 @@ class DeviceRoutes:
     def note_identity(self, link, value):
         identity = device_id(value)
         if not identity:
-            return True    # Older iOS apps have no identity field.
+            wire = getattr(link, "_wire", None)
+            return bool(wire is not None and wire.legacy)    # v2 では必ず付く。無いのは旧版 (v1) と USB でつないだときだけ
         target = link.settings.get("target_device")
         with self.lock:
             if self.multi:
@@ -145,7 +146,7 @@ class CameraGroup:
                 camera.changed("target_device", identity)
 
     def _global_changed(self, key, value):
-        if key not in ("known_devices", "preview_fps", "theme"):
+        if key not in ("known_devices", "identity", "preview_fps", "theme"):
             return
         for camera in self.cameras[1:]:
             camera.changed(key, value)
@@ -160,7 +161,7 @@ class CameraGroup:
             slot = next(number for number in CAMERA_SLOTS if number not in used)
         settings = sanitize_settings({**DEFAULT_SETTINGS, "mode_auto": True, **(profile or {})})
         settings.update(camera_slot=slot, backend="phonecam", camera_profiles=[])
-        for key in ("known_devices", "theme", "language", "preview_fps"):
+        for key in ("known_devices", "identity", "theme", "language", "preview_fps"):
             settings[key] = self.primary.get(key)
         holder = []   # 作る前は camera が無いので、箱を介して「音声を受け取るカメラは自分か」を見る
         camera = type(self.primary)(settings=settings, persist=False, demo=self.primary.demo, secondary=True,
@@ -238,16 +239,14 @@ class CameraGroup:
             camera.toggle_connect()
         if device is not None:
             camera.changed("usb_serial", usb_serial or "")
-            camera.changed("target_device", device.id if device.code else "")
+            camera.changed("target_device", device.id if device.paired else "")
             camera.set_ip(address or (device.addresses[0] if device.addresses else ""))
-            camera.set_pair_code(device.code)
             if camera.get("mode") == "usb":
                 camera.set_mode("auto")
         else:
             camera.changed("target_device", "")
             camera.changed("usb_serial", usb_serial)
             camera.set_ip("")
-            camera.set_pair_code("")
             if camera.get("mode") == "wifi":
                 camera.set_mode("auto")
         self.changed.emit()
@@ -302,9 +301,8 @@ class CameraGroup:
             camera.toggle_connect()
         if camera.get("target_device") != device.id or not device.id:
             camera.changed("usb_serial", "")
-        camera.changed("target_device", device.id if device.code else "")
+        camera.changed("target_device", device.id if device.paired else "")
         camera.set_ip(address)
-        camera.set_pair_code(device.code)
         if camera.get("mode") == "usb":
             camera.set_mode("auto")
         self.changed.emit()
@@ -354,7 +352,7 @@ class CameraGroup:
 
 
 GLOBAL_KEYS = {
-    "known_devices", "camera_profiles", "audio_camera", "theme", "language", "preview_fps",
+    "known_devices", "identity", "camera_profiles", "audio_camera", "theme", "language", "preview_fps",
     "update_check", "update_skip_version", "setup_done", "setup_shown_version",
     "window_maximized", "window_geometry", "tk_window_geometry",
     "audio_defaults_backup", "vbcable_restore_pending", "hotkeys_enabled", "hotkeys",

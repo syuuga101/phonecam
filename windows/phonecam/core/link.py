@@ -6,6 +6,7 @@ import json
 import socket
 import threading
 import time
+from dataclasses import replace
 from phonecam.core.crashlog import log_connection, log_error
 from phonecam.i18n import t as tr
 from phonecam.core.profiling import PROFILE
@@ -25,7 +26,6 @@ from phonecam.core.protocol import (
     AUDIO_RCVBUF,
     AUDIO_RETRY_SEC,
     AUTH_REFUSED_RETRY_SEC,
-    AUTH_TIMEOUT_SEC,
     LimitError,
     MAIN_RCVBUF,
     MAX_AUDIO_PAYLOAD,
@@ -38,30 +38,42 @@ from phonecam.core.protocol import (
     PhoneCamError,
     RECONNECT_SEC,
     RX_IDLE_SEC,
-    ReceiveTimeout,
     encode_msg,
     parse_pong,
     parse_timing,
     read_msg,
 )
-from phonecam.core.settings import (
-    auth_fail_text,
-    auth_refused_text,
-    auth_failure_kind,
-    auth_status_effect,
-    build_auth_control,
-    mirror_key,
-    valid_pair_code,
+from phonecam.core.handshake import PairSession, connect_handshake
+from phonecam.core.secure import (
+    HS_SECONDS,
+    HandshakeError,
+    SecureError,
+    Wire,
+    fp_equal,
+    hs_encode,
+    load_identity,
+    log_name,
+    session_channel,
 )
+from phonecam.core.settings import auth_refused_text, mirror_key
 from phonecam.core.stats import LatencyTracker
 from phonecam.core.usbmux import usbmux_available, usbmux_connect, usbmux_devices, usbmux_probe, wifi_connect
-from phonecam.core.wireless import device_id, discover, local_ipv4, merge_devices, read_device
+from phonecam.core.wireless import Device, device_id, discover, ipv4, local_ipv4, merge_devices, read_device
 from phonecam.core.vcam import VirtualCamOutput
 
 # Wi-Fi でつないでいる間に USB を試して失敗したとき、同じ iPhone で次に試すまでの待ち時間 (回数が増えるほど伸びる)。
 # USB を抜き差しした (usbmux の端末一覧が変わった) ら最初からやり直す。
 USB_BACKOFF_SEC = (30.0, 60.0, 300.0)
 USB_WATCH_SEC = 2.0
+
+
+def hs_text(kind):
+    """ハンドシェイクが止まった理由の説明 (利用者向け)。"""
+    if kind == "unpaired":
+        return tr("core.hs.unpaired")
+    if kind == "mismatch":
+        return tr("core.hs.mismatch")
+    return tr("core.hs.legacy")
 
 
 class Link:
@@ -94,15 +106,22 @@ class Link:
         self.last_frame_size = None  # 最後にデコードしたフレームの (幅, 高さ)
         self.hw_disabled = False   # ハードウェアデコードが失敗した (設定を入れ直すまで、再接続しても使わない)
         self._decoder_key = None
-        self._mode, self._ip, self._code = "usb", "", None   # 今回の接続で実際に使う方式 / IP / 登録済み端末のコード
-        self._last_wifi = None     # auto で最後に Wi-Fi でつながれた (ip, code)。つながらなくなったら捨てる
+        self._mode, self._ip, self._device = "usb", "", None   # 今回の接続で実際に使う方式 / IP / 登録済み (ピン留め済み) の端末
+        self._last_wifi = None     # auto で最後に Wi-Fi でつながれた (ip, 端末)。つながらなくなったら捨てる
+        self._wire = None          # 認証が済んだ接続の送受信 (Wi-Fi は暗号化)。認証前は None で、何も送らない
+        self._keys = None          # この接続のセッション鍵 (音声チャンネルの結び付けに使う)。旧版との USB は None
+        self._peer_key = None      # 認証できた iPhone の公開鍵
+        self._fail_kind = None     # 接続が閉じた理由 (unpaired / mismatch / legacy / refused / None)
+        self.on_paired = None      # 画面側が付ける: USB で初めてペアリングできた端末 (Device) を受け取る (保存を頼む)
+        self._usb_paired = {}      # USB シリアル -> 最後に自動でペアリングした時刻
+        self._pair_session = None
+        self.identity = lambda: load_identity(self.settings)
         self._device_id = None     # USB 接続した iPhone の usbmux デバイスID (音声チャンネルも同じ iPhone へ)
         self._audio_sock = None
-        # 認証 (v1.5): Wi-Fi ではペアリングコードが通るまで音声チャンネルを開かない
+        # 認証 (v2): ハンドシェイクが通るまで、設定の送信・デコード・音声チャンネルをしない
         self._auth_ok = threading.Event()
         self._auth_wake = threading.Event()   # 認証失敗で止まっているとき、再試行の合図
         self._authed = False
-        self._saw_required = False
         self._auth_blocked = False
         self._kf_lock = threading.Lock()
         self._last_kf_req = 0.0    # 最後にキーフレームを要求した時刻 (monotonic)
@@ -135,6 +154,9 @@ class Link:
         t = self._thread
         self._stop.set()
         self._auth_wake.set()
+        pair = self._pair_session
+        if pair is not None:
+            pair.close()
         for sock in (self._sock, self._audio_sock):
             if sock is not None:
                 try:
@@ -186,13 +208,17 @@ class Link:
             self._send_control_now(pending)
 
     def _send_control_now(self, control):
-        sock = self._sock
-        if sock is None:
-            return False
-        data = encode_msg(MSG_CONTROL, json.dumps(control).encode("utf-8"))
+        sock, wire = self._sock, self._wire
+        if sock is None or wire is None:
+            return False      # 認証が済むまでは何も送らない
+        payload = json.dumps(control).encode("utf-8")
+        return self._tx(sock, wire, MSG_CONTROL, payload)
+
+    def _tx(self, sock, wire, msg_type, payload):
+        """1 メッセージを送る。暗号化のカウンタと送信の順序を合わせるため、pack と sendall は同じロックの中で行う。"""
         try:
             with self._send_lock:
-                sock.sendall(data)
+                sock.sendall(wire.pack(msg_type, payload))
             return True
         except Exception:
             # 途中まで送ってしまった可能性がある (タイムアウト等)。メッセージの区切りが壊れるので接続ごと閉じて作り直す
@@ -259,39 +285,57 @@ class Link:
         if target:
             known = [d for entry in self.settings.get("known_devices", []) if (d := read_device(entry)) and d.id == target]
             if not known:
-                if ip and valid_pair_code(self.settings.get("pair_code", "")) and allowed(ip):
-                    return "wifi", ip, None
                 raise PhoneCamError(tr("core.link.unregistered"))
+            if not known[0].paired:
+                raise PhoneCamError(tr("core.link.needs_repair"))
             # Refresh the address of the selected device, never switch to another UUID.
             if self._last_wifi and allowed(self._last_wifi[0]):
-                return "wifi", self._last_wifi[0], known[0].code
+                return "wifi", self._last_wifi[0], known[0]
             fresh = discover(local_ipv4())
             for d in merge_devices(known, [d for d in fresh if d.id == target]):
                 for address in d.addresses:
                     if allowed(address) and self._probe(address):
-                        self._last_wifi = (address, d.code)
-                        return "wifi", address, d.code
+                        self._last_wifi = (address, d)
+                        return "wifi", address, d
             raise PhoneCamError(tr("core.link.chosen_not_found"))
         if mode == "wifi":
             return mode, ip, None
         if self._last_wifi and allowed(self._last_wifi[0]):
             return "wifi", self._last_wifi[0], self._last_wifi[1]
-        code = self.settings.get("pair_code", "")
-        if ip and valid_pair_code(code) and allowed(ip) and self._probe(ip):   # 一覧で選んだ / 手で入れた相手
-            return "wifi", ip, None
+        if ip and allowed(ip) and self._probe(ip):   # 一覧で選んだ / 手で入れた相手 (相手の鍵はハンドシェイクで探す)
+            return "wifi", ip, self._pinned_at(ip)
         known = [d for entry in self.settings.get("known_devices", []) if (d := read_device(entry))]
         if self.routes is not None:
             known = [d for d in known if self.routes.unbound_device(self, d.id)]
         if known:
+            if not any(d.paired for d in known):
+                raise PhoneCamError(tr("core.link.needs_repair"))
             found = discover(local_ipv4())
             live = {a for d in found for a in d.addresses}
             for d in merge_devices(known, found):
                 for a in d.addresses:
-                    if d.code and a in live and allowed(a):
-                        self._last_wifi = (a, d.code)
-                        return "wifi", a, d.code
+                    if d.paired and a in live and allowed(a):
+                        self._last_wifi = (a, d)
+                        return "wifi", a, d
             raise PhoneCamError(tr("core.link.known_not_found"))
         raise PhoneCamError(tr("core.link.none_found"))
+
+    def _pinned_at(self, ip):
+        """このアドレスで登録されているピン留め済みの端末 (無ければ None)。"""
+        for entry in self.settings.get("known_devices", []):
+            d = read_device(entry)
+            if d and d.paired and ip in d.addresses:
+                return d
+        return None
+
+    def _lookup_peer(self, fp):
+        """ハンドシェイクで iPhone が名乗ったフィンガープリントに合う、保存済みの公開鍵 (target があればその端末だけ)。"""
+        target = self.settings.get("target_device")
+        for entry in self.settings.get("known_devices", []):
+            d = read_device(entry)
+            if d and d.paired and (not target or d.id == target) and fp_equal(d.fp, fp):
+                return bytes.fromhex(d.key)
+        return None
 
     @staticmethod
     def _probe(ip):
@@ -322,7 +366,7 @@ class Link:
 
     def _note_usb_failure(self, serial, kind, backoff=True):
         """USB でつなげなかった。kind は表示用 ("app" / "trust" / "" = 表示なし)。backoff なら次に試すまで待つ。"""
-        log_connection("usb %s: 到達確認/接続に失敗 kind=%s 待ち=%s" % (serial, kind or "-", "あり" if backoff else "なし"))
+        log_connection("usb %s: 到達確認/接続に失敗 kind=%s 待ち=%s" % (log_name(serial), kind or "-", "あり" if backoff else "なし"))
         if backoff:
             count = self._usb_fail.get(serial, [0, 0.0])[0] + 1
             self._usb_fail[serial] = [count, self._clock() + USB_BACKOFF_SEC[min(count, len(USB_BACKOFF_SEC)) - 1]]
@@ -357,15 +401,15 @@ class Link:
                 return False
             # 1 台だけなら、識別ポート (5557) が開いていない古いアプリでも USB を諦めない。
             # 本接続の失敗は iPhone 側に影響しない (つながったときだけ今の接続を置き換える) ので、そのまま本接続を試す
-            log_connection("usb %s: 識別ポートに届かない (%s) ので、そのまま本接続を試す" % (serial, e))
+            log_connection("usb %s: 識別ポートに届かない (%s) ので、そのまま本接続を試す" % (log_name(serial), e))
         if strict:
             wifi_id = device_id(self.state.phone_status.get("deviceId"))
             if not wifi_id:
-                log_connection("usb %s: Wi-Fi 側の端末 ID がまだ分からないので乗り換えを保留" % serial)
+                log_connection("usb %s: Wi-Fi 側の端末 ID がまだ分からないので乗り換えを保留" % log_name(serial))
                 self._set_usb_note(tr("core.link.usb_preparing"))   # Wi-Fi 側の status がまだ。次の周期で
                 return False
             if not usb_id or usb_id != wifi_id:
-                log_connection("usb %s: 端末 ID が違う/読めないので乗り換えない (usb=%s wifi=%s)" % (serial, usb_id or "-", wifi_id))
+                log_connection("usb %s: 端末 ID が違う/読めないので乗り換えない (usb=%s wifi=%s)" % (log_name(serial), log_name(usb_id), log_name(wifi_id)))
                 self._note_usb_failure(serial, "")   # 別の iPhone か、ID が読めない: 勝手に乗り換えない
                 return False
         info = {}
@@ -381,7 +425,7 @@ class Link:
             usb_sock.close()
             return False
         self._handover = (serial, usb_sock, info)
-        log_connection("usb %s: USB に本接続できたので Wi-Fi(%s) から乗り換える" % (serial, self._ip))
+        log_connection("usb %s: USB に本接続できたので Wi-Fi(%s) から乗り換える" % (log_name(serial), log_name(self._ip)))
         self.state.update(status_text=tr("core.link.usb_switch"))
         self._last_wifi = None
         try:
@@ -435,7 +479,7 @@ class Link:
         while not stop.is_set():
             self.state.update(status_text=tr("core.link.connecting"), connected=False)
             try:
-                self._mode, self._ip, self._code = self._resolve()
+                self._mode, self._ip, self._device = self._resolve()
                 self.state.update(transport=self._mode, peer=self._ip if self._mode == "wifi" else "")
                 if self.routes is not None:
                     resource = ("usb", self._usb_serial) if self._mode == "usb" else ("wifi", self._ip)
@@ -459,7 +503,7 @@ class Link:
                     self._note_usb_failure(self._usb_serial, getattr(e, "kind", ""), backoff=False)
                 self._release_route()
                 self._last_wifi = None
-                log_connection("接続できず mode=%s: %s" % (self._mode, e))
+                log_connection("接続できず mode=%s: %s" % (self._mode, str(e).replace(self._ip, log_name(self._ip)) if self._ip else e))
                 self.state.update(status_text=tr("core.link.standby"), error_text=str(e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
@@ -481,18 +525,24 @@ class Link:
             sock.settimeout(1.0)
             self._tune_socket(sock, MAIN_RCVBUF)
             self._sock = sock
+            self._wire = None
+            self._keys = None
+            self._fail_kind = None
             self._authed = False
-            self._saw_required = False
             self._auth_ok.clear()
             self._usb_confirmed = False
             session_t0 = time.monotonic()
-            log_connection("接続 mode=%s peer=%s%s" % (self._mode, self._ip or self._usb_serial or "-",
+            log_connection("接続 mode=%s peer=%s%s" % (self._mode, log_name(self._ip or self._usb_serial),
                                                       " (Wi-Fi からの乗り換え)" if self._from_wifi else ""))
             end_reason = "相手が閉じた/こちらが閉じた"
             try:
                 self._session(sock, stop)
             except Exception as e:
                 end_reason = "%s: %s" % (type(e).__name__, e)
+                if isinstance(e, HandshakeError):
+                    self._fail_kind = e.kind
+                elif isinstance(e, ConnectionError) and not self._authed and self._mode == "wifi" and not isinstance(e, LimitError):
+                    self._fail_kind = "refused"     # 認証が済む前に閉じられた: Wi-Fi の許可がない / 締め出し中
                 if not stop.is_set():
                     self.state.update(error_text=tr("core.link.disconnected_error", error=e))
                     if isinstance(e, LimitError):
@@ -502,6 +552,7 @@ class Link:
             finally:
                 self._release_route()
                 self._sock = None
+                self._wire = None
                 try:
                     sock.close()
                 except Exception:
@@ -510,16 +561,20 @@ class Link:
             if stop.is_set():
                 break
             log_connection("切断 mode=%s peer=%s %.1f秒 映像=%d 認証=%s 乗り換え直後=%s 理由=%s" % (
-                self._mode, self._ip or self._usb_serial or "-", time.monotonic() - session_t0, self._rx_count,
+                self._mode, log_name(self._ip or self._usb_serial), time.monotonic() - session_t0, self._rx_count,
                 self._authed, self._from_wifi, end_reason))
             if self._mode == "usb" and self._from_wifi and not self._usb_confirmed:
                 self._note_usb_failure(self._usb_serial, "trust")   # 乗り換えたのに iPhone の status まで届かなかった
             self._last_wifi = None
-            kind = auth_failure_kind(self._mode, self._authed, self._saw_required)
-            if kind == "code":
-                # コード違い: 何度も再接続すると iPhone に締め出されるので、コードを直す/接続を押すまで待つ
-                self.state.update(status_text=tr("core.link.auth_failed"),
-                                  error_text=auth_fail_text(), auth_state="failed")
+            kind = self._fail_kind
+            if kind == "unpaired" and self._mode == "usb":
+                # USB の初回: ケーブルで直結していて iPhone 側で「このコンピュータを信頼」済みなので、コード入力なしでペアリングする
+                if self._pair_over_usb(stop):
+                    continue
+            if kind in ("unpaired", "mismatch", "legacy"):
+                # 鍵の登録が無い・変わった / 旧版: 自動で何度もつなぎ直しても直らないので、ペアリングし直すまで待つ
+                self.state.update(status_text=tr("core.link.pair_needed"), error_text=hs_text(kind),
+                                  auth_state=kind)
                 self._auth_blocked = True
                 self._auth_wake.clear()
                 while not stop.is_set() and not self._auth_wake.wait(0.3):
@@ -538,6 +593,44 @@ class Link:
             stop.wait(RECONNECT_SEC)
         self.vcam.park()
 
+    def _pair_over_usb(self, stop):
+        """USB で、まだペアリングしていない iPhone につないだ: コードの入力なしでペアリングする。
+        USB (usbmux) は iPhone 側で「このコンピュータを信頼」した PC からだけ使える。ここで公開鍵を交換しておくと、
+        次からの Wi-Fi は、コードを入れなくても同じ鍵で認証できる。成功したら True (すぐつなぎ直す)。"""
+        now = time.monotonic()
+        serial = self._usb_serial or ""
+        if now - self._usb_paired.get(serial, -1e9) < 60.0:
+            return False        # ペアリングした直後なのにまた未登録と言われた: 繰り返さない
+        self._usb_paired[serial] = now
+        session = PairSession(self._connect, self.identity(), socket.gethostname()[:40], auto_confirm=True)
+        self._pair_session = session
+        try:
+            session.run()
+        finally:
+            self._pair_session = None
+        peer = session.result
+        if not peer or stop.is_set():
+            return False
+        device = Device(peer["id"], peer["name"], ipv4(peer["addresses"])[:32], "", peer["model"], "", peer["s"].hex())
+        self.remember_device(device)
+        log_connection("USB で初めてペアリングした (端末 %s)" % log_name(device.id))
+        return True
+
+    def remember_device(self, device):
+        """ペアリングした端末を設定の登録に入れる (alias は引き継ぐ)。画面側 (on_paired) には保存を頼む。"""
+        known = [d for entry in self.settings.get("known_devices", []) if (d := read_device(entry))]
+        old = next((d for d in known if d.id == device.id), None)
+        if old is not None and old.alias:
+            device = replace(device, alias=old.alias)
+        if old is not None and not device.addresses:
+            device = replace(device, addresses=old.addresses)
+        self.settings["known_devices"] = [d.stored() for d in [device, *(d for d in known if d.id != device.id)][:64]]
+        if self.on_paired is not None:
+            try:
+                self.on_paired(device)
+            except Exception:
+                log_error("on_paired")
+
     def _release_route(self):
         if self._claimed is not None:
             self.routes.release(self, self._claimed)
@@ -548,18 +641,26 @@ class Link:
             raise PhoneCamError(tr("core.link.need_av"))
         decoders = DecoderManager(make_decoder, hw=self._hw_wanted())
         self._decoder_key = None
-        self.state.update(status_text=tr("core.link.connected"), connected=self._mode == "usb", error_text="", audio_path="shared",
-                          thin_total=0, thin_last=0.0, phone_status={})  # 前の接続のステータス (phoneEdit の seq など) を持ち越さない
+        self.state.update(status_text=tr("core.link.checking_code"), connected=False, error_text="", audio_path="shared",
+                          thin_total=0, thin_last=0.0, phone_status={}, auth_state="checking")  # 前の接続のステータス (phoneEdit の seq など) を持ち越さない
 
-        # 最初にペアリングコードを送る (Wi-Fi で必須。USB では iPhone が無視する)。USB は認証不要なので音声チャンネルもすぐ開く
+        # ハンドシェイク (v2): 相手の鍵を確かめ、Wi-Fi なら暗号化の鍵を作る。済むまで設定・制御・映像は一切扱わない (監査 #2)。
+        # PIN は送らない。USB は認証だけ行って平文のまま、Wi-Fi は旧版 (v1) の相手とはつながない
         mode = self._mode
-        if mode == "wifi" or valid_pair_code(self.settings.get("pair_code", "")):
-            auth = {"auth": {"code": self._code}} if self._code else build_auth_control(self.settings)
-            with self._send_lock:
-                sock.sendall(encode_msg(MSG_CONTROL, json.dumps(auth).encode("utf-8")))
-        if mode == "usb":
-            self._authed = True
-            self._auth_ok.set()
+        wire, keys, peer_key = connect_handshake(sock, self.identity(), self._lookup_peer, stop, usb=(mode == "usb"),
+                                                 deadline=time.monotonic() + HS_SECONDS)
+        if peer_key is not None:
+            device = self._pinned_by_key(peer_key)
+            target = self.settings.get("target_device")
+            if device is not None and target and device.id != target:
+                raise PhoneCamError(tr("core.link.assigned_elsewhere"))
+        self._wire, self._keys, self._peer_key = wire, keys, peer_key
+        if wire.legacy:
+            self.state.update(usb_note=tr("core.link.legacy_usb"))
+            log_connection("旧版 (v1) の iPhone と USB で接続 (警告)")
+        self._authed = True
+        self._auth_ok.set()
+        self.state.update(status_text=tr("core.link.connected"), connected=True, auth_state="")
         # 保存済み設定を全部送る + キーフレーム要求
         self._send_full(sock)
 
@@ -601,26 +702,18 @@ class Link:
         if self.stream is not None:
             # 新しい接続では iPhone は既定で動作中として扱うので、PC側の希望をすぐ伝える
             full["stream"] = {"active": self.stream.on_connect(time.monotonic())}
-        with self._send_lock:
-            sock.sendall(encode_msg(MSG_CONTROL, json.dumps(full).encode("utf-8")))
+        wire = self._wire
+        if wire is None:
+            return
+        if not self._tx(sock, wire, MSG_CONTROL, json.dumps(full).encode("utf-8")):
+            raise ConnectionError("send failed")
 
-    def _note_auth_status(self, st):
-        """iPhone のステータスから認証の進み具合を記録する。認証待ち → 認証済みになったら設定を送り直す。"""
-        effect = auth_status_effect(st)
-        if effect == "required":
-            self._saw_required = True
-            self.state.update(auth_state="required", status_text=tr("core.link.checking_code"))
-        elif effect == "ok":
-            was_waiting = self._saw_required and not self._authed
-            self._authed = True
-            if not self.state.connected or self.state.auth_state:
-                self.state.update(connected=True, auth_state="", status_text=tr("core.link.connected"))
-            self._auth_ok.set()
-            if was_waiting:
-                try:
-                    self._send_full()  # 認証前に送った分は無視されている可能性があるので送り直す
-                except Exception:
-                    pass
+    def _pinned_by_key(self, key):
+        for entry in self.settings.get("known_devices", []):
+            d = read_device(entry)
+            if d and d.paired and d.key == key.hex():
+                return d
+        return None
 
     # -- 音声チャンネル (ポート 5556) -------------------------------------
     def _audio_channel_loop(self, sess_stop, stop):
@@ -638,12 +731,9 @@ class Link:
                 asock.settimeout(1.0)
                 self._tune_socket(asock, AUDIO_RCVBUF)
                 self._audio_sock = asock
-                try:
-                    asock.sendall(encode_msg(MSG_CONTROL, json.dumps({"hello": "audio"}).encode("utf-8")))
-                except Exception:
-                    pass
+                awire = self._audio_hello(asock)
                 self.state.update(audio_path="dedicated")
-                self._audio_read_loop(asock, sess_stop, stop)
+                self._audio_read_loop(asock, awire, sess_stop, stop)
             except LimitError as e:
                 log_error("audio limit", e.log_line())   # 音声チャンネルの上限・期限超え。映像側の音声に戻って再試行
             except Exception:
@@ -660,13 +750,25 @@ class Link:
             if sess_stop.wait(AUDIO_RETRY_SEC):
                 break
 
-    def _audio_read_loop(self, asock, sess_stop, stop):
+    def _audio_hello(self, asock):
+        """音声チャンネルを映像のセッションに結び付ける: 最初に audio_tok を送る (監査 #4)。
+        Wi-Fi ではこのメッセージも音声用の鍵で包む (盗聴した人がトークンを使い回せないように)。"""
+        keys = self._keys
+        if keys is None:   # 旧版 (v1) の iPhone と USB
+            asock.sendall(encode_msg(MSG_CONTROL, json.dumps({"hello": "audio"}).encode("utf-8")))
+            return Wire(None, legacy=True)
+        body = hs_encode({"audio_tok": keys.audio_tok.hex()})
+        wire = Wire(None if self._mode == "usb" else session_channel(keys, True, audio=True))
+        asock.sendall(wire.pack(MSG_CONTROL, body))
+        return wire
+
+    def _audio_read_loop(self, asock, awire, sess_stop, stop):
         class _Either:
             def is_set(self_inner):
                 return sess_stop.is_set() or stop.is_set() or not self.audio_enabled()
         either = _Either()
         while not either.is_set():
-            msg_type, payload = read_msg(asock, either, cap=MAX_AUDIO_PAYLOAD)
+            msg_type, payload = awire.read(asock, either, cap=MAX_AUDIO_PAYLOAD)
             if msg_type == MSG_AUDIO and self.audio is not None:
                 try:
                     if self.audio_enabled():
@@ -800,18 +902,13 @@ class Link:
                                   name="phonecam-output", daemon=True)
         worker.start()
         prev_capture = None
-        auth_deadline = time.monotonic() + AUTH_TIMEOUT_SEC   # 認証が済むまでの期限 (USB は最初から認証済み)
+        wire = self._wire    # ここに来るのは認証 (ハンドシェイク) が済んだあとだけ
         try:
             while not stop.is_set():
                 if PROFILE is not None:
                     before_read = time.perf_counter()
-                if self._authed:
-                    # 認証後: 1 バイトも来ない時間が RX_IDLE_SEC を超えたら切る (状態通知・pong が生存確認になる)
-                    msg_type, payload = read_msg(sock, stop, True, RX_IDLE_SEC)
-                else:
-                    if time.monotonic() >= auth_deadline:
-                        raise ReceiveTimeout("認証", AUTH_TIMEOUT_SEC)
-                    msg_type, payload = read_msg(sock, stop, False, AUTH_TIMEOUT_SEC, auth_deadline)
+                # 1 バイトも来ない時間が RX_IDLE_SEC を超えたら切る (状態通知・pong が生存確認になる)。Wi-Fi は復号と検証もここで行う
+                msg_type, payload = wire.read(sock, stop, RX_IDLE_SEC)
                 t_recv = time.perf_counter()
                 if self._out_error is not None:
                     raise self._out_error
@@ -866,21 +963,20 @@ class Link:
                     try:
                         st = json.loads(payload.decode("utf-8"))
                         if isinstance(st, dict):
-                            self._note_auth_status(st)
-                            if self._authed and self._mode == "usb" and not self._usb_confirmed:
+                            if self._mode == "usb" and not self._usb_confirmed:
                                 self._usb_confirmed = True
                                 self._usb_fail.pop(self._usb_serial, None)   # USB が通った: 待ち時間を捨てる
-                                self._set_usb_note("")
-                            if self._authed:
-                                if self.routes is not None:
-                                    identity_ok = self.routes.note_identity(self, st.get("deviceId"))
-                                if identity_ok:
-                                    self.state.update(phone_status=st)
-                                    if PROFILE is not None:
-                                        PROFILE.describe(self.vcam.slot, transport=self._mode,
-                                                         decoder=self.state.decoder, sent_fps=st.get("sentFps"),
-                                                         camera_drops=st.get("cameraDroppedFrames"),
-                                                         network_drops=st.get("networkDroppedFrames"))
+                                if not wire.legacy:      # 旧版の警告は残す
+                                    self._set_usb_note("")
+                            if self.routes is not None:
+                                identity_ok = self.routes.note_identity(self, st.get("deviceId"))
+                            if identity_ok:
+                                self.state.update(phone_status=st)
+                                if PROFILE is not None:
+                                    PROFILE.describe(self.vcam.slot, transport=self._mode,
+                                                     decoder=self.state.decoder, sent_fps=st.get("sentFps"),
+                                                     camera_drops=st.get("cameraDroppedFrames"),
+                                                     network_drops=st.get("networkDroppedFrames"))
                     except Exception:
                         pass
                     if not identity_ok:
