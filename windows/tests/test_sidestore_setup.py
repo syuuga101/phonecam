@@ -260,3 +260,38 @@ def test_diagnostics_tolerates_failures():
     states = {r["id"]: r["state"] for r in res}
     assert states["itunes"] == ps.DIAG_WARN and states["amds"] == ps.DIAG_WARN and states["iloader"] == ps.DIAG_WARN
     assert states["usb"] == ps.DIAG_NG
+
+
+def test_connection_test_probe_never_touches_the_video_port():
+    """段階 8 の到達確認が映像のポート (5555) につなぐと、iPhone は今の接続 (受信ソフトの USB/Wi-Fi) を切ってしまう。"""
+    import plistlib
+    import socket
+    import struct
+
+    sent = []
+
+    class FakeSock:
+        def settimeout(self, _t):
+            pass
+
+        def sendall(self, data):
+            sent.append(data)
+
+        def recv(self, n):
+            body = plistlib.dumps({"MessageType": "Result", "Number": 0}, fmt=plistlib.FMT_XML)
+            data = struct.pack("<IIII", 16 + len(body), 1, 8, 1) + body
+            self._buf = getattr(self, "_buf", data)
+            chunk, self._buf = self._buf[:n], self._buf[n:]
+            return chunk
+
+        def close(self):
+            pass
+
+    snap = {"usb": True, "device_id": 3}
+    assert iphone.probe_phonecam(snap, connector=lambda *a, **k: FakeSock()) is True
+    port = plistlib.loads(sent[0][16:])["PortNumber"]
+    assert socket.ntohs(port) == iphone.IDENTITY_PORT != iphone.PHONE_PORT
+
+
+def test_test_step_passes_when_connected_over_usb():
+    assert iphone.step_status("test", _snap(), {"link": True})[0] == iphone.DONE

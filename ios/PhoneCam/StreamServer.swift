@@ -440,7 +440,7 @@ final class StreamServer {
     }
 
     /// 接続元のアドレス文字列とループバックかどうか。ループバック以外 (不明を含む) は Wi-Fi 扱い。
-    private static func remoteInfo(_ endpoint: NWEndpoint) -> (ip: String, loopback: Bool) {
+    static func remoteInfo(_ endpoint: NWEndpoint) -> (ip: String, loopback: Bool) {
         guard case let .hostPort(host, _) = endpoint else {
             return ("unknown", false)
         }
@@ -455,7 +455,7 @@ final class StreamServer {
                 // ::ffff:a.b.c.d (IPv4 射影アドレス)
                 return ipv4Info(Array(b[12..<16]))
             }
-            let loop = b[0..<15].allSatisfy { $0 == 0 } && b[15] == 1
+            let loop = LoopbackAddress.isLoopback(b)
             let text = b.map { String(format: "%02x", $0) }.joined()
             return (text, loop)
         case .name(let name, _):
@@ -468,7 +468,7 @@ final class StreamServer {
     private static func ipv4Info(_ b: [UInt8]) -> (ip: String, loopback: Bool) {
         guard b.count == 4 else { return ("unknown", false) }
         let text = "\(b[0]).\(b[1]).\(b[2]).\(b[3])"
-        return (text, b[0] == 127)
+        return (text, LoopbackAddress.isLoopback(b))
     }
 
     // MARK: - 送信 (どのスレッドからでも可)
@@ -648,21 +648,49 @@ final class StreamServer {
 }
 
 
-/// Read-only identification over USB. Loopback only, with no effect on the
-/// main/audio listeners or their current clients.
+/// Read-only identification over USB (port 5557). Answers loopback peers only (usbmux arrives on lo0), with no effect on
+/// the main/audio listeners or their current clients.
+///
+/// The listener is bound to the port only (no requiredLocalEndpoint): pinning it to 127.0.0.1 can miss usbmux
+/// connections, which made the PC's reachability check fail and kept it on Wi-Fi. Non-loopback peers are dropped in
+/// the handler instead. It restarts itself if the listener fails.
 final class USBIdentityListener {
+    static let port: UInt16 = 5557
     private let queue = DispatchQueue(label: "phonecam.usb.identity")
     private var listener: NWListener?
     private let payload: Data
+    private var stopped = false
 
     init(id: String) {
         payload = Data((id + "\n").utf8)
+        queue.async { [weak self] in self?.start() }
+    }
+
+    private func start() {
+        guard !stopped, listener == nil else { return }
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: 5557)
-        guard let listener = try? NWListener(using: params) else { return }
+        params.allowLocalEndpointReuse = true
+        guard let port = NWEndpoint.Port(rawValue: USBIdentityListener.port),
+              let listener = try? NWListener(using: params, on: port) else {
+            restartSoon()
+            return
+        }
         self.listener = listener
+        listener.stateUpdateHandler = { [weak self, weak listener] state in
+            switch state {
+            case .failed, .cancelled:
+                listener?.cancel()
+                self?.queue.async {
+                    guard let self, self.listener === listener else { return }
+                    self.listener = nil
+                    self.restartSoon()
+                }
+            default:
+                break
+            }
+        }
         listener.newConnectionHandler = { [weak self] conn in
-            guard let self else { conn.cancel(); return }
+            guard let self, StreamServer.remoteInfo(conn.endpoint).loopback else { conn.cancel(); return }
             conn.stateUpdateHandler = { [weak conn, payload = self.payload] state in
                 guard let conn, case .ready = state else { return }
                 conn.send(content: payload, completion: .contentProcessed { _ in conn.cancel() })
@@ -673,5 +701,12 @@ final class USBIdentityListener {
         listener.start(queue: queue)
     }
 
-    deinit { listener?.cancel() }
+    private func restartSoon() {
+        queue.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.start() }
+    }
+
+    deinit {
+        stopped = true
+        listener?.cancel()
+    }
 }

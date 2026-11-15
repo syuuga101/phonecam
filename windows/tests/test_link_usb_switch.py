@@ -23,8 +23,34 @@ class Clock:
         return self.now
 
 
-@pytest.fixture
-def env(monkeypatch):
+class FakeRoutes:
+    """DeviceRoutes の代わり。multi=True (2 台以上) では端末 ID の照合が必須、False (1 台) では不要。"""
+
+    def __init__(self, devices, multi):
+        self.multi = multi
+        self._devices = devices
+
+    def available_usb(self, link):
+        return list(self._devices["serials"])
+
+    def unbound_usb(self, link, serial):
+        return True
+
+    def usb_identity(self, serial):
+        return ""
+
+    def claim(self, link, resource):
+        return True
+
+    def release(self, link, resource):
+        pass
+
+    def can_claim(self, link, resource):
+        return True
+
+
+@pytest.fixture(params=[True], ids=["multi"])
+def env(monkeypatch, request):
     clock = Clock()
     calls = []
     devices = {"serials": [SERIAL]}
@@ -41,6 +67,7 @@ def env(monkeypatch):
     connect_mock = Mock(side_effect=connect)
     monkeypatch.setattr(transport, "usbmux_connect", connect_mock)
     link = transport.Link({**DEFAULT_SETTINGS}, SharedState(), lambda: ("auto", ""))
+    link.routes = FakeRoutes(devices, request.param)
     link._clock = clock
     link.state.update(phone_status={"deviceId": PHONE}, connected=True, transport="wifi")
     wifi = Mock(name="wifi_sock")
