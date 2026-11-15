@@ -12,7 +12,7 @@
 - [ ] iOS アプリがビルドできた（GitHub Actions の「Build iOS」が成功）
 - [ ] Windows の exe がビルドできた（GitHub Actions の「Build Windows receiver」が成功）
 - [ ] 実機（iPhone と Windows PC）で動作を確認した
-- [ ] USB と Wi-Fi（ペアリングコード）の両方で確認した（接続まわりを変えた場合）
+- [ ] USB と Wi-Fi（ペアリング・暗号化）の両方で確認した（接続まわりを変えた場合）
 - [ ] 古い iPhone アプリ／古い PC アプリとの互換性を確認した（プロトコルを変えた場合）
 
 確認した環境（Windows / iPhone / iOS）:

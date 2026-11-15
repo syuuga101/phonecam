@@ -8,6 +8,7 @@ struct SettingsView: View {
     var showStreamInfo = false
     var onClose: (() -> Void)?
     @State private var showScanner = false
+    @State private var showResetPairings = false
     @AppStorage(OrientationLock.defaultsKey) private var orientationRaw = OrientationLock.auto.rawValue
     @AppStorage("showGrid") private var showGrid = false
     @AppStorage("showLevel") private var showLevel = true
@@ -144,24 +145,39 @@ struct SettingsView: View {
                 }
                 .disabled(model.recActive)
                 .sheet(isPresented: $showScanner) { WirelessScanner(model: model) }
-                VStack(spacing: 8) {
-                    Text(model.pairingCode)
-                        .font(.title.monospaced())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .textSelection(.enabled)
-                    Button("コードを変更") {
-                        model.regeneratePairingCode()
+                if !model.pairingCode.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("settings.pairing.waiting")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Text(PairRequestRules.displayCode(model.pairingCode))
+                            .font(.title.monospaced())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .accessibilityLabel(model.pairingCode.map(String.init).joined(separator: ", "))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                }
+                if model.pairedPCCount > 0 {
+                    Button(role: .destructive) {
+                        showResetPairings = true
+                    } label: {
+                        Text("settings.pairing.reset \(model.pairedPCCount)")
+                    }
+                    .confirmationDialog("settings.pairing.reset_ask", isPresented: $showResetPairings,
+                                        titleVisibility: .visible) {
+                        Button("settings.pairing.reset_do", role: .destructive) { model.resetPairings() }
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
             }
         } header: {
             Text("接続")
         } footer: {
-            if model.wifiAllowed {
-                Text("PCの『ペアリングコード』欄に入力します。USB接続では不要です。")
+            if model.legacyUSBPeer {
+                Text("settings.legacy_usb")
+            } else if model.wifiAllowed {
+                Text("settings.pairing.footer")
             }
         }
     }

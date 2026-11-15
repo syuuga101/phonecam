@@ -1,11 +1,11 @@
 import Foundation
 
-/// 認証前の「ペアリング要求」(プロトコル v1.6) の規則。ネットワークや UI には依存しない純粋なロジック。
-/// PC が要求を送ると、iPhone は画面にペアリングコードをポップアップで出す。コードそのものは送らない。
-/// 要求を受け付けても認証は通らない (コードの照合は SecurityManager のまま)。
+/// 認証前の「ペアリング要求」(プロトコル v2) の規則。ネットワークや UI には依存しない純粋なロジック。
+/// PC がコード方式のペアリングを始めると、iPhone は画面に 6 桁の照合コードをポップアップで出す。
+/// コードは鍵交換の結果から両側で計算するもので、ネットワークには流れない (Secure.swift)。
 enum PairRequestRules {
-    /// 認証前の接続が送れる 1 メッセージの大きさの上限
-    static let maxPreAuthBytes = 1024
+    /// 認証前の接続が送れる 1 メッセージの大きさの上限 (64 KiB)
+    static let maxPreAuthBytes = 64 * 1024
     /// 同じ IP からの要求の最短間隔 (秒)
     static let minInterval: TimeInterval = 10
     /// ポップアップを出したままにする上限 (秒)。過ぎたらその接続を閉じて、ポップアップも消す
@@ -53,27 +53,6 @@ enum PairRequestRules {
         guard code.count == 6, code.allSatisfy({ $0 >= "0" && $0 <= "9" }) else { return code }
         let mid = code.index(code.startIndex, offsetBy: 3)
         return String(code[..<mid]) + " " + String(code[mid...])
-    }
-}
-
-/// PC から届く認証前のメッセージ (種別 10 の JSON)。知らないキーや不正な内容は nil (無視する)。
-enum PairRequestMessage: Equatable {
-    case request(id: String, name: String)
-    case cancel(id: String)
-
-    init?(control obj: [String: Any]) {
-        if let r = obj["pairRequest"] as? [String: Any] {
-            guard let id = r["id"] as? String, PairRequestRules.isValidID(id) else { return nil }
-            let name = (r["name"] as? String) ?? ""
-            self = .request(id: id, name: PairRequestRules.sanitizeName(name))
-            return
-        }
-        if let c = obj["pairCancel"] as? [String: Any] {
-            guard let id = c["id"] as? String, PairRequestRules.isValidID(id) else { return nil }
-            self = .cancel(id: id)
-            return
-        }
-        return nil
     }
 }
 

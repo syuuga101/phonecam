@@ -1,38 +1,30 @@
 import Foundation
 
-/// 接続の認可 (v1.5)。USB (ループバック) は信頼し、Wi-Fi は「許可」トグルとペアリングコードで守る。
+/// 接続の認可 (プロトコル v2)。USB (ループバック) は「このコンピュータを信頼」で守られ、Wi-Fi は「許可」トグルと
+/// ペアリングで覚えた PC の鍵 (Secure.swift) で守る。PIN やコードを保存・送信する仕組みは無い。
 /// どのスレッドからでも呼べる。
 final class SecurityManager {
     private static let wifiKey = "wifiAllowed"
-    private static let codeKey = "pairingCode"
     private static let maxFailures = 3
     private static let lockoutSeconds: TimeInterval = 60
 
+    let identity: DeviceIdentity
+    let pinned: PinnedPCStore
+
     private let lock = NSLock()
     private var wifi: Bool
-    private var code: String
     private var failures: [String: Int] = [:]
     private var lockedUntil: [String: Date] = [:]
-    private var authorizedIPValue: String?
+    private var binding: AudioBinding?
+    private var bindingObservers: [() -> Void] = []
 
-    init() {
+    init(storage: SecretStorage = KeychainStorage()) {
         let d = UserDefaults.standard
         wifi = d.bool(forKey: SecurityManager.wifiKey)
-        if let c = d.string(forKey: SecurityManager.codeKey), SecurityManager.isValid(c) {
-            code = c
-        } else {
-            let fresh = SecurityManager.makeCode()
-            code = fresh
-            d.set(fresh, forKey: SecurityManager.codeKey)
-        }
-    }
-
-    private static func isValid(_ c: String) -> Bool {
-        return c.count == 6 && c.allSatisfy { $0 >= "0" && $0 <= "9" }
-    }
-
-    private static func makeCode() -> String {
-        return String(format: "%06d", Int.random(in: 0...999_999))
+        identity = DeviceIdentity.load(storage)
+        pinned = PinnedPCStore(storage: storage)
+        // v1 の 6 桁コードは使わない (残っていれば消す)
+        d.removeObject(forKey: "pairingCode")
     }
 
     // MARK: - Wi-Fi 許可
@@ -50,42 +42,7 @@ final class SecurityManager {
         UserDefaults.standard.set(on, forKey: SecurityManager.wifiKey)
     }
 
-    // MARK: - ペアリングコード
-
-    var pairingCode: String {
-        lock.lock()
-        defer { lock.unlock() }
-        return code
-    }
-
-    /// 新しいコードを作って保存する。作ったコードを返す。
-    @discardableResult
-    func regenerateCode() -> String {
-        let fresh = SecurityManager.makeCode()
-        lock.lock()
-        code = fresh
-        failures.removeAll()
-        lockedUntil.removeAll()
-        lock.unlock()
-        UserDefaults.standard.set(fresh, forKey: SecurityManager.codeKey)
-        return fresh
-    }
-
-    /// コードの照合 (長さに依存しない比較)
-    func verify(_ candidate: String) -> Bool {
-        lock.lock()
-        let expected = Array(code.utf8)
-        lock.unlock()
-        let given = Array(candidate.utf8)
-        var diff = given.count ^ expected.count
-        let n = min(given.count, expected.count)
-        for i in 0..<n {
-            diff |= Int(given[i] ^ expected[i])
-        }
-        return diff == 0
-    }
-
-    // MARK: - 失敗によるロックアウト
+    // MARK: - 失敗によるロックアウト (同じ IP からの確認の失敗・コードの入力違い)
 
     func isLockedOut(_ ip: String) -> Bool {
         lock.lock()
@@ -100,16 +57,23 @@ final class SecurityManager {
         return false
     }
 
-    func noteFailure(_ ip: String) {
+    /// 失敗を数える。ロックアウトが始まったら true (呼び出し側はその IP の接続を全部切る)
+    @discardableResult
+    func noteFailure(_ ip: String) -> Bool {
         lock.lock()
+        defer { lock.unlock() }
         let n = (failures[ip] ?? 0) + 1
         if n >= SecurityManager.maxFailures {
             failures[ip] = nil
             lockedUntil[ip] = Date().addingTimeInterval(SecurityManager.lockoutSeconds)
-        } else {
-            failures[ip] = n
+            // 期限切れの記録は掃除する (メモリが増え続けない)
+            let now = Date()
+            lockedUntil = lockedUntil.filter { $0.value > now }
+            return true
         }
-        lock.unlock()
+        failures[ip] = n
+        if failures.count > 256 { failures.removeAll() }
+        return false
     }
 
     func noteSuccess(_ ip: String) {
@@ -118,17 +82,27 @@ final class SecurityManager {
         lock.unlock()
     }
 
-    // MARK: - 認証済みメインクライアントの IP (音声チャンネル用)
+    // MARK: - 音声チャンネルの結び付け
 
-    func setAuthorizedIP(_ ip: String?) {
+    /// 映像 (5555) のハンドシェイクが済んだら呼ぶ (切れたら nil)。音声 (5556) はこの情報のトークンで結び付く。
+    /// 変わるたびに observer を呼ぶ: 音声側は古いセッションの接続を閉じる。
+    func setAudioBinding(_ value: AudioBinding?) {
         lock.lock()
-        authorizedIPValue = ip
+        binding = value
+        let observers = bindingObservers
         lock.unlock()
+        for observer in observers { observer() }
     }
 
-    func isAuthorizedIP(_ ip: String) -> Bool {
+    var audioBinding: AudioBinding? {
         lock.lock()
         defer { lock.unlock() }
-        return authorizedIPValue == ip
+        return binding
+    }
+
+    func addBindingObserver(_ observer: @escaping () -> Void) {
+        lock.lock()
+        bindingObservers.append(observer)
+        lock.unlock()
     }
 }
