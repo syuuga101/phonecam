@@ -7,6 +7,7 @@
 画面は phonecam/qt 側。ここは純粋な関数とクラスだけにしてテストしやすくしている。
 """
 
+import base64
 import hashlib
 import json
 import os
@@ -20,6 +21,16 @@ DOWNLOAD_TIMEOUT_SEC = 30
 ASSET_NAME = "PhoneCamReceiver.exe"
 OLD_SUFFIX = ".old.exe"
 MIN_EXE_BYTES = 64 * 1024
+
+# 更新の署名 (Ed25519)。リリースには update-manifest.json (version・exe の SHA-256・サイズ) と、その署名
+# update-manifest.json.sig (Base64) が付く (release.yml が秘密鍵 UPDATE_SIGNING_KEY で署名する。手順は docs/release-signing.md)。
+# UPDATE_PUBLIC_KEY (Ed25519 の公開鍵 32 バイトを Base64 にしたもの) が空の間は、署名の仕組みを使わずに
+# 「GitHub が返す SHA-256 と一致すること」だけで更新する (ハッシュが無ければ更新しない)。
+# 公開鍵を入れたら、署名つきのマニフェストが無い・署名が合わない更新はすべて中止する。
+UPDATE_PUBLIC_KEY = ""
+MANIFEST_NAME = "update-manifest.json"
+MANIFEST_SIG_NAME = "update-manifest.json.sig"
+MAX_MANIFEST_BYTES = 64 * 1024
 
 
 class UpdateError(Exception):
@@ -101,7 +112,13 @@ def parse_release(data):
     body = data.get("body")
     asset = None
     assets = data.get("assets")
+    extra = {}
     if isinstance(assets, list):
+        for a in assets:
+            if isinstance(a, dict) and a.get("name") in (MANIFEST_NAME, MANIFEST_SIG_NAME):
+                u = a.get("browser_download_url")
+                if isinstance(u, str) and u.lower().startswith("https://"):
+                    extra["manifest_url" if a.get("name") == MANIFEST_NAME else "manifest_sig_url"] = u
         for a in assets:
             if not isinstance(a, dict) or a.get("name") != ASSET_NAME:
                 continue
@@ -116,7 +133,8 @@ def parse_release(data):
                 h = digest[7:].strip().lower()
                 if re.fullmatch(r"[0-9a-f]{64}", h):
                     sha256 = h
-            asset = {"name": ASSET_NAME, "url": url, "size": size, "sha256": sha256}
+            asset = {"name": ASSET_NAME, "url": url, "size": size, "sha256": sha256, "version": display_version(tag)}
+            asset.update(extra)
             break
     return {
         "tag": tag,
@@ -184,6 +202,168 @@ def markdown_to_text(md):
 
 
 # ---------------------------------------------------------------------------
+# Ed25519 (RFC 8032) — 外部ライブラリを増やさないための純 Python 実装
+# ---------------------------------------------------------------------------
+# 検証は更新のときに1回だけなので速度は問題にならない。署名 (sign) は CI でマニフェストに署名するときだけ使う。
+# RFC 8032 のテストベクトルと、cryptography ライブラリの結果との一致を tests/test_hardening.py で確かめている。
+
+_P = 2 ** 255 - 19
+_Q = 2 ** 252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
+
+
+def _inv(x):
+    return pow(x, _P - 2, _P)
+
+
+def _add(a, b):
+    A = (a[1] - a[0]) * (b[1] - b[0]) % _P
+    B = (a[1] + a[0]) * (b[1] + b[0]) % _P
+    C = 2 * a[3] * b[3] * _D % _P
+    D = 2 * a[2] * b[2] % _P
+    E, F, G, H = B - A, D - C, D + C, B + A
+    return (E * F % _P, G * H % _P, F * G % _P, E * H % _P)
+
+
+def _mul(s, pt):
+    q = (0, 1, 1, 0)
+    while s > 0:
+        if s & 1:
+            q = _add(q, pt)
+        pt = _add(pt, pt)
+        s >>= 1
+    return q
+
+
+def _equal(a, b):
+    return (a[0] * b[2] - b[0] * a[2]) % _P == 0 and (a[1] * b[2] - b[1] * a[2]) % _P == 0
+
+
+def _recover_x(y, sign):
+    if y >= _P:
+        return None
+    x2 = (y * y - 1) * _inv(_D * y * y + 1)
+    if x2 == 0:
+        return None if sign else 0
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P != 0:
+        x = x * _SQRT_M1 % _P
+    if (x * x - x2) % _P != 0:
+        return None
+    if (x & 1) != sign:
+        x = _P - x
+    return x
+
+
+_GY = 4 * _inv(5) % _P
+_GX = _recover_x(_GY, 0)
+_G = (_GX, _GY, 1, _GX * _GY % _P)
+
+
+def _compress(pt):
+    zi = _inv(pt[2])
+    x, y = pt[0] * zi % _P, pt[1] * zi % _P
+    return int.to_bytes(y | ((x & 1) << 255), 32, "little")
+
+
+def _decompress(b):
+    if len(b) != 32:
+        return None
+    y = int.from_bytes(b, "little")
+    sign = y >> 255
+    y &= (1 << 255) - 1
+    x = _recover_x(y, sign)
+    return None if x is None else (x, y, 1, x * y % _P)
+
+
+def _h512_modq(data):
+    return int.from_bytes(hashlib.sha512(data).digest(), "little") % _Q
+
+
+def _expand(seed):
+    h = hashlib.sha512(seed).digest()
+    a = int.from_bytes(h[:32], "little")
+    a &= (1 << 254) - 8
+    a |= 1 << 254
+    return a, h[32:]
+
+
+def ed25519_public_key(seed):
+    """秘密鍵 (32 バイトの種) → 公開鍵 (32 バイト)。"""
+    if len(seed) != 32:
+        raise ValueError("seed must be 32 bytes")
+    return _compress(_mul(_expand(seed)[0], _G))
+
+
+def ed25519_sign(seed, message):
+    """CI でマニフェストに署名する。64 バイトの署名を返す。"""
+    a, prefix = _expand(seed)
+    pub = _compress(_mul(a, _G))
+    r = _h512_modq(prefix + message)
+    rs = _compress(_mul(r, _G))
+    s = (r + _h512_modq(rs + pub + message) * a) % _Q
+    return rs + int.to_bytes(s, 32, "little")
+
+
+def ed25519_verify(public_key, message, signature):
+    """署名が正しければ True。形式がおかしい入力も False (例外は出さない)。"""
+    try:
+        if len(public_key) != 32 or len(signature) != 64:
+            return False
+        a = _decompress(public_key)
+        rs = signature[:32]
+        r = _decompress(rs)
+        s = int.from_bytes(signature[32:], "little")
+        if a is None or r is None or s >= _Q:
+            return False
+        h = _h512_modq(rs + public_key + message)
+        return _equal(_mul(s, _G), _add(r, _mul(h, a)))
+    except Exception:
+        return False
+
+
+def decode_public_key(text):
+    """Base64 の公開鍵 → 32 バイト。空なら None (署名なしの移行モード)。形式が不正なら UpdateError。"""
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except Exception:
+        raw = b""
+    if len(raw) != 32:
+        raise UpdateError("更新の署名用の公開鍵が正しくありません。安全のため更新しません")
+    return raw
+
+
+def verify_manifest(manifest_bytes, signature_b64, version, public_key):
+    """署名つきマニフェストを確かめて {"version","sha256","size"} を返す。
+    署名が合わない・版が違う・exe の名前や SHA-256 の形が違うときは UpdateError。
+    manifest_bytes は署名した JSON のバイト列そのもの (読み直さず、そのバイト列で署名の確認と解釈の両方をする)。"""
+    try:
+        sig = base64.b64decode((signature_b64 or b"").strip(), validate=True)
+    except Exception:
+        sig = b""
+    if not ed25519_verify(public_key, manifest_bytes, sig):
+        raise UpdateError("更新情報の署名が正しくありません。安全のため更新しません")
+    try:
+        data = json.loads(manifest_bytes.decode("utf-8"))
+    except Exception:
+        raise UpdateError("更新情報を読み取れませんでした")
+    if not isinstance(data, dict) or data.get("asset") != ASSET_NAME:
+        raise UpdateError("更新情報の内容が正しくありません。安全のため更新しません")
+    if parse_version(str(data.get("version"))) != parse_version(version) or parse_version(version) is None:
+        raise UpdateError("更新情報のバージョンが一致しません。安全のため更新しません")
+    sha = data.get("sha256")
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", sha):
+        raise UpdateError("更新情報にハッシュがありません。安全のため更新しません")
+    size = data.get("size")
+    size = size if isinstance(size, int) and not isinstance(size, bool) and size > 0 else 0
+    return {"version": str(data.get("version")), "sha256": sha.lower(), "size": size}
+
+
+# ---------------------------------------------------------------------------
 # ダウンロードと検証
 # ---------------------------------------------------------------------------
 
@@ -207,7 +387,9 @@ def sha256_file(path):
 
 
 def verify_file(path, size=0, sha256=""):
-    """サイズ・SHA-256 (分かるものだけ)・exe の先頭 (MZ) を確かめる。"""
+    """サイズ・SHA-256・exe の先頭 (MZ) を確かめる。SHA-256 が無いときは確かめられないので UpdateError (更新しない)。"""
+    if not sha256:
+        raise UpdateError("公開されたハッシュ (SHA-256) が無いため、更新ファイルを確かめられません。安全のため更新しません")
     try:
         actual = os.path.getsize(path)
     except OSError:
@@ -216,19 +398,64 @@ def verify_file(path, size=0, sha256=""):
         raise UpdateError("ダウンロードしたファイルが小さすぎます")
     if size and actual != size:
         raise UpdateError("ダウンロードが途中で切れました（サイズが一致しません）")
-    if sha256 and sha256_file(path).lower() != sha256.lower():
+    if sha256_file(path).lower() != sha256.lower():
         raise UpdateError("ダウンロードしたファイルが公開されたものと一致しません（SHA-256の不一致）。安全のため更新しません")
     with open(path, "rb") as f:
         if f.read(2) != b"MZ":
             raise UpdateError("ダウンロードしたファイルの形式が正しくありません")
 
 
-def download_asset(asset, dest, progress=None, cancel=None, opener=None, timeout=DOWNLOAD_TIMEOUT_SEC, version="dev"):
-    """asset (parse_release の asset) を dest へ保存して検証する。失敗時は dest を残さない。"""
+def _fetch_small(url, limit, opener, timeout, version):
+    """マニフェストなど小さいファイルを https で読む (limit バイトを超えたら中止)。"""
+    if not str(url).lower().startswith("https://"):
+        raise UpdateError("安全でないURL (https以外) からはダウンロードしません")
+    req = urllib.request.Request(url, headers={"User-Agent": "PhoneCam/%s" % version})
+    try:
+        with opener(req, timeout=timeout) as resp:
+            final = getattr(resp, "geturl", lambda: url)()
+            if isinstance(final, str) and not final.lower().startswith("https://"):
+                raise UpdateError("安全でないURL (https以外) へ転送されたため中止しました")
+            data = resp.read(limit + 1)
+    except UpdateError:
+        raise
+    except Exception:
+        raise UpdateError("更新情報をダウンロードできませんでした")
+    if len(data) > limit:
+        raise UpdateError("更新情報が大きすぎます。安全のため更新しません")
+    return data
+
+
+def expected_from_release(asset, opener=None, timeout=CHECK_TIMEOUT_SEC, version="dev", public_key=None):
+    """更新ファイルが満たすべき (SHA-256, サイズ) を決める。
+    - 公開鍵が埋め込まれているとき: 署名つきマニフェストが必須。署名・版・SHA-256 を確かめ、GitHub のハッシュがあれば一致も要求する
+    - 公開鍵が空のとき (移行中): GitHub が返す SHA-256 が必須 (無ければ UpdateError で更新しない)"""
+    asset = asset if isinstance(asset, dict) else {}
+    key = decode_public_key(UPDATE_PUBLIC_KEY if public_key is None else public_key)
+    sha, size = str(asset.get("sha256") or "").lower(), int(asset.get("size") or 0)
+    if key is None:
+        if not sha:
+            raise UpdateError("公開されたハッシュ (SHA-256) が無いため、更新ファイルを確かめられません。安全のため更新しません")
+        return sha, size
+    opener = opener or _default_opener
+    if not asset.get("manifest_url") or not asset.get("manifest_sig_url"):
+        raise UpdateError("署名つきの更新情報がありません。安全のため更新しません")
+    manifest = _fetch_small(asset["manifest_url"], MAX_MANIFEST_BYTES, opener, timeout, version)
+    sig = _fetch_small(asset["manifest_sig_url"], 1024, opener, timeout, version)
+    info = verify_manifest(manifest, sig.decode("ascii", "ignore"), asset.get("version") or "", key)
+    if sha and sha != info["sha256"]:
+        raise UpdateError("更新情報のハッシュが公開されたものと一致しません。安全のため更新しません")
+    return info["sha256"], (info["size"] or size)
+
+
+def download_asset(asset, dest, progress=None, cancel=None, opener=None, timeout=DOWNLOAD_TIMEOUT_SEC, version="dev",
+                   public_key=None):
+    """asset (parse_release の asset) を dest へ保存して検証する。失敗時は dest を残さない。
+    SHA-256 (署名つきマニフェスト、または移行中は GitHub のハッシュ) が分からないときは、ダウンロードせずに中止する。"""
     url = asset.get("url", "") if isinstance(asset, dict) else ""
     if not url.lower().startswith("https://"):
         raise UpdateError("安全でないURL (https以外) からはダウンロードしません")
     opener = opener or _default_opener
+    want_sha, want_size = expected_from_release(asset, opener=opener, timeout=timeout, version=version, public_key=public_key)
     req = urllib.request.Request(url, headers={"User-Agent": "PhoneCam/%s" % version})
     part = dest
     try:
@@ -240,7 +467,7 @@ def download_asset(asset, dest, progress=None, cancel=None, opener=None, timeout
                 total = int(resp.headers.get("Content-Length") or 0)
             except Exception:
                 total = 0
-            total = total or int(asset.get("size") or 0)
+            total = total or int(want_size or 0)
             done = 0
             with open(part, "wb") as out:
                 while True:
@@ -253,7 +480,7 @@ def download_asset(asset, dest, progress=None, cancel=None, opener=None, timeout
                     done += len(chunk)
                     if progress:
                         progress(done, total)
-        verify_file(part, asset.get("size") or 0, asset.get("sha256") or "")
+        verify_file(part, want_size, want_sha)
     except UpdateError:
         _silent_remove(part)
         raise

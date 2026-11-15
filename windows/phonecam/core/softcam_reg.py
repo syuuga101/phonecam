@@ -337,19 +337,140 @@ def x86_registration_status(slot=1):
         return "unavailable"
 
 
+LEGACY_FILTER_CATEGORY = "{083863F1-70DE-11d0-BD40-00A0C911CE86}"   # DirectShow の「すべてのフィルター」カテゴリ
+
+
+def _file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _view_flag(bits):
+    import winreg
+    return winreg.KEY_WOW64_32KEY if bits == 32 else winreg.KEY_WOW64_64KEY
+
+
+def machine_registered_path(slot=1, bits=64):
+    """マシン全体の登録 (HKLM\\SOFTWARE\\Classes) だけを、64bit / 32bit のビューを明示して読む。未登録なら None。
+    HKCR はユーザー別 (HKCU\\Software\\Classes) の登録も混ぜたビューなので、管理者権限の処理では使わない。"""
+    try:
+        import winreg
+        sub = "SOFTWARE\\Classes\\CLSID\\%s\\InprocServer32" % camera_clsid(slot)
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, sub, 0, winreg.KEY_READ | _view_flag(bits)) as k:
+            value = winreg.QueryValueEx(k, "")[0]
+        return str(value) if value else None
+    except Exception:
+        return None
+
+
+def _inside(path, root):
+    p, r = _norm_path(os.path.realpath(path)), _norm_path(os.path.realpath(root))
+    return p == r or p.startswith(r + os.sep)
+
+
+def is_trusted_softcam_dll(path, slot=1, bits=64):
+    """regsvr32 /u に渡してよい DLL か。次をすべて満たすときだけ True。
+    - アプリ管理下の softcam フォルダ (ProgramData\\PhoneCam\\softcam) の中にある
+    - ファイル名が softcam.dll (32bit は softcam32.dll)
+    - 中身の SHA-256 が、この exe に同梱している正規の DLL と一致する
+    見つからない・読めないときも False (DLL は読み込まない)。"""
+    try:
+        if not path or not os.path.isabs(str(path).strip().strip('"')):
+            return False
+        path = str(path).strip().strip('"')
+        want_name = SOFTCAM_DLL32 if bits == 32 else SOFTCAM_DLL
+        if os.path.basename(path).lower() != want_name:
+            return False
+        if not _inside(path, softcam_install_root()) or not os.path.isfile(path):
+            return False
+        known = softcam32_path(slot) if bits == 32 else softcam_path(slot)
+        if not os.path.isfile(known):
+            return False
+        return _file_sha256(path) == _file_sha256(known)
+    except Exception:
+        return False
+
+
+def _delete_key_tree(wr, sub, flag):
+    try:
+        key = wr.OpenKey(wr.HKEY_LOCAL_MACHINE, sub, 0, wr.KEY_READ | flag)
+    except FileNotFoundError:
+        return
+    with key:
+        names, i = [], 0
+        while True:
+            try:
+                names.append(wr.EnumKey(key, i))
+            except OSError:
+                break
+            i += 1
+    for name in names:
+        _delete_key_tree(wr, sub + "\\" + name, flag)
+    wr.DeleteKeyEx(wr.HKEY_LOCAL_MACHINE, sub, flag, 0)
+
+
+def delete_registration_keys(slot=1, bits=64):
+    """DLL を読み込まずに、このカメラの登録キー (CLSID と、DirectShow のデバイス一覧の項目) だけを HKLM から消す。"""
+    try:
+        import winreg as wr
+        flag = _view_flag(bits)
+        clsid = camera_clsid(slot).lower()
+        _delete_key_tree(wr, "SOFTWARE\\Classes\\CLSID\\%s" % camera_clsid(slot), flag)
+        for cat in (VIDEO_INPUT_CATEGORY, LEGACY_FILTER_CATEGORY):
+            base = "SOFTWARE\\Classes\\CLSID\\%s\\Instance" % cat
+            try:
+                with wr.OpenKey(wr.HKEY_LOCAL_MACHINE, base, 0, wr.KEY_READ | flag) as root:
+                    names, i = [], 0
+                    while True:
+                        try:
+                            names.append(wr.EnumKey(root, i))
+                        except OSError:
+                            break
+                        i += 1
+                    mine = []
+                    for name in names:
+                        owner = name.lower()
+                        try:
+                            with wr.OpenKey(root, name, 0, wr.KEY_READ | flag) as item:
+                                owner = str(wr.QueryValueEx(item, "CLSID")[0]).lower()
+                        except OSError:
+                            pass
+                        if owner == clsid or name.lower() == clsid:
+                            mine.append(name)
+            except FileNotFoundError:
+                continue
+            for name in mine:
+                _delete_key_tree(wr, base + "\\" + name, flag)
+        return True
+    except Exception:
+        return False
+
+
 def helper_unregister(slot=1):
-    """Unregister the selected filter in both registry views."""
+    """管理者権限で実行される --unregister。64bit / 32bit の両方の登録を解除する。
+    登録された DLL のパスは HKLM から明示して読み、「アプリ管理下の softcam フォルダの中にあり、同梱の正規 DLL と
+    SHA-256 が一致する」ときだけ regsvr32 /u に渡す。一致しないときは DLL を読み込まず、登録キーの削除だけにする
+    (登録は解除され、攻撃者が差し込んだ DLL は管理者権限で読み込まれない)。"""
     ok = True
-    for executable, view in zip(_regsvr32_paths(), (0, 32)):
-        registered = softcam_registered_path(slot, view)
+    for executable, bits in zip(_regsvr32_paths(), (64, 32)):
+        registered = machine_registered_path(slot, bits)
         if not registered:
             continue
-        dll = registered
-        if not os.path.isfile(dll):
+        dll = registered if is_trusted_softcam_dll(registered, slot, bits) else None
+        if dll is None:
+            # 登録先のファイルが無い・別の場所のときは、いま入れている正規の DLL で解除する (解除は CLSID で行うので登録先は問わない)
             installed = softcam_installed_path(slot)
-            dll = (os.path.join(os.path.dirname(installed), SOFTCAM_DLL32)
-                   if installed and view == 32 else installed)
-        if not dll or not os.path.isfile(dll) or not _run_regsvr32(executable, dll, unregister=True):
+            if installed and bits == 32:
+                installed = os.path.join(os.path.dirname(installed), SOFTCAM_DLL32)
+            if installed and is_trusted_softcam_dll(installed, slot, bits):
+                dll = installed
+        if dll is not None:
+            if not _run_regsvr32(executable, dll, unregister=True):
+                ok = False
+        elif not delete_registration_keys(slot, bits):
             ok = False
     _cleanup_old_install_dirs()
     return ok
