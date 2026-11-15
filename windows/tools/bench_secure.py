@@ -11,6 +11,8 @@ from phonecam.core import secure  # noqa: E402
 
 
 def main(size=40_000, rounds=2000):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # Windows の既定コードページ (cp1252) でも落ちないように
     k1, k2 = os.urandom(32), os.urandom(32)
     pc = secure.Channel(k1, b"AAAA", k2, b"BBBB")
     ph = secure.Channel(k2, b"BBBB", k1, b"AAAA")
