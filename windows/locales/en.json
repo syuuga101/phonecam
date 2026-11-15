@@ -204,6 +204,7 @@
  "core.link.used_by_other": "This iPhone is used by another camera output",
  "core.protocol.bad_length": "Invalid message length",
  "core.protocol.closed": "The connection was closed",
+ "core.protocol.timeout": "Disconnected because nothing was received in time",
  "core.reg.details": "{message}\n\nDetails: {error}",
  "core.reg.hint_exe": "Press the Register (update) button on the Video page",
  "core.reg.hint_src": "Run register.bat (administrator rights are required)",

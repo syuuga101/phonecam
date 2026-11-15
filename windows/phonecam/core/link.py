@@ -25,7 +25,10 @@ from phonecam.core.protocol import (
     AUDIO_RCVBUF,
     AUDIO_RETRY_SEC,
     AUTH_REFUSED_RETRY_SEC,
+    AUTH_TIMEOUT_SEC,
+    LimitError,
     MAIN_RCVBUF,
+    MAX_AUDIO_PAYLOAD,
     MSG_AUDIO,
     MSG_CONTROL,
     MSG_PONG,
@@ -34,6 +37,8 @@ from phonecam.core.protocol import (
     PHONE_PORT,
     PhoneCamError,
     RECONNECT_SEC,
+    RX_IDLE_SEC,
+    ReceiveTimeout,
     encode_msg,
     parse_pong,
     parse_timing,
@@ -490,7 +495,9 @@ class Link:
                 end_reason = "%s: %s" % (type(e).__name__, e)
                 if not stop.is_set():
                     self.state.update(error_text=tr("core.link.disconnected_error", error=e))
-                    if not isinstance(e, (OSError, ConnectionError, PhoneCamError)):
+                    if isinstance(e, LimitError):
+                        log_error("link limit", e.log_line())   # 上限・期限による切断は 1 行だけ残す
+                    elif not isinstance(e, (OSError, ConnectionError, PhoneCamError)):
                         log_error("link session")  # 想定外の例外だけ記録する (通常の切断は記録しない)
             finally:
                 self._release_route()
@@ -637,6 +644,8 @@ class Link:
                     pass
                 self.state.update(audio_path="dedicated")
                 self._audio_read_loop(asock, sess_stop, stop)
+            except LimitError as e:
+                log_error("audio limit", e.log_line())   # 音声チャンネルの上限・期限超え。映像側の音声に戻って再試行
             except Exception:
                 pass  # ポートが開いていない/切断: 静かに再試行
             finally:
@@ -657,11 +666,13 @@ class Link:
                 return sess_stop.is_set() or stop.is_set() or not self.audio_enabled()
         either = _Either()
         while not either.is_set():
-            msg_type, payload = read_msg(asock, either)
+            msg_type, payload = read_msg(asock, either, cap=MAX_AUDIO_PAYLOAD)
             if msg_type == MSG_AUDIO and self.audio is not None:
                 try:
                     if self.audio_enabled():
                         self.audio.feed(payload)
+                except LimitError:
+                    raise
                 except Exception:
                     pass
             # それ以外 (type 10 など) は無視する
@@ -789,11 +800,18 @@ class Link:
                                   name="phonecam-output", daemon=True)
         worker.start()
         prev_capture = None
+        auth_deadline = time.monotonic() + AUTH_TIMEOUT_SEC   # 認証が済むまでの期限 (USB は最初から認証済み)
         try:
             while not stop.is_set():
                 if PROFILE is not None:
                     before_read = time.perf_counter()
-                msg_type, payload = read_msg(sock, stop)
+                if self._authed:
+                    # 認証後: 1 バイトも来ない時間が RX_IDLE_SEC を超えたら切る (状態通知・pong が生存確認になる)
+                    msg_type, payload = read_msg(sock, stop, True, RX_IDLE_SEC)
+                else:
+                    if time.monotonic() >= auth_deadline:
+                        raise ReceiveTimeout("認証", AUTH_TIMEOUT_SEC)
+                    msg_type, payload = read_msg(sock, stop, False, AUTH_TIMEOUT_SEC, auth_deadline)
                 t_recv = time.perf_counter()
                 if self._out_error is not None:
                     raise self._out_error
@@ -888,6 +906,8 @@ class Link:
                         try:
                             if self.audio_enabled():
                                 self.audio.feed(payload)
+                        except LimitError:
+                            raise
                         except Exception:
                             pass
                 # それ以外の種別は無視する (将来の拡張用)
