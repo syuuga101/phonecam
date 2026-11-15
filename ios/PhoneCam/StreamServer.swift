@@ -35,6 +35,11 @@ final class StreamServer {
     var onControl: (([String: Any]) -> Void)?
     var onClientConnected: ((String) -> Void)?
     var onClientDisconnected: (() -> Void)?
+    /// 認証前の PC からのペアリング要求 (プロトコル v1.6)。respond に "shown" か "background" などを渡すと PC へ返事を送る。
+    /// 返事を渡さなければ何も返さない。respond はどのスレッドからでも呼べる。
+    var onPairRequest: ((_ id: String, _ name: String, _ ip: String, _ respond: @escaping (String) -> Void) -> Void)?
+    /// ポップアップを閉じる (要求した PC が切れた / 時間切れ / 認証成功 / 拒否)
+    var onPairDismiss: ((_ id: String) -> Void)?
 
     private let queue = DispatchQueue(label: "phonecam.server")
     private var listener: NWListener?
@@ -65,6 +70,7 @@ final class StreamServer {
         var ready = false
         var closed = false
         var isClient = false
+        var pairID: String?      // この接続が送ってきたペアリング要求の ID (1 接続に 1 つだけ)
         var gen = 0
         var parser = PacketParser()
         var timeout: DispatchWorkItem?
@@ -80,6 +86,8 @@ final class StreamServer {
     // queue 上でのみ触る
     private var activeSession: Session?
     private var pendings: [Session] = []     // 認証待ちの Wi-Fi 接続 (クライアントにはまだならない)
+    private var activePairSession: Session?  // ペアリングコードのポップアップを出している要求の接続 (常に 1 つだけ)
+    private var pairGate = PairRequestGate()
 
     // MARK: - 開始 / 停止
 
@@ -238,6 +246,7 @@ final class StreamServer {
         if s.authorized {
             activate(s)
         } else {
+            s.parser.maxPayload = PairRequestRules.maxPreAuthBytes   // 認証前は小さなメッセージだけ受ける
             pendings.append(s)
             if pendings.count > 4 {
                 let oldest = pendings.removeFirst()
@@ -304,7 +313,8 @@ final class StreamServer {
             markClientReady(s)
         } else if !s.authorized {
             // 認証前: authRequired の status を 1 つだけ送り、5 秒以内の auth を待つ
-            sendRaw(s, status: ["authRequired": true, "authOk": false])
+            // pairPopup: ペアリング要求 (v1.6) に対応している。古い PC アプリは未知のキーを無視する
+            sendRaw(s, status: ["authRequired": true, "authOk": false, "pairPopup": 1])
             let item = DispatchWorkItem { [weak self, weak s] in
                 guard let self = self, let s = s, !s.authorized, !s.closed else { return }
                 self.authFailed(s)
@@ -322,9 +332,19 @@ final class StreamServer {
     private func authSucceeded(_ s: Session) {
         security.noteSuccess(s.ip)
         s.authorized = true
+        s.parser.maxPayload = PacketParser.defaultMaxPayload
         s.timeout?.cancel()
         s.timeout = nil
         pendings.removeAll { $0 === s }
+        // 認証が通ったので、コードのポップアップは閉じる
+        if let p = activePairSession {
+            if p === s {
+                activePairSession = nil
+                if let id = p.pairID { onPairDismiss?(id) }
+            } else {
+                closeSession(p)
+            }
+        }
         activate(s)
     }
 
@@ -335,6 +355,10 @@ final class StreamServer {
         s.timeout?.cancel()
         s.timeout = nil
         pendings.removeAll { $0 === s }
+        if activePairSession === s {
+            activePairSession = nil
+            if let id = s.pairID { onPairDismiss?(id) }
+        }
         if s.isClient && activeSession === s {
             dropClient(generation: s.gen)
         } else {
@@ -385,6 +409,11 @@ final class StreamServer {
                     self.handleMessage(s, msg)
                     if s.closed { break }
                 }
+                // 認証前に大きすぎるメッセージを送ってきた接続は、失敗として数えて切る
+                if !s.closed && !s.authorized && s.parser.overflowed {
+                    self.authFailed(s)
+                    return
+                }
             }
             if s.closed { return }
             if error != nil || isComplete {
@@ -400,7 +429,11 @@ final class StreamServer {
               let obj = try? JSONSerialization.jsonObject(with: msg.payload) as? [String: Any] else { return }
 
         if !s.authorized {
-            // 認証前は auth 以外を無視する (pong も返さない)
+            // 認証前は pairRequest / pairCancel と auth 以外を無視する (pong も返さない)
+            if let pair = PairRequestMessage(control: obj) {
+                handlePairMessage(s, pair)
+                return
+            }
             guard let a = obj["auth"] as? [String: Any] else { return }
             let code = (a["code"] as? String) ?? ""
             if security.verify(code) {
@@ -415,6 +448,76 @@ final class StreamServer {
             sendPong(ping)
         }
         onControl?(obj)
+    }
+
+    // MARK: - ペアリング要求 (認証前。プロトコル v1.6)
+
+    /// 要求の処理 (queue 上)。認証前の接続だけがここに来る。
+    /// 受け付けても認証は通らない。コードは画面に出すだけで、ネットワークには送らない。
+    private func handlePairMessage(_ s: Session, _ msg: PairRequestMessage) {
+        switch msg {
+        case .cancel(let id):
+            if s.pairID == id { closeSession(s) }
+        case .request(let id, let name):
+            guard s.pairID == nil else { return }   // 1 接続に 1 回だけ
+            s.pairID = id
+            let decision = pairGate.evaluate(ip: s.ip, activeIP: activePairSession?.ip,
+                                             now: ProcessInfo.processInfo.systemUptime)
+            guard decision == .accept else {
+                replyPair(s, id: id, state: decision == .busy ? "busy" : "limited", thenClose: true)
+                return
+            }
+            if let old = activePairSession, old !== s { closeSession(old) }   // 同じ PC の古い要求を置き換える
+            activePairSession = s
+            // 要求だけの接続は、認証の失敗としては数えない。ポップアップの時間が過ぎたら閉じる
+            scheduleClose(s, after: PairRequestRules.popupSeconds)
+            guard let handler = onPairRequest else {
+                replyPair(s, id: id, state: "unavailable", thenClose: true)
+                return
+            }
+            handler(id, name, s.ip) { [weak self, weak s] state in
+                self?.queue.async {
+                    guard let self = self, let s = s, !s.closed, s.pairID == id else { return }
+                    self.replyPair(s, id: id, state: state, thenClose: state != "shown")
+                }
+            }
+        }
+    }
+
+    /// 「拒否」: 要求した PC へ declined を返して、その接続を閉じる。どのスレッドからでも可。
+    func declinePair(id: String) {
+        queue.async { [weak self] in
+            guard let self = self, let s = self.activePairSession, s.pairID == id, !s.closed else { return }
+            self.replyPair(s, id: id, state: "declined", thenClose: true)
+        }
+    }
+
+    private func replyPair(_ s: Session, id: String, state: String, thenClose: Bool) {
+        let status: [String: Any] = ["pairReply": ["id": id, "state": state]]
+        guard JSONSerialization.isValidJSONObject(status),
+              let json = try? JSONSerialization.data(withJSONObject: status) else {
+            if thenClose { closeSession(s) }
+            return
+        }
+        if thenClose { scheduleClose(s, after: PairRequestRules.rejectLinger) }   // 送れなくても必ず閉じる
+        s.conn.send(content: Packet.encode(type: PacketType.status, payload: json),
+                    completion: .contentProcessed({ [weak self, weak s] _ in
+            guard thenClose else { return }
+            self?.queue.async {
+                if let s = s { self?.closeSession(s) }
+            }
+        }))
+    }
+
+    /// seconds 秒後に、認証の失敗としては数えずに接続を閉じる (前の予約は取り消す)
+    private func scheduleClose(_ s: Session, after seconds: TimeInterval) {
+        s.timeout?.cancel()
+        let item = DispatchWorkItem { [weak self, weak s] in
+            guard let self = self, let s = s else { return }
+            self.closeSession(s)
+        }
+        s.timeout = item
+        queue.asyncAfter(deadline: .now() + seconds, execute: item)
     }
 
     /// 認証前の接続へ status を直接送る

@@ -4,6 +4,7 @@ from dataclasses import replace
 from io import BytesIO
 from queue import Empty, SimpleQueue
 from threading import Thread
+import socket
 import time
 
 from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QVBoxLayout, QWidget,
 )
 
+from phonecam.core import pairreq
 from phonecam.core.wireless import (
     PAIR_SECONDS, Pairing, discover, hotspot_on, ipv4, merge_devices, on_tether, read_device, route_of,
 )
@@ -231,11 +233,16 @@ class Disclosure(QWidget):
 
 
 class CodeDialog(QDialog):
-    """未登録の iPhone に初めてつなぐときだけ出す、6桁コードの入力。"""
+    """未登録の iPhone に初めてつなぐときだけ出す、6桁コードの入力。
+    address があれば、iPhone へ「ペアリング要求」を送り、iPhone の画面にコードをポップアップで出してもらう。
+    対応していない iPhone や返事がないときは、今までどおり設定画面でコードを確認してもらう。"""
 
-    def __init__(self, parent, name):
+    def __init__(self, parent, name, address=None, requester=pairreq.PairRequester):
         super().__init__(parent)
         self.setWindowTitle(t("wireless.code_title"))
+        self.declined = False
+        self.requester = None
+        self.states = SimpleQueue()
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
         head = QLabel(t("wireless.code_for", name=name))
@@ -243,9 +250,9 @@ class CodeDialog(QDialog):
         font.setWeight(QFont.Weight.DemiBold)
         head.setFont(font)
         layout.addWidget(head)
-        note = Hint(t("wireless.code_note"))
-        note.setMinimumWidth(320)
-        layout.addWidget(note)
+        self.note = Hint(t("wireless.code_note"))
+        self.note.setMinimumWidth(320)
+        layout.addWidget(self.note)
         self.edit = QLineEdit()
         self.edit.setMaxLength(6)
         self.edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -268,6 +275,35 @@ class CodeDialog(QDialog):
         buttons.addWidget(self.ok)
         layout.addLayout(buttons)
         self.code = ""
+        self.poll = QTimer(self, interval=100)
+        self.poll.timeout.connect(self._poll)
+        if address:
+            self.requester = requester(address, socket.gethostname(), self.states.put).start()
+            self.poll.start()
+
+    def _poll(self):
+        while True:
+            try:
+                state = self.states.get_nowait()
+            except Empty:
+                return
+            if state == pairreq.SHOWN:
+                self.note.setText(t("wireless.code_note_popup"))
+            elif state == pairreq.BACKGROUND:
+                self.note.setText(t("wireless.code_note_background"))
+            elif state == pairreq.DECLINED:
+                self.declined = True
+                self.reject()
+                return
+            else:
+                self.note.setText(t("wireless.code_note"))   # 今までどおり、iPhone の設定画面で確認してもらう
+
+    def done(self, result):
+        self.poll.stop()
+        requester, self.requester = self.requester, None
+        if requester is not None:
+            requester.close()   # iPhone のポップアップも閉じてもらう
+        super().done(result)
 
     def _edited(self, text):
         code = normalize_pair_code(text)
@@ -722,10 +758,13 @@ class WirelessOptions:
         if entry.registered:
             self._start(entry.address, entry.device.code, entry.device)
             return
-        dialog = CodeDialog(self.page, entry.name)
+        dialog = CodeDialog(self.page, entry.name, None if self.ctrl.demo else entry.address)
         accepted = dialog.exec() == QDialog.DialogCode.Accepted
         code = dialog.code
+        declined = dialog.declined
         dialog.deleteLater()
+        if declined:
+            self.ctrl.toast.emit(t("wireless.pair_declined"), "error")
         if not accepted:
             return
         device = entry.device

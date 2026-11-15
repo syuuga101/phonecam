@@ -12,6 +12,13 @@ struct OutputCanvas: Equatable {
     let crop: Bool   // fit == "crop"。false は "pad"
 }
 
+/// PC のペアリング要求で出すポップアップの内容。code は画面にだけ出す (ネットワークには送らない)。
+struct PairPopup: Equatable {
+    let id: String
+    let pcName: String
+    let code: String
+}
+
 // MARK: - AppModel (カメラ・エンコーダ・サーバをつなぐ)
 
 final class AppModel: ObservableObject {
@@ -38,6 +45,7 @@ final class AppModel: ObservableObject {
     @Published var micText = String(localized: "オフ")
     @Published var wifiAllowed = false
     @Published var pairingCode = ""
+    @Published var pairPopup: PairPopup?   // PC からの要求でコードを出しているとき
     // 手元操作 (すべてメインスレッドで更新する)
     @Published var lens = "wide"
     @Published var lenses: [String] = ["wide"]
@@ -287,6 +295,21 @@ final class AppModel: ObservableObject {
         }
 
         // サーバ
+        // PC のペアリング要求: アプリが前面にあるときだけコードをポップアップで出す (通知は出さない)
+        server.onPairRequest = { [weak self] id, name, _, respond in
+            self?.handlePairRequest(id: id, name: name, respond: respond)
+        }
+        server.onPairDismiss = { [weak self] id in
+            DispatchQueue.main.async { self?.dismissPairPopup(id: id) }
+        }
+        // バックグラウンドへ移るとき (アプリスイッチャーの画像にコードが写らないよう) ポップアップは閉じる
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.pairPopup = nil
+        }
         server.onClientConnected = { [weak self] kind in
             guard let self = self else { return }
             self.resetStreamRate(wifi: kind == "Wi-Fi")
@@ -844,6 +867,34 @@ final class AppModel: ObservableObject {
     func deviceNameChanged() {
         server.updateBonjourService(wirelessIdentity.service)
         timerQueue.async { [weak self] in self?.sendFullStatus() }
+    }
+
+    // MARK: PC からのペアリング要求 (ポップアップ)
+
+    /// StreamServer の queue から呼ばれる。前面にいるときだけコードを出し、"shown" / "background" を返す。
+    private func handlePairRequest(id: String, name: String, respond: @escaping (String) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard UIApplication.shared.applicationState == .active else {
+                respond("background")
+                return
+            }
+            self.pairPopup = PairPopup(id: id, pcName: name, code: self.security.pairingCode)
+            respond("shown")
+        }
+    }
+
+    /// ポップアップを閉じる (「閉じる」/ PC が切れた / 認証成功)。id を渡したときは、その要求のものだけ。
+    func dismissPairPopup(id: String? = nil) {
+        guard let p = pairPopup, id == nil || p.id == id else { return }
+        pairPopup = nil
+    }
+
+    /// 「拒否」: PC に「拒否された」と返して閉じる
+    func declinePairPopup() {
+        guard let p = pairPopup else { return }
+        pairPopup = nil
+        server.declinePair(id: p.id)
     }
 
     func regeneratePairingCode() {
