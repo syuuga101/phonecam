@@ -10,7 +10,7 @@ PhoneCam の PC 側の **セットアップウィザード**（受信アプリ�
 
 ## 全体の流れ
 
-所要時間は、**初めてなら 30〜40 分**ほどです（ダウンロードや再起動の待ち時間を含む目安です）。**PC を使うのは準備と手順 1〜3 だけで、手順 4 からは iPhone だけ**です。
+所要時間は、**初めてなら 30〜40 分**ほどです（ダウンロードや再起動の待ち時間を含む目安です）。準備と手順 1〜3 は PC を使います。手順 4〜7 は iPhone で操作し、手順 8 で PC の受信アプリにつなぎます。
 
 | 段階 | やること | 使うもの | 目安 |
 |---|---|---|---|
@@ -34,20 +34,20 @@ PhoneCam の PC 側の **セットアップウィザード**（受信アプリ�
 
 **PC**
 
-- □ Windows 10 または 11 の PC（**64bit**。ARM 版の Windows 10 は、SideStore の公式が非対応としています）
-- □ iPhone をつなぐ **USB ケーブル**（充電専用ではなく、データ通信ができるもの。iPhone に付属のケーブルで大丈夫です）
-- □ インターネットにつながっていること
+- [ ] Windows 10 または 11 の PC（このガイドでは **x64** 版を使います）
+- [ ] iPhone をつなぐ **USB ケーブル**（充電専用ではなく、データ通信ができるもの。iPhone に付属のケーブルで大丈夫です）
+- [ ] インターネットにつながっていること
 
 **iPhone**
 
-- □ iOS 17 以上（PhoneCam が必要とする版です）
-- □ **パスコード** を設定してあること（設定 > Face ID とパスコード、など）
-- □ **Wi-Fi** につながること（モバイル回線では、SideStore の更新ができません）
+- [ ] iOS 17 以上（PhoneCam が必要とする版です）
+- [ ] **パスコード** を設定してあること（設定 > Face ID とパスコード、など）
+- [ ] **Wi-Fi** につながること（モバイル回線では、SideStore の更新ができません）
 
 **そのほか**
 
-- □ **Apple ID**（無料のものでOK。メールアドレスとパスワードを控えておきます。サブのアカウントでも構いません。パスワードは **大文字と小文字が区別されます**）
-- □ Apple ID の **確認コード** を受け取れるもの（Apple ID でサインイン済みのほかの Apple 端末、または登録してある電話番号の携帯）
+- [ ] **Apple ID**（無料のものでOK。メールアドレスとパスワードを控えておきます。サブのアカウントでも構いません。パスワードは **大文字と小文字が区別されます**）
+- [ ] Apple ID の **確認コード** を受け取れるもの（Apple ID でサインイン済みのほかの Apple 端末、または登録してある電話番号の携帯）
 
 > 無料の Apple ID には、制限があります。**アプリは同時に 3 つまで**（SideStore 自身も 1 つに数えます）、**7 日ごとに更新が必要**です。このページの手順は、その範囲で、いちばん簡単に PhoneCam を使える方法です。くわしくは [無料の Apple ID の制限](#無料の-apple-id-の制限) へ。
 
@@ -61,13 +61,14 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 
 **0-1. Windows が 64bit か確認します（念のため）**
 
-1. キーボードの **Windows キーを押しながら R** を押します。
-2. 出てきた小さな窓に `control /name microsoft.system` と入力して、Enter を押します。
-3. 「システムの種類」を見ます。
+1. Windows の **設定** を開きます。
+2. **システム** を選びます。
+3. **バージョン情報** を開きます。
+4. 「システムの種類」を確認します。
 
-> 📷 画像: images/sidestore/01-pc-system-type.png（コントロールパネルの「システム」。「システムの種類」の行）
+> 📷 画像: images/sidestore/01-pc-system-type.png（Windows の「バージョン情報」にある「システムの種類」）
 
-**こうなればOK**: 「64 ビット オペレーティング システム」と書いてある。「32 ビット」の場合は、iloader が使えません。
+**こうなれば OK**　「64 ビット オペレーティング システム、x64 ベース プロセッサ」と表示されています。
 
 **0-2. iTunes を入れます**
 
@@ -75,7 +76,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 2. ダウンロードしたファイルを開いて、案内どおりに進めます。
 3. 求められたら、PC を再起動します。
 
-**こうなればOK**: スタートメニューに「iTunes」が出る（iTunes 自体は、開かなくてもかまいません）。
+**こうなれば OK**　 スタートメニューに「iTunes」が出る（iTunes 自体は、開かなくてもかまいません）。
 
 **0-3. iloader を入れます**
 
@@ -83,13 +84,12 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 2. Windows 用の **MSI** をダウンロードします（`iloader-windows-x64.msi`。SideStore の公式は、MSI をすすめています）。
 3. ダウンロードしたファイルを開いて、案内どおりにインストールします。
 
-**こうなればOK**: スタートメニューに「iloader」が出る。
+**こうなれば OK**　 スタートメニューに「iloader」が出る。
 
 <details>
 <summary>つまずいたら（手順 0）</summary>
 
 - **iTunes が Microsoft Store 版しか入らない・うまく動かない**: Apple 公式サイト版に入れ替えるか、Microsoft Store の **「Apple Devices」アプリ** を入れて試してください（SideStore の公式も、この方法を案内しています）。
-- **Windows の青い警告（SmartScreen）が出る**: 「詳細情報」→「実行」を選びます。
 - **インストールで管理者の確認（青い画面）が出る**: 「はい」を押します。
 
 </details>
@@ -101,7 +101,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 1. USB ケーブルで、iPhone と PC をつなぎます。
 2. iPhone のロックを解除します（画面をつけて、Face ID かパスコードで開きます）。
 
-**こうなればOK**: PhoneCam のウィザードの「iPhoneをUSBで接続」に、**「iPhoneが見つかりました」** と出て、自動で次の画面に進む。（ウィザードを使わないときは、次の手順の iloader に iPhone が出ればOKです。）
+**こうなれば OK**　 PhoneCam のウィザードの「iPhoneをUSBで接続」に、**「iPhoneが見つかりました」** と出て、自動で次の画面に進む。（ウィザードを使わないときは、次の手順の iloader に iPhone が出ればOKです。）
 
 <details>
 <summary>つまずいたら（手順 1）</summary>
@@ -121,7 +121,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 
 > 📷 画像: images/sidestore/02-trust-prompt.png（iPhone の「このコンピュータを信頼しますか？」の画面）
 
-**こうなればOK**: ウィザードに **「信頼済みです」** と出る（ウィザードを使わないときは、次の手順の iloader に iPhone の名前が出る）。
+**こうなれば OK**　 ウィザードに **「信頼済みです」** と出る（ウィザードを使わないときは、次の手順の iloader に iPhone の名前が出る）。
 
 > 「信頼」の確認は、PC とつなぐたびに出ることがあります。そのたびに押してください。
 
@@ -146,7 +146,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 
 3. 確認コードを求められたら、Apple から届いたコードを入力します。
 
-**こうなればOK**: iloader のメイン画面に、Apple ID が表示される。
+**こうなれば OK**　 iloader のメイン画面に、Apple ID が表示される。
 
 4. 画面で、**つないだ iPhone** を選びます。
 
@@ -157,7 +157,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 
 > 📷 画像: images/sidestore/05-iloader-done.png（iloader の完了表示）
 
-**こうなればOK**: iPhone のホーム画面に、**SideStore** のアイコンが出る。
+**こうなれば OK**　 iPhone のホーム画面に、**SideStore** のアイコンが出る。
 
 > **Stable（安定版）** を選んでください。Nightly（最新の開発版）は、不安定なことがあります。
 
@@ -167,7 +167,7 @@ PC に、**iTunes**（iPhone を USB で見つけるための部品が入りま�
 <summary>つまずいたら（手順 3）</summary>
 
 - **iloader に iPhone が出ない**: 手順 1・2 を、もう一度確認します。PhoneCam のウィザードの **「SideStoreの導入チェック」** ボタンを押すと、iTunes（Apple Mobile Device Service）・iPhone の接続・信頼を、まとめて確認できます。
-- **「Verification codes can't be sent to this phone number」と出て、サインインできない**: Apple が、確認コードの SMS を送る回数を制限しているためです。**しばらく時間をおいて**（目安として数時間）、もう一度やります。急ぐときは、その Apple ID でサインインしている **ほかの端末（iPad・Mac など）に出る確認コード** を使います。何度も連続で押さないでください。
+- **「Verification codes can't be sent to this phone number」と出て、サインインできない**: Apple の SMS 送信回数制限が考えられます。**時間をおいて**から、もう一度試します。急ぐときは、その Apple ID でサインインしている **ほかの端末（iPad・Mac など）に出る確認コード** を使います。何度も連続で押さないでください。
 - **「Apple ID またはパスワードが違います」と出る**: 大文字と小文字、全角・半角を確かめます。Apple のサイト（appleid.apple.com）で、同じ組み合わせでサインインできるか試すのも、確実な方法です。
 - **ほかのエラーが出る**: iloader のエラー画面は、原因の候補を出してくれます。[[よくある質問とトラブル]] の「サインインできない・エラーが出る」も見てください。
 - **iloader の質問先**: iloader の不具合は、SideStore ではなく、iloader の作者（[nab138/iloader](https://github.com/nab138/iloader)）や、idevice の Discord に聞く決まりです。
@@ -194,7 +194,7 @@ iPhone だけで行います。ここからは PC は使いません（USB は�
 6. 確認が出たら、**許可**（Allow）を押します。iPhone が再起動することがあります。
 7. パスコードを入力します。
 
-**こうなればOK**: もう一度「VPNとデバイス管理」を開くと、自分の Apple ID が信頼済みになっている。
+**こうなれば OK**　 もう一度「VPNとデバイス管理」を開くと、自分の Apple ID が信頼済みになっている。
 
 **4-2. デベロッパモードをオンにする**
 
@@ -210,7 +210,7 @@ iPhone だけで行います。ここからは PC は使いません（USB は�
 
 > 📷 画像: images/sidestore/08-developer-mode-confirm.png（再起動後に出る、デベロッパモードをオンにする確認画面）
 
-**こうなればOK**: 「デベロッパモード」の項目が **オン** になっている。
+**こうなれば OK**　 「デベロッパモード」の項目が **オン** になっている。
 
 > iPhone が 2 回再起動することがあります。慌てずに、そのたびにロックを解除します。
 
@@ -235,11 +235,12 @@ iPhone だけで行います。ここからは PC は使いません（USB は�
 
 2. **LocalDevVPN** を開きます。
 3. **Connect** を押します。
-4. 「VPN 構成の追加」を求められたら、**許可**（Allow）を押して、パスコードを入力します。
+4. 「VPN 構成の追加」を求められたら、**許可**（Allow）を押します。
+5. パスコードを求められたら入力します。
 
 > 📷 画像: images/sidestore/10-localdevvpn-allow.png（「VPN構成の追加を許可」の確認画面）
 
-**こうなればOK**: LocalDevVPN の画面が接続中になり、iPhone の画面上部に **VPN のマーク** が出る。
+**こうなれば OK**　 LocalDevVPN の画面が接続中になり、iPhone の画面上部に **VPN のマーク** が出る。
 
 > 📷 画像: images/sidestore/11-localdevvpn-connected.png（LocalDevVPN が Connect 済みの画面と、画面上部の VPN マーク）
 
@@ -251,7 +252,7 @@ iPhone だけで行います。ここからは PC は使いません（USB は�
 - **VPN を使っている別のアプリ（WireGuard など）がある**: オフにします。VPN は、同時に 1 つしか使えません。
 - **広告ブロックなどの DNS のアプリがある**: オフにします。
 - **Connect を押しても、すぐに切れる**: LocalDevVPN を開き直して、もう一度押します。iPhone を再起動すると直ることもあります。
-- **あとで「VPN に接続してください」と出る**: LocalDevVPN の **Tunnel IP** を `10.7.0.0/32` にすると直ります。[[よくある質問とトラブル]] の「LocalDevVPN につながっているのに『VPN に接続してください』と出る」へ。
+- **あとで「VPN に接続してください」と出る**: Wi-Fi と VPN の接続を確認したうえで、LocalDevVPN の **Tunnel IP** を `10.7.0.0/32` に変更して再接続します。[[よくある質問とトラブル]] の「LocalDevVPN につながっているのに『VPN に接続してください』と出る」へ。
 
 </details>
 
@@ -259,7 +260,7 @@ iPhone だけで行います。ここからは PC は使いません（USB は�
 
 ## 手順 6: SideStore にサインインして、最初の更新をする
 
-SideStore が使えるようにするための手順です。**この「最初の更新」を必ずやってから、PhoneCam を入れてください。** やらないと、あとで更新したときに、先に入れたアプリが消えることがあります（iloader が入れた SideStore と、SideStore 自身では、内部の ID が違うことがあり、更新すると SideStore 自身のものに切り替わるためです）。
+SideStore が使えるようにするための手順です。**この「最初の更新」を必ずやってから、PhoneCam を入れてください。**
 
 1. iPhone で **LocalDevVPN** が Connect になっていて、**Wi-Fi** につながっていることを確かめます。
 2. **SideStore** を開きます。
@@ -279,7 +280,7 @@ SideStore が使えるようにするための手順です。**この「最初�
 
 8. 待ちます。
 
-**こうなればOK**: iPhone が **ホーム画面に戻り**、通知が出る。数秒後に、SideStore がまた使えるようになる。ここまでで、SideStore の準備は完了です。**USB ケーブルを外して大丈夫です。**
+**こうなれば OK**　 iPhone が **ホーム画面に戻り**、通知が出る。数秒後に、SideStore がまた使えるようになる。ここまでで、SideStore の準備は完了です。**USB ケーブルを外して大丈夫です。**
 
 <details>
 <summary>つまずいたら（手順 6）</summary>
@@ -302,7 +303,10 @@ PhoneCam は、SideStore の **ソース**（アプリの配布元のリスト�
 
 1. PC の PhoneCam のウィザードで、「SideStoreにPhoneCamを追加して入れる」の画面を開きます。
 2. iPhone の **カメラ** で、画面の **QR コード** を読み取ります。
-3. SideStore で開く表示が出たら押して、ソースの追加を確認する画面で **追加** を押します。
+3. SideStore で開く表示を押します。
+4. ソースの確認画面で **追加** を押します。
+
+**こうなれば OK**　SideStore の **Sources** に PhoneCam の配布元が表示されます。
 
 **方法 B: URL を貼り付けて追加する（QR が使えないとき）**
 
@@ -312,24 +316,26 @@ PhoneCam は、SideStore の **ソース**（アプリの配布元のリスト�
 https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.json
 ```
 
-2. **SideStore** を開き、下のタブの **Sources** を開きます。
-3. **＋** ボタンを押します。
-4. URL を貼り付けて、**追加** を押します。
+2. **SideStore** を開きます。
+3. 下のタブの **Sources** を開きます。
+4. **＋** ボタンを押します。
+5. URL を貼り付けます。
+6. **追加** を押します。
 
 > 📷 画像: images/sidestore/15-sidestore-sources-add.png（SideStore の Sources で「＋」を押して、URL を入れる画面）
 
-> 同じ内容の `altstore-source.json`（旧 URL）も、引き続き使えます。
+**こうなれば OK**　**Sources** に PhoneCam の配布元が表示されます。
 
 **どちらの方法でも、そのあとは同じです。**
 
-5. 追加した **PhoneCam のソース** を開きます（Sources の一覧にあります。Browse からも探せます）。
-6. **PhoneCam** の **GET**（入手）を押します。
+1. **Browse** を開きます。
+2. **PhoneCam** の **GET**（入手）を押します。
 
 > 📷 画像: images/sidestore/16-sidestore-phonecam-get.png（PhoneCam のソースのページ。「GET」ボタン）
 
-7. 終わるまで待ちます。
+3. インストールが終わるまで待ちます。
 
-**こうなればOK**: iPhone のホーム画面に **PhoneCam** のアイコンが出る。
+**こうなれば OK**　 iPhone のホーム画面に **PhoneCam** のアイコンが出る。
 
 <details>
 <summary>つまずいたら（手順 7）</summary>
@@ -352,23 +358,24 @@ https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.
 
 > 📷 画像: images/sidestore/17-phonecam-permissions.png（カメラの許可を求める画面）
 
-**こうなればOK**: iPhone の画面に、カメラの映像が出る。
+**こうなれば OK**　 iPhone の画面に、カメラの映像が出る。
 
 **8-2. PC の受信アプリとつなぐ**
 
-1. iPhone を USB で PC につないだまま、PhoneCam を **前面に出しておきます**（画面をロックしないでください）。
-2. PC で、PhoneCam の受信アプリを開きます（ウィザードの「接続テスト」の画面でも大丈夫です）。
+1. iPhone を USB で PC につなぎます。
+2. iPhone で PhoneCam を**前面に出しておきます**。
+3. PC で、PhoneCam の受信アプリを開きます。ウィザードを進めている場合は「接続テスト」の画面を表示します。
 
 > 📷 画像: images/sidestore/18-wizard-test-done.png（PC のウィザードの「接続テスト」で、「PhoneCamアプリとつながりました」と出ている画面）
 
-**こうなればOK**: ウィザードに **「PhoneCamアプリとつながりました」** と出る（受信アプリのほうなら、映像が流れる）。これで、**iPhone へのアプリの導入は完了**です。お疲れさまでした。
+**こうなれば OK**　 ウィザードに **「PhoneCamアプリとつながりました」** と出る（受信アプリのほうなら、映像が流れる）。これで、**iPhone へのアプリの導入は完了**です。お疲れさまでした。
 
 このあとは、[[OBSで使う]] や [[Discordで使う]] へ。
 
 <details>
 <summary>つまずいたら（手順 8）</summary>
 
-- **PhoneCam を開くと、すぐに閉じる・開かない**: 期限が切れているか、デベロッパモードがオフです。手順 4 を確認して、手順 6 の更新（7 DAYS）をやり直します。
+- **PhoneCam を開くと、すぐに閉じる・開かない**: 手順 4 でデベロッパモードを確認します。期限切れの場合は [[アップデート方法]] の復旧手順を使います。
 - **「iPhoneのPhoneCamアプリに接続できません」と出る**: iPhone で PhoneCam を起動して、前面に出したままにします。
 - **「信頼されていないデベロッパ」と出る**: 手順 4-1 をやります。
 - 接続の問題は、[[よくある質問とトラブル]] の「接続できない」へ。
@@ -385,11 +392,9 @@ https://github.com/syuuga101/phonecam/releases/latest/download/sidestore-source.
 |---|---|---|
 | **アプリは同時に 3 つまで** | SideStore 自身も 1 つに数えます。PhoneCam を入れると、残りは 1 つです。 | 使わないアプリを、SideStore の My Apps から消します。 |
 | **7 日で期限が切れる** | 期限が切れると、アプリが開かなくなります。 | **7 日ごとに、SideStore で更新します**（[[アップデート方法]] の「7 日ごとの更新」）。 |
-| **1 週間に入れられる「別々のアプリ」は 10 種類まで** | 入れたり消したりを繰り返すと、数えられます。 | 週をまたいで、リセットを待ちます。 |
+| **7 日間に使える App ID は 10 個まで** | App ID は署名時に使う識別子です。アプリの拡張機能も枠を使うことがあります。 | SideStore の App ID 一覧で期限を確認し、枠が空くのを待ちます。 |
 
-> **面倒な設定をしたくない人は、SideStore 単体で、PhoneCam をダウンロード・更新すれば十分です。** 下の LiveContainer は、**上級者向けの任意の方法**なので、読まなくてかまいません。
->
-> 有料の Apple Developer アカウント（年 $99）なら、3 アプリの制限はなくなり、期限も 1 年に延びます（SideStore 公式 FAQ より）。
+このガイドの手順で、無料の Apple ID と SideStore 単体を使って PhoneCam の導入・更新ができます。[SideStore 公式 FAQ](https://docs.sidestore.io/docs/faq)
 
 ---
 
@@ -409,12 +414,12 @@ SideStore は、期限が近づくと、iPhone の中で自動で更新しよう
 
 上の 手順 0〜6 のとおりに、SideStore を入れます。AltStore は、そのままで構いません（途中で消す必要はありません）。
 
-> 無料の Apple ID で同時に入れられるのは **3 アプリまで**です。AltStore + PhoneCam + SideStore で、すでに 3 つ使っていると、SideStore が入りません。そのときは、先に AltStore を消して（下の「3.」）から、SideStore を入れてください。
+> 無料の Apple ID で同時に入れられるのは **3 アプリまで**です。すでに AltStore や PhoneCam などで 3 枠を使っていると、SideStore を追加できません。そのときは、先に AltStore を消して（下の「3.」）から、SideStore を入れてください。
 
 **2. PhoneCam を SideStore から入れ直す**
 
 1. SideStore の **Sources** に、PhoneCam の配布元を追加します（上の 手順 7）。
-2. PhoneCam を入れます。AltStore で入れた PhoneCam が残っている場合、SideStore から入れると、**消さずにそのまま上書き**されて、設定も残ります。
+2. PhoneCam を入れます。AltStore で入れた PhoneCam がある場合は、まず削除せずに SideStore からのインストールを試します。
 
    > 上書きされないで、2 つ並んだり、エラーになったりしたときは、AltStore 側の PhoneCam を一度消してから入れ直してください（PhoneCam の設定は iPhone の中のものなので、消すと戻ります）。
 
@@ -429,33 +434,20 @@ SideStore から PhoneCam が動くことを確かめたら、次を消して構
 
 ---
 
-## 上級者向け（任意）: LiveContainer を使う
+## 上級者向け（任意）　LiveContainer を使う
 
-> **初心者の人は、この項目は読まなくて大丈夫です。** PhoneCam は、SideStore から普通に入れるのがおすすめです。
+通常の導入は、SideStore 単体で PhoneCam を入れて更新する手順 0〜8 で完了します。
 
-**LiveContainer**（ライブコンテナ）は、iPhone の中で、ほかのアプリを「アプリの中のアプリ」として動かすアプリです。入れたアプリは、LiveContainer 1 つ分として数えられるので、無料の Apple ID の「**3 アプリまで**」「**1 週間に 10 種類まで**」の制限を、避けられます。SideStore 入りの **LiveContainer + SideStore** という版もあります。
+**LiveContainer** は、iPhone 上でほかのアプリを内部で実行するアプリです。SideStore を内蔵した版もあります。導入する場合は [LiveContainer + SideStore の公式手順](https://livecontainer.github.io/docs/installation/lc_sidestore) を参照してください。
 
-**入れ方（目安）**: PC の **iloader** で、SideStore を入れるときに、LiveContainer + SideStore も入れられます（iloader の README に書かれています）。くわしい手順は、[LiveContainer の公式ページ](https://github.com/LiveContainer/LiveContainer) と [SideStore の公式ドキュメント](https://docs.sidestore.io/) を見てください。
+PhoneCam の接続テストは、SideStore から iPhone に直接インストールした状態で行います。
 
-**PhoneCam を LiveContainer の中に入れるときの注意**
+<details>
+<summary>LiveContainer + SideStore で error 1006 が出るとき</summary>
 
-- Wi-Fi の自動検出（Bonjour）、ローカルネットワーク、バックグラウンドでの配信など、**一部の機能が動かない可能性があります**。
-- LiveContainer + SideStore の構成でも、**PhoneCam を SideStore から入れれば、そのまま使えます**。
+UDID は iPhone を識別する ID です。SideStore がこの ID を取得できないときは、[[よくある質問とトラブル]] の「LiveContainer + SideStore で error 1006 が出る」に沿って、iloader でペアリングファイルを作り直します。
 
-**LiveContainer で「error 1006 UDID」（UDID を取得できない）と出るとき**
-
-**ペアリングファイル**（iPhone と PC が「お互いを知っている」という印のファイル）が使えなくなっています。作り直します。SideStore の公式の手順は、次のとおりです。
-
-1. 出てくる確認は、すべて許可します。
-2. SideStore の **Settings** で、**Reset Pairing File**（ペアリングファイルをリセット）を押します。
-3. PC の **iloader** を開き、iPhone を USB でつないで、**Delete Stored Pairing** を押します。
-4. 一覧から iPhone を選び、iPhone に出る **信頼** を押します。
-5. **Manage Pairing File** を押して、**Place**（All Apps など）を押します。
-6. iPhone で SideStore を開いて、更新します。
-7. まだ出るときは、LocalDevVPN の **Device IP** を `10.7.0.1` にして、つなぎ直します。
-8. それでもだめなときは、SideStore の **Anisette** を別のサーバーに変えて、iPhone を再起動します。
-
-（出典: [SideStore 公式のエラーコード一覧](https://docs.sidestore.io/docs/troubleshooting/error-codes)。この方法は、SideStore の Nightly 版と LiveContainer の組み合わせで使うものです。）
+</details>
 
 ---
 
@@ -463,6 +455,7 @@ SideStore から PhoneCam が動くことを確かめたら、次を消して構
 
 - [[よくある質問とトラブル]]: 症状から探せます（VPN のエラー、更新できない、サインインできない、ペアリングファイルなど）。
 - [[アップデート方法]]: 7 日ごとの更新と、期限が切れたときの直し方。
+- [SideStore 公式の導入手順](https://docs.sidestore.io/docs/installation/install) / [iloader 公式](https://github.com/nab138/iloader) / [LocalDevVPN 公式](https://github.com/jkcoxson/LocalDevVPN)
 - [SideStore 公式のトラブルシューティング](https://docs.sidestore.io/docs/troubleshooting/common-issues) / [FAQ](https://docs.sidestore.io/docs/faq)
 - 解決しないときは、[Issues](https://github.com/syuuga101/phonecam/issues) へ。
 

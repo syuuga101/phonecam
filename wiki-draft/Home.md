@@ -1,5 +1,3 @@
-Welcome to the phonecam wiki!
-
 # PhoneCam 使い方ガイド
 
 使っていない iPhone を、Windows 用の低遅延ウェブカメラ＆マイクにするアプリ **PhoneCam** の使い方ガイドです。OBS や Discord で、iPhone のカメラを「PhoneCam」として使えます。
@@ -15,19 +13,20 @@ Welcome to the phonecam wiki!
 
 最新版は [Releases](https://github.com/syuuga101/phonecam/releases/latest) からダウンロードできます。
 
-## ガイドの目次
+## 初めて使うとき
 
-上から順に読むと、セットアップから使いこなしまで分かります。
+1. [[はじめに（セットアップ）]] で Windows の受信アプリを用意します。
+2. [[iPhoneアプリの入れ方（SideStore）]] の手順 0〜8 で、iPhone に PhoneCam を入れて映像を確認します。
 
-1. [[はじめに（セットアップ）]]
-2. [[iPhoneアプリの入れ方（SideStore）]]
-3. [[OBSで使う]]
-4. [[Discordで使う]]
-5. [[音声（iPhoneのマイク）を使う]]
-6. [[画質と遅延の調整]]
-7. [[録画機能]]
-8. [[ショートカットキー]]
-9. [[アップデート方法]]
-10. [[よくある質問とトラブル]]
+## インストール後
+
+- [[アップデート方法]] ― 7 日ごとの期限更新と、期限切れからの復旧
+- [[よくある質問とトラブル]] ― SideStore、VPN、USB 接続などの対処
+- [[OBSで使う]]
+- [[Discordで使う]]
+- [[音声（iPhoneのマイク）を使う]]
+- [[画質と遅延の調整]]
+- [[録画機能]]
+- [[ショートカットキー]]
 
 解決しないときは [Issues](https://github.com/syuuga101/phonecam/issues) へ（テンプレートがあります）。
