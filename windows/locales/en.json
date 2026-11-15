@@ -537,7 +537,7 @@
  "setup.iphone.usb.title": "Connect the iPhone by USB",
  "setup.iphone.vpn.l1": "Install \"LocalDevVPN\" from the App Store. You can open its App Store page with the QR code on the right or the button below.",
  "setup.iphone.vpn.l2": "Open LocalDevVPN and tap \"Connect\". If asked to add a VPN configuration, tap \"Allow\" and enter your passcode.",
- "setup.iphone.vpn.l3": "Whenever you install or update apps in SideStore, keep LocalDevVPN turned on (Connect).",
+ "setup.iphone.vpn.l3": "Whenever you install or update apps in SideStore, keep LocalDevVPN turned on (Connect). If an update fails with a \"connect to VPN\" error even though LocalDevVPN is connected, open LocalDevVPN's settings, set Tunnel IP to 10.7.0.0/32, and reconnect (a known issue since LocalDevVPN 1.3; updating LocalDevVPN may reset it).",
  "setup.iphone.vpn.title": "Install LocalDevVPN and connect",
  "setup.wizard.check_iloader_1": "Checking iloader...",
  "setup.wizard.check_iloader_2": "iloader is installed",

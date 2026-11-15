@@ -537,7 +537,7 @@
  "setup.iphone.usb.title": "iPhoneをUSBで接続",
  "setup.iphone.vpn.l1": "App Storeから「LocalDevVPN」を入れます。右のQRコードか、下のボタンでApp Storeのページを開けます。",
  "setup.iphone.vpn.l2": "LocalDevVPNを開いて「Connect」を押します。VPN構成の追加を求められたら「許可」を押して、パスコードを入力します。",
- "setup.iphone.vpn.l3": "SideStoreでアプリを入れたり更新したりするときは、いつもLocalDevVPNをオン（Connect）にします。",
+ "setup.iphone.vpn.l3": "SideStoreでアプリを入れたり更新したりするときは、いつもLocalDevVPNをオン（Connect）にします。 LocalDevVPNにつながっているのに「VPNに接続してください」と出て更新できないときは、LocalDevVPNの設定で Tunnel IP を 10.7.0.0/32 にして、つなぎ直してください（LocalDevVPN 1.3 以降で起きる既知の問題です。更新すると元に戻ることがあります）。",
  "setup.iphone.vpn.title": "LocalDevVPNを入れて接続",
  "setup.wizard.check_iloader_1": "iloader を確認しています…",
  "setup.wizard.check_iloader_2": "iloaderが入っている",

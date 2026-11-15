@@ -111,6 +111,8 @@ PhoneCam を開いたら、カメラとローカルネットワークの許可�
 
 - **7 日で期限が切れます**（無料の Apple ID の場合）。SideStore が、iPhone の中で自動で更新します。うまくいかないときは、手動で更新します（[[アップデート方法]] の「7 日ごとの更新」）。
 - **更新するときは、LocalDevVPN を Connect にして、Wi-Fi につないでおきます。**
+- LocalDevVPN につながっているのに「VPN に接続してください」のエラーで更新できないときは、LocalDevVPN の設定で **Tunnel IP を `10.7.0.0/32`** にして、つなぎ直してください（LocalDevVPN 1.3 以降で起きる既知の問題です。LocalDevVPN を更新すると元に戻ることがあります。出典: [SideStore Issue #1460](https://github.com/SideStore/SideStore/issues/1460)）。
+- LiveContainer の中に PhoneCam を入れると、Wi-Fi の自動検出（Bonjour）、ローカルネットワーク、バックグラウンドでの配信など、一部の機能が動かない可能性があります。PhoneCam は SideStore から普通に入れることをおすすめします（LiveContainer + SideStore の構成でも、SideStore から入れればそのまま使えます）。
 - 無料の Apple ID で同時に有効にできるアプリは **3 つまで**です（SideStore 自身も 1 つに数えます）。PhoneCam を入れると、残りは 1 つです。
 - 1 週間に入れられる「別々のアプリ」は 10 種類までです。
 - iPhone の iOS を更新したり、iPhone を初期化したりすると、**ペアリングファイル**（iPhone と PC が「お互いを知っている」という印のファイル）が使えなくなることがあります。そのときは、PC の **iloader** で入れ直します（[[よくある質問とトラブル]] の「ペアリングファイルの期限切れ」）。
