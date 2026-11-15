@@ -232,12 +232,12 @@ def main():
         guard.activated.connect(win.bring_to_front)
         app.aboutToQuit.connect(guard.close)
     app._phonecam_guard = guard    # 参照を持ち続ける (消えると待ち受けが終わる)
-    # 初回・更新後のセットアップは、ウィンドウを出す前にこのウィンドウの中へ入れる (最初に見える画面がもうセットアップ。別のウィンドウは開かない)
+    win.restore_state()
+    # 初回・更新後のセットアップは、メインウィンドウを出したあと、その上に別のウィンドウとして出す (前面・中央、親子関係つき)
     try:
         ctrl.first_run_setup()
     except Exception:
         crashlog.log_error("first_run_setup")
-    win.restore_state()
     app.aboutToQuit.connect(win.cameras.close)
     app.aboutToQuit.connect(crashlog.mark_exit)
     return app.exec()

@@ -284,8 +284,9 @@ def _other_windows(win):
     return [w for w in QApplication.topLevelWidgets() if w is not win and w.isVisible()]
 
 
-def test_setup_opens_inside_the_main_window_not_as_another_window(app):
-    from phonecam.qt.setup_wizard import SetupWizardDialog, SetupWizardPanel
+def test_setup_opens_as_a_child_window_over_the_main_window(app):
+    from shiboken6 import isValid
+    from phonecam.qt.setup_wizard import SetupWizardDialog
     ctrl = Controller.demo_connected("ja")
     win = MainWindow(ctrl, tick=False)
     win.resize(1100, 760)
@@ -295,24 +296,31 @@ def test_setup_opens_inside_the_main_window_not_as_another_window(app):
         ctrl._setup_open = True
         ctrl.setup_requested.emit(False, None)       # 初回起動・更新後に controller が出す合図
         _settle(app)
-        panel = win.setup_panel
-        assert isinstance(panel, SetupWizardPanel)
-        assert win.root_stack.currentWidget() is panel
-        assert not win.findChildren(SetupWizardDialog)
-        assert _other_windows(win) == []
-        assert panel.page == 0 and panel.next_btn.isVisible()
-        # 「あとで」: 普段の画面に戻り、設定ページの再表示もできる
-        panel._skip()
+        dialog = win.setup_dialog
+        assert isinstance(dialog, SetupWizardDialog)
+        assert dialog.parent() is win                # 親子関係がある (タスクバーに別のボタンは増えない)
+        assert _other_windows(win) == [dialog]       # 見えているのはメインとセットアップの 2 つだけ
+        wc, dc = win.geometry().center(), dialog.geometry().center()
+        if win.screen().availableGeometry().contains(win.frameGeometry()):   # 画面からはみ出す大きさのときは、画面内に収める方を優先
+            assert abs(wc.x() - dc.x()) <= 40 and abs(wc.y() - dc.y()) <= 40   # メインの中央
+        assert dialog.screen().availableGeometry().intersects(dialog.frameGeometry())
+        assert dialog.page == 0 and dialog.next_btn.isVisible()
+        # 「あとで」: 閉じて、設定ページから再表示もできる
+        dialog._skip()
         _settle(app)
-        assert win.setup_panel is None
-        assert win.root_stack.currentWidget() is win.main_area
+        assert not isValid(dialog) or not dialog.isVisible()   # 閉じると破棄される
         assert not ctrl._setup_open
         ctrl.setup_requested.emit(False, None)
         _settle(app)
-        assert win.setup_panel is not None
-        win.setup_panel._skip()
+        assert win.setup_dialog is not None and isValid(win.setup_dialog) and win.setup_dialog.isVisible()
+        win.setup_dialog._skip()
         _settle(app)
     finally:
+        if win.setup_dialog is not None and isValid(win.setup_dialog):
+            try:
+                win.setup_dialog.close()
+            except RuntimeError:
+                pass
         win.close()
         win.deleteLater()
 

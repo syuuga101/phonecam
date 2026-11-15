@@ -18,7 +18,7 @@ import os
 import threading
 import time
 
-from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -161,10 +161,8 @@ class ResultRow(QWidget):
 # ---------------------------------------------------------------------------
 
 class _WizardLogic:
-    """ウィザードの中身 (画面・ページ・終了処理)。QDialog (単体 / テスト) と QWidget (メインウィンドウの中) の両方に混ぜて使う。
+    """ウィザードの中身 (画面・ページ・終了処理)。QDialog に混ぜて使う。
     start="iphone" のときは iPhone の手順だけを開く。"""
-
-    EMBEDDED = False   # True: メインウィンドウの中に出す。自分でウィンドウの大きさ・位置を変えない
 
     def _wizard_init(self, controller, on_finish=None, on_skip=None, open_url=None, launch=None,
                      start="setup", update_version=None):
@@ -194,8 +192,7 @@ class _WizardLogic:
 
         self._build_frame()
         self._timers()
-        if not self.EMBEDDED:
-            fit_to_work_area(self, 700, 580)
+        fit_to_work_area(self, 700, 580)
         self._listener = self._on_controller
         controller.listen(self._listener)
         self.show_page(ps.PAGE_IPHONE if start == "iphone" else (ps.PAGE_INSTALL if start == "guided" else ps.PAGE_WELCOME))
@@ -373,7 +370,7 @@ class _WizardLogic:
     def _fit_window(self):
         """中身の高さに合わせてウィンドウを高くする (縮めはしない)。作業領域からははみ出させない。
         収まらないぶんは本文のスクロールで受け、下のボタン行は常に見える。"""
-        if self._ended or not self.auto_fit or self.EMBEDDED:
+        if self._ended or not self.auto_fit:
             return
         try:
             if not self.isVisible():
@@ -1157,7 +1154,7 @@ class _WizardLogic:
 
 
 class SetupWizardDialog(_WizardLogic, QDialog):
-    """単体のウィンドウで開くウィザード (--setup-wizard / テスト)。"""
+    """別のウィンドウで開くウィザード (初回・更新後はメインウィンドウの上に出す / --setup-wizard / テスト)。"""
 
     def __init__(self, controller, parent=None, on_finish=None, on_skip=None, open_url=None, launch=None,
                  start="setup", update_version=None):
@@ -1169,30 +1166,6 @@ class SetupWizardDialog(_WizardLogic, QDialog):
 
     def _accepted(self):
         QDialog.accept(self)
-
-
-class SetupWizardPanel(_WizardLogic, QWidget):
-    """メインウィンドウの中に出すウィザード (別のウィンドウを開かない)。終わると finished(1) を出す。"""
-
-    EMBEDDED = True
-    finished = Signal(int)
-
-    def __init__(self, controller, parent=None, on_finish=None, on_skip=None, open_url=None, launch=None,
-                 start="setup", update_version=None):
-        QWidget.__init__(self, parent)
-        self.setAutoFillBackground(True)
-        self._wizard_init(controller, on_finish, on_skip, open_url, launch, start, update_version)
-
-    def _accepted(self):
-        self.finished.emit(1)
-
-    def keyPressEvent(self, e):
-        # ダイアログではないので、Enter で「次へ」を押す動きは自分で持つ
-        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self.next_btn.isVisible() and self.next_btn.isEnabled() \
-                and self.next_btn.isDefault() and not self._ended:
-            self.next_btn.click()
-            return
-        super().keyPressEvent(e)
 
 
 def _overview_row(glyph, title):
@@ -1216,25 +1189,24 @@ def make_audio_guard(get, set_):
         return None
 
 
-def create_setup_panel(ctrl, after_update=None, parent=None):
-    """アプリ本体のウィンドウの中に出すウィザードを作る (別のウィンドウは開かない)。
-    呼ぶ側が表示する。終わる (あとで / 完了) と panel.finished が出る。設定は ctrl 経由で読み書きする。"""
-    from phonecam.core.softcam_reg import bind_setup_host
-    bind_setup_host(link_connected=lambda: bool(ctrl.state.connected))
-
-    def audio_set(key, value):
-        ctrl.changed(key, value)
-        ctrl.save_now()
-
-    controller = ps.SetupController(QtRoot(), audio_guard=make_audio_guard(ctrl.get, audio_set))
-
-    def finish():
-        ctrl.changed("setup_done", True)
-        ctrl.save_now()
-
-    panel = SetupWizardPanel(controller, parent, on_finish=finish, on_skip=finish, update_version=after_update)
-    panel.finished.connect(lambda _result: controller.close())
-    return panel
+def place_over_parent(dialog, parent, retry=True):
+    """セットアップのウィンドウを、メインウィンドウの前面・中央に置く (親子関係があるので、タスクバーに別のボタンは増えない)。"""
+    try:
+        top = parent.window()
+        frame = top.frameGeometry() if top.isVisible() else None
+        if frame is not None and not top.isMinimized():
+            x = frame.x() + (frame.width() - dialog.frameGeometry().width()) // 2
+            y = frame.y() + (frame.height() - dialog.frameGeometry().height()) // 2
+            avail = available_geometry(top)
+            x = max(avail.x(), min(x, avail.x() + avail.width() - dialog.frameGeometry().width()))
+            y = max(avail.y(), min(y, avail.y() + avail.height() - dialog.frameGeometry().height()))
+            dialog.move(QPoint(x, y))
+        dialog.raise_()
+        dialog.activateWindow()
+        if retry:   # 親が表示された直後は、枠の位置がまだ確定していないことがあるので、もう一度だけ置き直す
+            QTimer.singleShot(120, lambda: place_over_parent(dialog, parent, retry=False))
+    except RuntimeError:
+        pass
 
 
 def open_setup_dialog(parent, ctrl, diagnose=False, after_update=None):
@@ -1261,4 +1233,6 @@ def open_setup_dialog(parent, ctrl, diagnose=False, after_update=None):
     dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dialog.finished.connect(lambda _result: ctrl.setup_dialog_closed())
     dialog.open()
+    if parent is not None:
+        place_over_parent(dialog, parent)
     return dialog

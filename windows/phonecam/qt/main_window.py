@@ -167,14 +167,9 @@ class MainWindow(QMainWindow):
         self.resize(960, 720)
         self.setMinimumSize(640, 520)
 
-        # 中央は 2 枚重ね: 0 = 普段の画面 (ナビ + ページ)、1 = セットアップ (初回・更新後)。セットアップは別のウィンドウを
-        # 開かず、この 2 枚目に出す (起動時に開くウィンドウをメインの 1 つだけにするため)
-        self.root_stack = QStackedWidget()
-        self.setCentralWidget(self.root_stack)
         central = QWidget()
-        self.main_area = central
-        self.root_stack.addWidget(central)
-        self.setup_panel = None
+        self.setCentralWidget(central)
+        self.setup_dialog = None    # 開いているセットアップのウィンドウ (メインウィンドウの上に出る別ウィンドウ)
         outer = QHBoxLayout(central)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -735,7 +730,7 @@ class MainWindow(QMainWindow):
         self._toast_timer.start(TOAST_MS)
 
     def _place_toast(self):
-        c = self.main_area
+        c = self.centralWidget()
         lw = min(self.toast_label.width(), max(100, c.width() - 40))
         self.toast_label.setFixedWidth(lw)
         self.toast_label.move((c.width() - lw) // 2, c.height() - self.toast_label.height() - 24)
@@ -746,43 +741,15 @@ class MainWindow(QMainWindow):
             self._place_toast()
 
     def _open_setup(self, diagnose, after_update):
-        """セットアップ。ウィザードはこのウィンドウの中に出す (別のウィンドウは開かない)。SideStore の導入チェックは、
-        設定ページから押したときだけ開くので、ダイアログのまま。"""
+        """セットアップ (ウィザード / SideStore の導入チェック) を、別プロセスではなくこのプロセスの別ウィンドウとして開く。
+        メインウィンドウの前面・中央に、親子関係を付けて出す (タスクバーに別のボタンは増えない)。"""
         try:
-            if diagnose:
-                from phonecam.qt.setup_wizard import open_setup_dialog
-                open_setup_dialog(self, self.ctrl, diagnose=True, after_update=after_update)
-            else:
-                self.show_setup(after_update)
+            from phonecam.qt.setup_wizard import open_setup_dialog
+            self.setup_dialog = open_setup_dialog(self, self.ctrl, diagnose=diagnose, after_update=after_update)
         except Exception as error:
-            self._hide_setup()
+            self.setup_dialog = None
             self.ctrl.setup_dialog_closed()
             self.show_toast(t("settings.setup.launch_error", error=error), "error")
-
-    def show_setup(self, after_update=None):
-        """ウィザードをウィンドウいっぱいに出す (ナビも隠れる)。「あとで」や完了で、普段の画面に戻る。"""
-        if self.setup_panel is not None:
-            return self.setup_panel
-        from phonecam.qt.setup_wizard import create_setup_panel
-        panel = create_setup_panel(self.ctrl, after_update=after_update)
-        self.setup_panel = panel
-        self.root_stack.addWidget(panel)
-        self.root_stack.setCurrentWidget(panel)
-        panel.finished.connect(self._setup_finished)
-        panel.setFocus()
-        return panel
-
-    def _setup_finished(self, _result=0):
-        self._hide_setup()
-        self.ctrl.setup_dialog_closed()
-
-    def _hide_setup(self):
-        panel, self.setup_panel = self.setup_panel, None
-        self.root_stack.setCurrentWidget(self.main_area)
-        if panel is not None:
-            self.root_stack.removeWidget(panel)
-            panel.hide()
-            panel.deleteLater()
 
     # -- 仮想カメラの登録の帯 -------------------------------------------------------------------
     def _camera_banner(self, state):
@@ -817,6 +784,14 @@ class MainWindow(QMainWindow):
         self.show()
         self.raise_()
         self.activateWindow()
+        dialog = self.setup_dialog
+        if dialog is not None:
+            try:
+                if dialog.isVisible():
+                    dialog.raise_()
+                    dialog.activateWindow()
+            except RuntimeError:
+                self.setup_dialog = None
 
     def restore_state(self):
         """起動時: 最大化 (既定) か、前回の位置と大きさ。画面外なら無視。show の代わりに呼ぶ。"""
