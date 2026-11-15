@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, button
+from phonecam.qt.plain import PlainLabel
 
 REVERT_SECONDS = 10
 
@@ -34,7 +35,7 @@ class LanguageConfirmDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 18)
         layout.setSpacing(6)
-        self.title_label = QLabel(t("settings.language.confirm"))
+        self.title_label = PlainLabel(t("settings.language.confirm"))
         font = self.title_label.font()
         font.setPointSizeF(13.0)
         font.setWeight(QFont.Weight.DemiBold)

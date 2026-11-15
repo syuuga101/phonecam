@@ -3,6 +3,7 @@
 """
 
 import json
+import math
 import socket
 import struct
 from phonecam.core.deps import np
@@ -105,7 +106,7 @@ def parse_pong(payload):
         phone_t = float(d["t"])
     except Exception:
         return None
-    if sent != sent or phone_t != phone_t:  # NaN
+    if not (math.isfinite(sent) and math.isfinite(phone_t)):  # NaN / inf
         return None
     return sent, phone_t
 
@@ -115,7 +116,7 @@ def parse_timing(payload):
     if len(payload) < 16:
         return None
     capture, send = struct.unpack(">dd", payload[:16])
-    if capture != capture or send != send:
+    if not (math.isfinite(capture) and math.isfinite(send)):  # NaN / inf
         return None
     return capture, send
 
@@ -128,7 +129,7 @@ def parse_audio(payload):
     if np is None or len(payload) < AUDIO_HEADER_SIZE:
         return None
     capture, rate, channels = struct.unpack(">dIB", payload[:AUDIO_HEADER_SIZE])
-    if rate < 8000 or rate > 192000:
+    if rate < 8000 or rate > 192000 or channels < 1 or not math.isfinite(capture):
         return None
     body = payload[AUDIO_HEADER_SIZE:]
     body = body[: len(body) // 2 * 2]

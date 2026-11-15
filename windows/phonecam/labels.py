@@ -217,3 +217,36 @@ def phone_mic_text(connected, phone_muted):
     if not connected:
         return "-"
     return t("audio.phonemic.muted" if phone_muted else "audio.phonemic.on")
+
+
+def mic_state_key(enabled, pc_muted, phone_muted):
+    """マイクの状態を 4 つ (+ 両方ミュート) に分ける純粋関数。戻り値は locale の末尾キー。"""
+    if not enabled:
+        return "off"
+    if pc_muted and phone_muted:
+        return "both"
+    if phone_muted:
+        return "phone"
+    if pc_muted:
+        return "muted"
+    return "on"
+
+
+def mic_state_text(enabled, pc_muted, phone_muted):
+    return {
+        "off": t("compact.sum.mic.off"),
+        "both": t("compact.sum.mic.both"),
+        "phone": t("compact.sum.mic.phone"),
+        "muted": t("compact.sum.mic.muted"),
+        "on": t("compact.sum.mic.on"),
+    }[mic_state_key(enabled, pc_muted, phone_muted)]
+
+
+NAME_MAX_CHARS = 40
+
+
+def clip_text(text, limit=NAME_MAX_CHARS):
+    """外から来た名前などを表示用に整える純粋関数。改行・制御文字を空白にし、limit 文字を超えたら … で切る。"""
+    text = "".join(" " if (ch.isspace() or ord(ch) < 32 or 0x7F <= ord(ch) < 0xA0) else ch for ch in str(text or ""))
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: max(limit - 1, 1)] + "…"

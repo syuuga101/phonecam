@@ -26,6 +26,7 @@ from phonecam.qt.setup_common import (
     plain_button,
 )
 from phonecam.qt.widgets import Card, FitBox, button
+from phonecam.qt.plain import PlainLabel
 
 try:
     import phonecam_iphone as iphone
@@ -197,7 +198,7 @@ class DiagnosticsDialog(QDialog):
         row.addWidget(StatusGlyph(DIAG_GLYPH.get(r["state"], "warn")), 0, Qt.AlignmentFlag.AlignTop)
         col = QVBoxLayout()
         col.setSpacing(2)
-        label = QLabel(r["label"])
+        label = PlainLabel(r["label"])
         f = label.font()
         f.setWeight(QFont.Weight.DemiBold)
         label.setFont(f)

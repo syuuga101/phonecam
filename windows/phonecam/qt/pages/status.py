@@ -12,6 +12,7 @@ from phonecam.core.stats import GRAPH_RANGES, THERMAL_LEVELS, format_mmss, graph
 from phonecam.i18n import t
 from phonecam.qt.widgets import NO_VALUE, Combo, ErrorLabel, Hint, Page, StatusValue, button, error_color, secondary_color, separator_color
 from phonecam.labels import CODEC_LABELS, DECODER_LABELS, THERMAL_LABELS, thin_text
+from phonecam.qt.plain import PlainLabel
 
 
 def _number(value, spec):
@@ -83,7 +84,7 @@ def _open_timer(page):
     dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     dialog.setWindowTitle(t("status.timer.title"))
     layout = QVBoxLayout(dialog)
-    label = QLabel()
+    label = PlainLabel()
     label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     font = label.font()
     font.setFamily("Consolas")

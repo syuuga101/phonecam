@@ -61,6 +61,7 @@ from phonecam.qt.widgets import (
     ref_palette,
     secondary_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 TILE_FPS_MAX = 30          # グリッドのプレビューは重くしないため最大 30fps
 BAND_H = 36                # タイル下の帯の高さ (論理px)
@@ -75,7 +76,7 @@ def _tile_height(width):
 # 小さな部品
 # ---------------------------------------------------------------------------
 
-class ElidedLabel(QLabel):
+class ElidedLabel(PlainLabel):
     """1 行に収まらないときは末尾を … にする二次色のラベル (全文はツールチップ)。"""
 
     def __init__(self, text="", parent=None):
@@ -679,7 +680,7 @@ class PickRow(QWidget):
         lay.addWidget(IconLabel("phone", 20), 0, Qt.AlignmentFlag.AlignVCenter)
         texts = QVBoxLayout()
         texts.setSpacing(2)
-        name = QLabel(entry.name)
+        name = PlainLabel(entry.name)
         font = name.font()
         font.setWeight(QFont.Weight.DemiBold)
         name.setFont(font)
@@ -863,7 +864,7 @@ class DevicePickDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(14)
-        title = QLabel(t("multi.pick.title", camera=group.label(camera)))
+        title = PlainLabel(t("multi.pick.title", camera=group.label(camera)))
         font = title.font()
         font.setPointSizeF(13.0)
         font.setWeight(QFont.Weight.DemiBold)
@@ -924,7 +925,7 @@ class AddCameraWizard(QDialog):
         lay.setSpacing(12)
         self.step_label = Hint("")
         lay.addWidget(self.step_label)
-        self.title = QLabel("")
+        self.title = PlainLabel("")
         font = self.title.font()
         font.setPointSizeF(14.0)
         font.setWeight(QFont.Weight.DemiBold)
@@ -971,9 +972,9 @@ class AddCameraWizard(QDialog):
         row.setSpacing(10)
         from phonecam.qt.wireless import Spinner
         self.prep_spinner = Spinner()
-        self.prep_icon = QLabel()
+        self.prep_icon = PlainLabel()
         self.prep_icon.setFixedSize(18, 18)
-        self.prep_text = QLabel("")
+        self.prep_text = PlainLabel("")
         font = self.prep_text.font()
         font.setWeight(QFont.Weight.DemiBold)
         self.prep_text.setFont(font)
@@ -1001,7 +1002,7 @@ class AddCameraWizard(QDialog):
         lay = QVBoxLayout(page)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(10)
-        self.done_note = QLabel("")
+        self.done_note = PlainLabel("")
         self.done_note.setWordWrap(True)
         lay.addWidget(self.done_note)
         self.done_card = Card()
@@ -1147,6 +1148,7 @@ class AddCameraWizard(QDialog):
 def confirm_remove(parent, group, camera):
     """確認ダイアログ。仮想カメラの登録解除もするかをチェックで選ばせる。消したら True。"""
     box = QMessageBox(parent)
+    box.setTextFormat(Qt.TextFormat.PlainText)
     box.setIcon(QMessageBox.Icon.Warning)
     box.setWindowTitle(t("multi.remove.title"))
     box.setText(t("multi.remove.confirm", camera=group.label(camera)))

@@ -20,11 +20,13 @@ from phonecam.core.wireless import (
 )
 from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
+from phonecam.labels import clip_text
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
     EmptyState, FitBox, FixedHint, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 
 def local_addresses():
@@ -45,7 +47,7 @@ class PairDialog(QDialog):
         self.note = Hint(t("wireless.firewall"))
         self.note.setMaximumWidth(430)
         layout.addWidget(self.note)
-        qr_view = QLabel()
+        qr_view = PlainLabel()
         qr_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
         qr_view.setAccessibleName(t("wireless.add"))
         layout.addWidget(qr_view)
@@ -173,7 +175,7 @@ class Separator(QWidget):
         painter.end()
 
 
-class NameLabel(QLabel):
+class NameLabel(PlainLabel):
     doubled = Signal()
 
     def mouseDoubleClickEvent(self, event):
@@ -200,7 +202,7 @@ class Disclosure(QWidget):
         row.setSpacing(12)
         self.arrow = IconLabel("chevron_down")
         self.arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        label = QLabel(title)
+        label = PlainLabel(title)
         label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         row.addWidget(self.arrow)
         row.addWidget(label, 1)
@@ -245,7 +247,7 @@ class CodeDialog(QDialog):
         self.states = SimpleQueue()
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
-        head = QLabel(t("wireless.code_for", name=name))
+        head = PlainLabel(t("wireless.code_for", name=clip_text(name)))
         font = head.font()
         font.setWeight(QFont.Weight.DemiBold)
         head.setFont(font)
@@ -326,7 +328,7 @@ class Entry:
 
     @property
     def name(self):
-        return self.device.title or t("wireless.unknown_device")
+        return clip_text(self.device.title) or t("wireless.unknown_device")
 
     @property
     def registered(self):
@@ -441,7 +443,7 @@ class WirelessOptions:
         row = QHBoxLayout(head)
         row.setContentsMargins(16, 10, 12, 6)
         row.setSpacing(8)
-        title = QLabel(t("wireless.found_title"))
+        title = PlainLabel(t("wireless.found_title"))
         font = title.font()
         font.setWeight(QFont.Weight.DemiBold)
         title.setFont(font)
@@ -497,7 +499,7 @@ class WirelessOptions:
         lay = QVBoxLayout(box)
         lay.setContentsMargins(44, 6, 16, 10)
         lay.setSpacing(4)
-        head = QLabel(title)
+        head = PlainLabel(title)
         font = head.font()
         font.setWeight(QFont.Weight.DemiBold)
         head.setFont(font)
@@ -689,7 +691,7 @@ class WirelessOptions:
             for entry in entries:
                 if self._camera(entry) is self.ctrl and self._state(entry) == "connected":
                     return t("wireless.summary.connected", name=entry.name, way=way)
-            name = (status.get("phone") or {}).get("deviceName") or t("connection.device.default")
+            name = clip_text((status.get("phone") or {}).get("deviceName")) or t("connection.device.default")
             return t("wireless.summary.connected", name=name, way=way)
         count = sum(1 for entry in entries if entry.found)
         if count:
@@ -841,8 +843,13 @@ class WirelessOptions:
         self._save_known([replace(item, alias=alias) if item.id == entry.device.id else item for item in self._known()])
 
     def forget(self, entry):
-        answer = QMessageBox.question(self.page, t("wireless.forget"), t("wireless.forget_ask", name=entry.name))
-        if answer != QMessageBox.StandardButton.Yes:
+        box = QMessageBox(self.page)
+        box.setTextFormat(Qt.TextFormat.PlainText)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(t("wireless.forget"))
+        box.setText(t("wireless.forget_ask", name=entry.name))
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if box.exec() != QMessageBox.StandardButton.Yes:
             return
         camera = self._camera(entry)
         if camera and camera.get("target_device") == entry.device.id:
