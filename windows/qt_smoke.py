@@ -454,7 +454,7 @@ def setup_shots(app, ctrl, win, out, scale):
             if len(others) != 1 or others[0] is not dlg:
                 failed.append(("setup_open", "expected exactly the main window and the wizard, got: %s" % ", ".join(type(w).__name__ for w in others)))
             wc, dc = win.geometry().center(), dlg.geometry().center()
-            if abs(wc.x() - dc.x()) > 40 or abs(wc.y() - dc.y()) > 40:
+            if win.screen().availableGeometry().contains(win.frameGeometry()) and (abs(wc.x() - dc.x()) > 40 or abs(wc.y() - dc.y()) > 40):
                 failed.append(("setup_open", "the wizard is not centered over the main window (%s vs %s)" % (wc, dc)))
             dlg.auto_fit = False
             _settle(app, 350)

@@ -300,7 +300,9 @@ def test_setup_opens_as_a_child_window_over_the_main_window(app):
         assert dialog.parent() is win                # 親子関係がある (タスクバーに別のボタンは増えない)
         assert _other_windows(win) == [dialog]       # 見えているのはメインとセットアップの 2 つだけ
         wc, dc = win.geometry().center(), dialog.geometry().center()
-        assert abs(wc.x() - dc.x()) <= 40 and abs(wc.y() - dc.y()) <= 40   # メインの中央
+        if win.screen().availableGeometry().contains(win.frameGeometry()):   # 画面からはみ出す大きさのときは、画面内に収める方を優先
+            assert abs(wc.x() - dc.x()) <= 40 and abs(wc.y() - dc.y()) <= 40   # メインの中央
+        assert dialog.screen().availableGeometry().intersects(dialog.frameGeometry())
         assert dialog.page == 0 and dialog.next_btn.isVisible()
         # 「あとで」: 閉じて、設定ページから再表示もできる
         dialog._skip()
@@ -313,6 +315,11 @@ def test_setup_opens_as_a_child_window_over_the_main_window(app):
         win.setup_dialog._skip()
         _settle(app)
     finally:
+        if win.setup_dialog is not None:
+            try:
+                win.setup_dialog.close()
+            except RuntimeError:
+                pass
         win.close()
         win.deleteLater()
 
