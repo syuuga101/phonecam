@@ -366,10 +366,11 @@ def test_second_launch_hands_over_to_the_running_window(app):
     first.activated.connect(lambda: raised.append(True))
     try:
         assert single_instance.claim(name, relaunch_wait=0) is None      # 2 つめは何も開かずに終わる
-        for _ in range(20):
+        import time
+        deadline = time.monotonic() + 5
+        while not raised and time.monotonic() < deadline:     # 名前付きパイプの受け渡しには少し時間がかかる
             app.processEvents()
-            if raised:
-                break
+            time.sleep(0.02)
         assert raised                                                     # 動いている方が前面に出す合図を受け取った
     finally:
         first.close()
