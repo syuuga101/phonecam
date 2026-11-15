@@ -8,7 +8,7 @@ import sys
 import threading
 import webbrowser
 
-from PySide6.QtCore import QByteArray, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QByteArray, QEvent, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QFont, QIcon, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -38,6 +38,7 @@ from phonecam.i18n import t
 from phonecam.qt import icons
 from phonecam.qt.language_dialog import LanguageConfirmDialog
 from phonecam.qt.multicam import AddCameraWizard, ElidedLabel, Segmented
+from phonecam.qt.preview_dock import DOCK_PAGES, WIDE_W, PreviewDock, make_toggle
 from phonecam.qt.widgets import (
     _THEME_EVENTS, MAX_CONTENT_W, PAGE_PAD_X, Hint, Page, blend, button, ref_palette, text_color,
 )
@@ -159,6 +160,7 @@ class MainWindow(QMainWindow):
         self.ctrl = ctrl
         self.cameras = CameraGroup(ctrl)
         self.camera_index = 0
+        self._dock_camera = ctrl    # プレビュードックが映すカメラ (開いているページのカメラ)
         self._cur = ctrl            # いま選んでいるカメラ (増減で番号がずれても追えるように持つ)
         self.camera_pages = {}     # {(カメラ, ページのキー): ページ}。2 台目以降のカメラごとのページ (最初に開いたときに作る)
         self._observed_cameras = {ctrl}
@@ -261,10 +263,29 @@ class MainWindow(QMainWindow):
         header_lay.addWidget(self.page_title, 0)
         header_lay.addStretch(1)
         header_lay.addWidget(self.segment, 0, Qt.AlignmentFlag.AlignVCenter)
+        # 映像・画質・エフェクト・音声のページ: プレビュードックの表示切り替え (見出しの右)
+        self.dock_toggle = make_toggle(ctrl)
+        self.dock_toggle.switch.toggled.connect(self._dock_toggled)
+        header_lay.addWidget(self.dock_toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.dock_toggle.hide()
         self.page_header.hide()
-        rl.addWidget(self.page_header)
+        # 見出し + (狭いときはドックの帯) + ページ の列。広いときはその右にドックの列を置く
+        self.pagecol = QWidget()
+        self._pagecol = QVBoxLayout(self.pagecol)
+        self._pagecol.setContentsMargins(0, 0, 0, 0)
+        self._pagecol.setSpacing(0)
+        self._pagecol.addWidget(self.page_header)
         self.stack = QStackedWidget()
-        rl.addWidget(self.stack, 1)
+        self._pagecol.addWidget(self.stack, 1)
+        body = QWidget()
+        self._body = QHBoxLayout(body)
+        self._body.setContentsMargins(0, 0, 0, 0)
+        self._body.setSpacing(0)
+        self._body.addWidget(self.pagecol, 1)
+        self.dock = PreviewDock(ctrl)
+        self.dock.hide()
+        self._dock_wide = None
+        rl.addWidget(body, 1)
         outer.addWidget(right, 1)
 
         self.pages = []
@@ -355,10 +376,13 @@ class MainWindow(QMainWindow):
         row = self.nav.currentRow()
         key = NAV_ITEMS[row][0] if row >= 0 else "connection"
         multi = len(self.cameras.cameras) > 1
-        self.page_header.setVisible(multi)
+        docked = key in DOCK_PAGES
+        self.page_header.setVisible(multi or docked)
         self.page_title.setText(t("nav." + key))
         self.segment.setVisible(multi and key in PER_CAMERA)
+        self.dock_toggle.setVisible(docked)
         self._sync_scrollbar()
+        self._sync_dock(key)
 
     def _cameras_changed(self):
         cams = self.cameras.cameras
@@ -469,6 +493,9 @@ class MainWindow(QMainWindow):
         for row, (key, _icon) in enumerate(NAV_ITEMS):
             self.nav.item(row).setText(t("nav." + key))
         self.nav.viewport().update()
+        self.dock_toggle.label.setText(t("dock.toggle"))
+        for w in (self.dock_toggle.label, self.dock_toggle.switch):
+            w.setToolTip(t("dock.toggle_tip"))
         self._sync_cameras()
         self._status(self.ctrl.status)
         self._update_banner(self.ctrl.update_banner)
@@ -560,6 +587,7 @@ class MainWindow(QMainWindow):
                     camera.status_changed.connect(lambda status, c=camera: self._camera_status(c, status))
                     camera.toast.connect(self.show_toast)
             self.stack.setCurrentWidget(self.camera_pages[cache_key])
+        self._dock_camera = camera
         self._sync_header()
         fn = getattr(self.stack.currentWidget(), "on_activated", None)
         if callable(fn):
@@ -597,6 +625,8 @@ class MainWindow(QMainWindow):
         if e.type() in _THEME_EVENTS and hasattr(self, "nav"):
             self._refresh_nav_icons()
             self.nav.viewport().update()
+        if e.type() == QEvent.Type.WindowStateChange and hasattr(self, "dock"):
+            self.dock._sync_timers()     # 最小化中は描かない / 戻ったら再開
 
     # -- 通知 --------------------------------------------------------------------------------
     def _status(self, s):

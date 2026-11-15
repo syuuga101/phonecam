@@ -600,6 +600,7 @@ def child(scale, out):
     from phonecam.controller import Controller
     from phonecam.qt.app import configure
     from phonecam.qt.main_window import NAV_ITEMS, MainWindow
+    from phonecam.qt.preview_dock import DOCK_PAGES
     from phonecam.qt.widgets import Expander
 
     ctrl = Controller.demo_connected("ja")
@@ -645,8 +646,8 @@ def child(scale, out):
             win.resize(W, H)
             win.select(i)
             _settle(app)
-            if not win.page_header.isHidden() or not win.segment.isHidden():
-                failed.append((key, "1 camera: segmented switch must be hidden"))
+            if not win.segment.isHidden() or win.page_header.isHidden() == (key in DOCK_PAGES):
+                failed.append((key, "1 camera: segmented switch must be hidden (header only on dock pages)"))
             win.current_page().verticalScrollBar().setValue(0)
             _settle(app)
             base = "%02d_%s_%s_x%s" % (i, key, theme, scale)
@@ -725,6 +726,8 @@ def child(scale, out):
     print("empty box height=%d need=%d" % (box.height(), need))
     if box.height() < need:
         failed.append(("connection", "empty state squeezed (%d < %d)" % (box.height(), need)))
+    # プレビュードック: 映像ページ (「レンズ・出力」を開いた状態) と音声ページを、広い (右の列) / 狭い (上の帯) で撮る
+    failed += dock_shots(app, ctrl, win, out, scale)
     # カメラが 2 台以上のとき: カメラページ (1 台接続中・1 台未接続) / 2 台目の接続ページ / 音声ページ / ウィザード / 選択ダイアログ
     from phonecam.qt.multicam import AddCameraWizard, DevicePickDialog
     known2 = Device("0d2e6a52-3c1b-4f0a-9d4e-7a1b2c3d4e5f", "リビングのiPhone", ("172.20.10.1",), "135790", "iPhone 15 Pro")
@@ -889,6 +892,41 @@ def child(scale, out):
             print("PAGE ERROR %s: %s" % (key, err), file=sys.stderr)
         return 1
     return 0
+
+
+def dock_shots(app, ctrl, win, out, scale):
+    from phonecam.qt.main_window import NAV_ITEMS
+    from phonecam.qt.preview_dock import WIDE_W
+    from phonecam.qt.widgets import Expander
+    failed = []
+    rows = {key: i for i, (key, _icon) in enumerate(NAV_ITEMS)}
+    ctrl.changed("preview_dock", True)
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app)
+        for page, shape, width in (("video", "wide", W), ("video", "narrow", 900), ("audio", "wide", W), ("audio", "narrow", 900)):
+            win.resize(width, H)
+            win.select(rows[page])
+            _settle(app, 450)
+            for expander in win.current_page().findChildren(Expander):
+                expander.set_expanded(True, animate=False, save=False)
+            win.current_page().verticalScrollBar().setValue(0)
+            _settle(app, 450)
+            dock = win.dock
+            name = "dock_%s_%s_%s_x%s" % (page, shape, theme, scale)
+            if not dock.isVisible():
+                failed.append((name, "preview dock is not visible"))
+            elif (width >= WIDE_W) != (win._body.indexOf(dock) >= 0):
+                failed.append((name, "preview dock is in the wrong place"))
+            elif dock.surface._pix is None:
+                failed.append((name, "preview dock shows no frame"))
+            elif dock.audio_row.isVisible() != (page == "audio"):
+                failed.append((name, "level row visibility is wrong"))
+            win.grab().save(os.path.join(out, name + ".png"))
+    win.select(rows["connection"])
+    win.resize(W, H)
+    _settle(app)
+    return failed
 
 
 def main():

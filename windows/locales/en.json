@@ -227,6 +227,8 @@
  "core.vcam.start_failed": "Cannot start the PhoneCam camera. Check that it is registered ({hint}). Details: {error}",
  "core.vcam.unity_failed": "Cannot start the virtual camera (Unity Capture). Install the Unity Capture driver. Details: {error}",
  "core.vcam.unregistered": "The PhoneCam camera is not registered. {hint}",
+ "dock.toggle": "Preview",
+ "dock.toggle_tip": "Show the preview on this page so you can watch the video while changing settings",
  "effects.background.hint": "Add a Chroma Key filter (green) to the OBS source to make the background transparent",
  "effects.background.mode.label": "Background mode",
  "effects.background.quality.label": "Quality",

@@ -227,6 +227,8 @@
  "core.vcam.start_failed": "PhoneCamカメラを開始できません。登録済みか確認してください（{hint}）。詳細: {error}",
  "core.vcam.unity_failed": "仮想カメラ(Unity Capture)を開始できません。Unity Captureドライバーをインストールしてください。詳細: {error}",
  "core.vcam.unregistered": "PhoneCamカメラが未登録です。{hint}",
+ "dock.toggle": "プレビュー",
+ "dock.toggle_tip": "設定を変えながら映像を確認できるよう、プレビューをこのページに出します",
  "effects.background.hint": "OBSのソースに「クロマキー」フィルタ(緑)を追加すると背景が透明になります",
  "effects.background.mode.label": "背景モード",
  "effects.background.quality.label": "品質",
