@@ -123,6 +123,7 @@ DEFAULT_SETTINGS = {
     "language": "system",        # "system" / "ja" / "en" ...
     "preview_fps": 30,           # アプリ内プレビューの更新fps (15/30/60)。仮想カメラ出力には影響しない
     "preview_width_ratio": 0.6667,  # プレビューの幅 (内容列幅に対する割合)
+    "preview_dock": True,        # Qt UI: 映像・画質・エフェクト・音声のページでプレビュードックを出す (全ページ共通)
     "idle_stop_sec": 60,   # 0 = 使われなくなっても止めない
     "window_maximized": True,    # Qt UI: 最大化で起動する
     "ui_expanded": {},           # Qt UI: ページごとの詳細表示状態
