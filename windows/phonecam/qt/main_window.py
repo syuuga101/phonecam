@@ -167,8 +167,14 @@ class MainWindow(QMainWindow):
         self.resize(960, 720)
         self.setMinimumSize(640, 520)
 
+        # 中央は 2 枚重ね: 0 = 普段の画面 (ナビ + ページ)、1 = セットアップ (初回・更新後)。セットアップは別のウィンドウを
+        # 開かず、この 2 枚目に出す (起動時に開くウィンドウをメインの 1 つだけにするため)
+        self.root_stack = QStackedWidget()
+        self.setCentralWidget(self.root_stack)
         central = QWidget()
-        self.setCentralWidget(central)
+        self.main_area = central
+        self.root_stack.addWidget(central)
+        self.setup_panel = None
         outer = QHBoxLayout(central)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -228,11 +234,13 @@ class MainWindow(QMainWindow):
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(0)
         self.update_bar = Bar()
+        self.camera_bar = Bar()     # 仮想カメラの登録・更新のお知らせ (ダイアログではなく帯で知らせる)
         self.warn_bar = Bar()
         warning_icon = QLabel()
         warning_icon.setPixmap(icons.pixmap("thermometer", 16, text_color(self.warn_bar)))
         self.warn_bar._lay.insertWidget(0, warning_icon)
         rl.addWidget(self.update_bar)
+        rl.addWidget(self.camera_bar)
         rl.addWidget(self.warn_bar)
         # ページ見出し (カメラが 2 台以上のときだけ): 左にページ名、右にカメラの切り替え。Page と同じ幅・余白でそろえる
         self.page_header = QWidget()
@@ -293,7 +301,8 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(self._cameras_row if len(self.cameras.cameras) > 1 else self._first_row)
 
         ctrl.toast.connect(self.show_toast)
-        ctrl.camera_prompt.connect(self._ask_camera_registration)
+        ctrl.camera_prompt.connect(self._camera_banner)
+        ctrl.camera_registration_changed.connect(self._camera_banner_refresh)
         ctrl.setup_requested.connect(self._open_setup)
         ctrl.status_changed.connect(lambda s: self._camera_status(ctrl, s))
         ctrl.update_changed.connect(self._update_banner)
@@ -691,8 +700,10 @@ class MainWindow(QMainWindow):
                 old = phonecam_update.self_replace(exe, dest)
                 try:
                     flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0
+                    env = phonecam_update.relaunch_env()
+                    env["PHONECAM_RELAUNCH"] = "1"   # 新しい方は、このプロセスが終わるまで待ってから二重起動の確認をする
                     subprocess.Popen([exe] + sys.argv[1:], close_fds=True, cwd=os.path.dirname(exe),
-                                     env=phonecam_update.relaunch_env(), creationflags=flags)
+                                     env=env, creationflags=flags)
                 except Exception as error:
                     restored = phonecam_update.undo_replace(exe, old, os.path.splitext(exe)[0] + ".failed.exe")
                     self.show_toast(t("update.msg.relaunch_failed_restored" if restored else "update.msg.relaunch_failed", error=error), "error")
@@ -724,7 +735,7 @@ class MainWindow(QMainWindow):
         self._toast_timer.start(TOAST_MS)
 
     def _place_toast(self):
-        c = self.centralWidget()
+        c = self.main_area
         lw = min(self.toast_label.width(), max(100, c.width() - 40))
         self.toast_label.setFixedWidth(lw)
         self.toast_label.move((c.width() - lw) // 2, c.height() - self.toast_label.height() - 24)
@@ -735,20 +746,77 @@ class MainWindow(QMainWindow):
             self._place_toast()
 
     def _open_setup(self, diagnose, after_update):
-        """セットアップ (ウィザード / SideStore の導入チェック) を、別プロセスではなくこのプロセスのダイアログとして開く。"""
+        """セットアップ。ウィザードはこのウィンドウの中に出す (別のウィンドウは開かない)。SideStore の導入チェックは、
+        設定ページから押したときだけ開くので、ダイアログのまま。"""
         try:
-            from phonecam.qt.setup_wizard import open_setup_dialog
-            open_setup_dialog(self, self.ctrl, diagnose=diagnose, after_update=after_update)
+            if diagnose:
+                from phonecam.qt.setup_wizard import open_setup_dialog
+                open_setup_dialog(self, self.ctrl, diagnose=True, after_update=after_update)
+            else:
+                self.show_setup(after_update)
         except Exception as error:
+            self._hide_setup()
             self.ctrl.setup_dialog_closed()
             self.show_toast(t("settings.setup.launch_error", error=error), "error")
 
-    def _ask_camera_registration(self, state):
-        key = "setup.first_run.update_cam" if state == "outdated" else "setup.first_run.register_cam"
-        if QMessageBox.question(self, "PhoneCam", t(key)) == QMessageBox.StandardButton.Yes:
-            self.ctrl.change_camera_registration("register")
-        else:
-            self.show_toast(t("setup.first_run.declined_note"))
+    def show_setup(self, after_update=None):
+        """ウィザードをウィンドウいっぱいに出す (ナビも隠れる)。「あとで」や完了で、普段の画面に戻る。"""
+        if self.setup_panel is not None:
+            return self.setup_panel
+        from phonecam.qt.setup_wizard import create_setup_panel
+        panel = create_setup_panel(self.ctrl, after_update=after_update)
+        self.setup_panel = panel
+        self.root_stack.addWidget(panel)
+        self.root_stack.setCurrentWidget(panel)
+        panel.finished.connect(self._setup_finished)
+        panel.setFocus()
+        return panel
+
+    def _setup_finished(self, _result=0):
+        self._hide_setup()
+        self.ctrl.setup_dialog_closed()
+
+    def _hide_setup(self):
+        panel, self.setup_panel = self.setup_panel, None
+        self.root_stack.setCurrentWidget(self.main_area)
+        if panel is not None:
+            self.root_stack.removeWidget(panel)
+            panel.hide()
+            panel.deleteLater()
+
+    # -- 仮想カメラの登録の帯 -------------------------------------------------------------------
+    def _camera_banner(self, state):
+        """専用カメラが未登録 / 古いとき、上の帯で知らせる。ダイアログは出さない。UAC は「準備する」を押したときだけ。"""
+        if state not in ("missing", "outdated"):
+            self.camera_bar.hide()
+            return
+        outdated = state == "outdated"
+        self.camera_bar.label.setText(t("setup.first_run.bar_update" if outdated else "setup.first_run.bar_register"))
+        self.camera_bar.set_actions([
+            (t("setup.first_run.bar_update_btn" if outdated else "setup.first_run.bar_prepare"),
+             lambda: self.ctrl.change_camera_registration("register")),
+            (t("setup.first_run.bar_later"), self._camera_banner_later),
+        ])
+        self.camera_bar.show()
+
+    def _camera_banner_later(self):
+        self.camera_bar.hide()
+        self.show_toast(t("setup.first_run.declined_note"))
+
+    def _camera_banner_refresh(self):
+        """登録の状態が変わった (登録できた / 別のところで更新した): 済んでいれば帯を消す。"""
+        if self.camera_bar.isHidden():
+            return
+        if self.ctrl.camera_registration not in ("missing", "outdated"):
+            self.camera_bar.hide()
+
+    def bring_to_front(self):
+        """二重起動した 2 つめのプロセスから呼ばれる: 最小化を戻して、いまのウィンドウを前面に出す。"""
+        if self.isMinimized():
+            self.setWindowState((self.windowState() & ~Qt.WindowState.WindowMinimized) | Qt.WindowState.WindowActive)
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
     def restore_state(self):
         """起動時: 最大化 (既定) か、前回の位置と大きさ。画面外なら無視。show の代わりに呼ぶ。"""

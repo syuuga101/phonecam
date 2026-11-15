@@ -274,3 +274,105 @@ def test_choosing_a_language_in_settings_asks_then_saves_or_reverts(app, button,
     finally:
         win.close()
         win.deleteLater()
+
+
+# ---------------------------------------------------------------------------
+# 一発で起動する: 起動時に開くウィンドウはメインの 1 つだけ
+# ---------------------------------------------------------------------------
+
+def _other_windows(win):
+    return [w for w in QApplication.topLevelWidgets() if w is not win and w.isVisible()]
+
+
+def test_setup_opens_inside_the_main_window_not_as_another_window(app):
+    from phonecam.qt.setup_wizard import SetupWizardDialog, SetupWizardPanel
+    ctrl = Controller.demo_connected("ja")
+    win = MainWindow(ctrl, tick=False)
+    win.resize(1100, 760)
+    win.show()
+    try:
+        _settle(app)
+        ctrl._setup_open = True
+        ctrl.setup_requested.emit(False, None)       # 初回起動・更新後に controller が出す合図
+        _settle(app)
+        panel = win.setup_panel
+        assert isinstance(panel, SetupWizardPanel)
+        assert win.root_stack.currentWidget() is panel
+        assert not win.findChildren(SetupWizardDialog)
+        assert _other_windows(win) == []
+        assert panel.page == 0 and panel.next_btn.isVisible()
+        # 「あとで」: 普段の画面に戻り、設定ページの再表示もできる
+        panel._skip()
+        _settle(app)
+        assert win.setup_panel is None
+        assert win.root_stack.currentWidget() is win.main_area
+        assert not ctrl._setup_open
+        ctrl.setup_requested.emit(False, None)
+        _settle(app)
+        assert win.setup_panel is not None
+        win.setup_panel._skip()
+        _settle(app)
+    finally:
+        win.close()
+        win.deleteLater()
+
+
+def test_camera_registration_is_announced_by_a_bar_without_any_dialog(app, monkeypatch):
+    from PySide6.QtWidgets import QDialog, QMessageBox
+
+    def boom(*args, **kwargs):
+        raise AssertionError("a dialog was opened for the registration prompt")
+
+    monkeypatch.setattr(QMessageBox, "question", boom)
+    monkeypatch.setattr(QMessageBox, "exec", boom)
+    monkeypatch.setattr(QDialog, "exec", boom)
+    ctrl = Controller.demo_connected("ja")
+    win = MainWindow(ctrl, tick=False)
+    win.resize(1100, 760)
+    win.show()
+    try:
+        _settle(app)
+        registered = []
+        ctrl.change_camera_registration = lambda action: registered.append(action)
+        ctrl.camera_prompt.emit("missing")
+        _settle(app)
+        assert win.camera_bar.isVisible()
+        assert _other_windows(win) == []
+        assert win.camera_bar.label.text() == i18n.t("setup.first_run.bar_register")
+        win.camera_bar._buttons[0].click()            # 「準備する」を押したときだけ登録 (UAC) に進む
+        assert registered == ["register"]
+        ctrl.camera_prompt.emit("outdated")
+        _settle(app)
+        assert win.camera_bar.label.text() == i18n.t("setup.first_run.bar_update")
+        ctrl.camera_registration = "ok"
+        ctrl.camera_registration_changed.emit()
+        _settle(app)
+        assert not win.camera_bar.isVisible()
+        ctrl.camera_prompt.emit("missing")
+        _settle(app)
+        win.camera_bar._buttons[1].click()            # 「あとで」
+        assert not win.camera_bar.isVisible()
+    finally:
+        win.close()
+        win.deleteLater()
+
+
+def test_second_launch_hands_over_to_the_running_window(app):
+    from phonecam.qt import single_instance
+    name = "PhoneCamReceiver-test-%d" % id(app)
+    first = single_instance.claim(name, relaunch_wait=0)
+    assert first is not None
+    raised = []
+    first.activated.connect(lambda: raised.append(True))
+    try:
+        assert single_instance.claim(name, relaunch_wait=0) is None      # 2 つめは何も開かずに終わる
+        for _ in range(20):
+            app.processEvents()
+            if raised:
+                break
+        assert raised                                                     # 動いている方が前面に出す合図を受け取った
+    finally:
+        first.close()
+    third = single_instance.claim(name, relaunch_wait=0)                  # 終わったあとは、また起動できる
+    assert third is not None
+    third.close()

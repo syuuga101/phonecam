@@ -217,6 +217,11 @@ jobs:
               if (Test-Path $f) { Write-Host "---- $n ----"; Get-Content $f -Raw | Write-Host }
             }
           }
+          # onefile の exe は「親 (展開役) + 子 (本体)」の 2 プロセス。親だけ止めると子が残り、二重起動の防止 (待ち受け) も残って次のテストの起動を邪魔する
+          function Stop-AllReceivers {
+            Get-Process -Name PhoneCamReceiver -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
           function Has-Traceback {
             foreach ($n in @("phonecam_crash.log", "phonecam_error.log")) {
               $f = Join-Path $logDir $n
@@ -233,7 +238,7 @@ jobs:
             $failed = $true
           } else {
             Write-Host "exe は 15 秒後も動作中 (pid $($p.Id))"
-            Stop-Process -Id $p.Id -Force
+            Stop-AllReceivers
           }
           Show-Logs
           if (Has-Traceback) { Write-Host "::error::クラッシュ/エラーログに Traceback があります"; $failed = $true }
@@ -283,12 +288,64 @@ jobs:
             $failed = $true
           } else {
             Write-Host "初回起動の exe は 15 秒後も動作中 (pid $($f.Id))"
-            Stop-Process -Id $f.Id -Force
+            Stop-AllReceivers
           }
           Show-Logs
           if (Has-Traceback) { Write-Host "::error::初回起動でクラッシュ/エラーログに Traceback があります"; $failed = $true }
 
           if ($failed) { throw "起動テストに失敗しました" }
+
+      # ---- 起動テスト (実際の Windows 画面): 初回起動 (設定なし) でウィンドウが 1 つだけ開くこと / 二重起動で増えないこと ----
+      # 上のテストは offscreen なので、ウィンドウが何枚開くかは見られない。ここは QT_QPA_PLATFORM を指定せず、本物の画面で起動する。
+      # 画面の無い環境 (ウィンドウが 0 個) のときは数えられないので警告だけにして、2 個以上のときだけ失敗にする。
+      - name: Launch smoke test (real windows, first run)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+          Remove-Item Env:PHONECAM_SMOKE -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path windows/dist/PhoneCamReceiver.exe).Path
+          $appdata = Join-Path $env:RUNNER_TEMP "real-appdata"
+          Remove-Item -Recurse -Force $appdata -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $appdata | Out-Null
+          $env:APPDATA = $appdata
+          $logDir = Join-Path $appdata "PhoneCam"
+          $failed = $false
+          function Show-Logs {
+            foreach ($n in @("phonecam_crash.log", "phonecam_error.log")) {
+              $f = Join-Path $logDir $n
+              if (Test-Path $f) { Write-Host "---- $n ----"; Get-Content $f -Raw | Write-Host }
+            }
+          }
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) {
+            Write-Host "::error::初回起動 (本物の画面) の exe が 20 秒以内に終了しました (exit code $($p.ExitCode))"
+            $failed = $true
+          } else {
+            $wins = @(./.github/scripts/count_windows.ps1 PhoneCamReceiver)
+            Write-Host "初回起動後に見えているウィンドウ: $($wins.Count) 個"
+            $wins | ForEach-Object { Write-Host "  $_" }
+            if ($wins.Count -gt 1) { Write-Host "::error::初回起動でウィンドウが 2 個以上開いています"; $failed = $true }
+            elseif ($wins.Count -eq 0) { Write-Host "::warning::ウィンドウを数えられませんでした (画面の無い環境の可能性)" }
+            # 二重起動: 2 つめは何も開かずに終わり、ウィンドウは増えない
+            $q = Start-Process -FilePath $exe -PassThru
+            if (-not $q.WaitForExit(60000)) {
+              Stop-Process -Id $q.Id -Force
+              Write-Host "::error::2 つめの起動が 60 秒で終わりませんでした (二重起動の防止が効いていません)"; $failed = $true
+            } else { Write-Host "2 つめの起動はすぐ終了 (exit code $($q.ExitCode))" }
+            if ($p.HasExited) { Write-Host "::error::2 つめを起動したら、先に動いていた方が終了しました"; $failed = $true }
+            $after = @(./.github/scripts/count_windows.ps1 PhoneCamReceiver)
+            Write-Host "二重起動のあとのウィンドウ: $($after.Count) 個"
+            if ($after.Count -gt [Math]::Max(1, $wins.Count)) { Write-Host "::error::二重起動でウィンドウが増えました"; $failed = $true }
+            Get-Process -Name PhoneCamReceiver -ErrorAction SilentlyContinue | Stop-Process -Force
+          }
+          Show-Logs
+          foreach ($n in @("phonecam_crash.log", "phonecam_error.log")) {
+            $f = Join-Path $logDir $n
+            if ((Test-Path $f) -and ((Get-Content $f -Raw) -match "Traceback")) { Write-Host "::error::$n に Traceback があります"; $failed = $true }
+          }
+          if ($failed) { throw "実画面の起動テストに失敗しました" }
 
       - name: Upload exe
         uses: actions/upload-artifact@v4
