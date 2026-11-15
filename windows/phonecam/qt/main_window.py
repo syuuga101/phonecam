@@ -42,6 +42,7 @@ from phonecam.qt.preview_dock import DOCK_PAGES, WIDE_W, PreviewDock, make_toggl
 from phonecam.qt.widgets import (
     _THEME_EVENTS, MAX_CONTENT_W, PAGE_PAD_X, Hint, Page, blend, button, ref_palette, text_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 # (キー, アイコン名)。順番がページ番号 (qt/pages/<キー>.py の build(ctrl) -> QWidget)
 NAV_ITEMS = [("cameras", "camera"), ("connection", "link"), ("video", "video"), ("quality", "sun"), ("effects", "sparkles"),
@@ -121,7 +122,7 @@ class Bar(QFrame):
         self._lay = QHBoxLayout(self)
         self._lay.setContentsMargins(16, 6, 16, 6)
         self._lay.setSpacing(10)
-        self.label = QLabel()
+        self.label = PlainLabel()
         self.label.setWordWrap(True)
         self._lay.addWidget(self.label, 1)
         self._buttons = []
@@ -182,11 +183,11 @@ class MainWindow(QMainWindow):
         nl = QVBoxLayout(navbox)
         nl.setContentsMargins(0, 14, 0, 8)
         nl.setSpacing(10)
-        self.app_icon = QLabel()
+        self.app_icon = PlainLabel()
         self.app_icon.setContentsMargins(16, 0, 0, 0)
         self.app_icon.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._set_app_icon()
-        self.app_name = QLabel(ctrl.app_title())
+        self.app_name = PlainLabel(ctrl.app_title())
         f = self.app_name.font()
         f.setBold(True)
         self.app_name.setFont(f)
@@ -233,7 +234,7 @@ class MainWindow(QMainWindow):
         self.update_bar = Bar()
         self.camera_bar = Bar()     # 仮想カメラの登録・更新のお知らせ (ダイアログではなく帯で知らせる)
         self.warn_bar = Bar()
-        warning_icon = QLabel()
+        warning_icon = PlainLabel()
         warning_icon.setPixmap(icons.pixmap("thermometer", 16, text_color(self.warn_bar)))
         self.warn_bar._lay.insertWidget(0, warning_icon)
         rl.addWidget(self.update_bar)
@@ -253,7 +254,7 @@ class MainWindow(QMainWindow):
         header_lay = QHBoxLayout(header_col)
         header_lay.setContentsMargins(PAGE_PAD_X, 16, PAGE_PAD_X, 8)
         header_lay.setSpacing(12)
-        self.page_title = QLabel()
+        self.page_title = PlainLabel()
         f = self.page_title.font()
         f.setPointSizeF(16.0)
         f.setWeight(QFont.Weight.DemiBold)
@@ -296,7 +297,7 @@ class MainWindow(QMainWindow):
             self.stack.addWidget(self._load_page(key))
 
         # トースト (下の中央)
-        self.toast_label = QLabel(central)
+        self.toast_label = PlainLabel(central)
         self.toast_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.toast_label.setContentsMargins(18, 8, 18, 8)
         f = self.toast_label.font()
@@ -816,13 +817,16 @@ class MainWindow(QMainWindow):
     # -- 仮想カメラの登録の帯 -------------------------------------------------------------------
     def _camera_banner(self, state):
         """専用カメラが未登録 / 古いとき、上の帯で知らせる。ダイアログは出さない。UAC は「準備する」を押したときだけ。"""
-        if state not in ("missing", "outdated"):
+        if state not in ("missing", "outdated", "partial"):
             self.camera_bar.hide()
             return
         outdated = state == "outdated"
-        self.camera_bar.label.setText(t("setup.first_run.bar_update" if outdated else "setup.first_run.bar_register"))
+        partial = state == "partial"
+        self.camera_bar.label.setText(t("setup.first_run.bar_partial" if partial else
+                                        "setup.first_run.bar_update" if outdated else "setup.first_run.bar_register"))
         self.camera_bar.set_actions([
-            (t("setup.first_run.bar_update_btn" if outdated else "setup.first_run.bar_prepare"),
+            (t("setup.first_run.bar_retry_btn" if partial else "setup.first_run.bar_update_btn" if outdated
+               else "setup.first_run.bar_prepare"),
              lambda: self.ctrl.change_camera_registration("register")),
             (t("setup.first_run.bar_later"), self._camera_banner_later),
         ])
@@ -836,7 +840,7 @@ class MainWindow(QMainWindow):
         """登録の状態が変わった (登録できた / 別のところで更新した): 済んでいれば帯を消す。"""
         if self.camera_bar.isHidden():
             return
-        if self.ctrl.camera_registration not in ("missing", "outdated"):
+        if self.ctrl.camera_registration not in ("missing", "outdated") and not self.ctrl.camera_partial():
             self.camera_bar.hide()
 
     def bring_to_front(self):

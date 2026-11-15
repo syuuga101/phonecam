@@ -176,8 +176,7 @@ class Pairing:
             return None
         if not isinstance(data, dict):
             return None
-        token = data.get("token")
-        if not isinstance(token, str) or not secrets.compare_digest(token.encode("utf-8"), self._token.encode("ascii")):
+        if not token_matches(data.get("token"), self._token):
             return None
         if data.get("v") != VERSION:
             return None
@@ -185,6 +184,17 @@ class Pairing:
         if isinstance(data.get("addresses"), list):
             data["addresses"] = [peer, *data["addresses"]]
         return read_device(data)
+
+
+def token_matches(token, expected):
+    """QR トークンの一致判定。文字列でない・不正な Unicode (サロゲートなど) は例外にせず不一致にする。"""
+    if not isinstance(token, str):
+        return False
+    try:
+        raw = token.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return secrets.compare_digest(raw, expected.encode("ascii"))
 
 
 def local_ipv4():

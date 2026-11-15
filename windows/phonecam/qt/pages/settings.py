@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QLabel
 from phonecam.core.settings import PREVIEW_FPS_CHOICES
 from phonecam.i18n import t
 from phonecam.qt.widgets import Hint, Page, bound_combo, bound_switch, button
+from phonecam.qt.plain import PlainLabel
 
 _REPO = "https://github.com/syuuga101/phonecam"
 _TRANSLATE_URL = "https://crowdin.com/project/phonecam"  # 翻訳協力 (Crowdin)。空にすると行を隠す
@@ -27,7 +28,7 @@ def build(ctrl):
         bound_combo(ctrl, "preview_fps", [(v, f"{v} fps") for v in PREVIEW_FPS_CHOICES]))
 
     updates = page.add_section(t("update.section"))
-    updates.add_row("info", t("update.version.label")).addControl(QLabel(ctrl.version_text()))
+    updates.add_row("info", t("update.version.label")).addControl(PlainLabel(ctrl.version_text()))
     check_row = updates.add_row("download", t("update.check.label"))
     check = button(t("update.check.button"))
     check.clicked.connect(lambda: ctrl.check_updates())
@@ -56,7 +57,7 @@ def build(ctrl):
     setup.add_row("wrench", t("setup.diagnose.label"), t("setup.diagnose.hint")).addControl(diagnose)
 
     about = page.add_section(t("settings.about.title"))
-    about.add_row("person", t("settings.about.author")).addControl(QLabel("syuuga101"))
+    about.add_row("person", t("settings.about.author")).addControl(PlainLabel("syuuga101"))
     for icon, name, label, url in (
         ("download", "repo", "GitHub", _REPO),
         ("document", "guide", t("settings.about.guide.link"), _REPO + "/wiki"),
@@ -68,5 +69,5 @@ def build(ctrl):
         link = button(label)
         link.clicked.connect(lambda _, target=url: QDesktopServices.openUrl(QUrl(target)))
         about.add_row(icon, t(f"settings.about.{name}")).addControl(link)
-    about.add_row("document", t("settings.about.license")).addControl(QLabel("GPL-2.0-or-later"))
+    about.add_row("document", t("settings.about.license")).addControl(PlainLabel("GPL-2.0-or-later"))
     return page.finish()

@@ -263,30 +263,78 @@ def _cleanup_old_install_dirs(keep_hash=None):
                 shutil.rmtree(os.path.join(root, name), ignore_errors=True)
 
 
+class RegisterResult:
+    """--register の結果。x64 / x86 は regsvr32 まで成功したか (x86 は 32bit 版 DLL が同梱されていないとき None)。
+    bool() は 64bit 側の成功 (これまでの True / False と同じ)。"""
+
+    def __init__(self, x64=False, x86=None):
+        self.x64, self.x86 = bool(x64), (None if x86 is None else bool(x86))
+
+    def __bool__(self):
+        return self.x64
+
+    @property
+    def partial(self):
+        """64bit だけ登録できて、32bit が失敗した状態。"""
+        return self.x64 and self.x86 is False
+
+    def __repr__(self):
+        return "RegisterResult(x64=%r, x86=%r)" % (self.x64, self.x86)
+
+
+EXIT_REGISTER_PARTIAL = 3   # --register: 64bit だけ登録できた (32bit の登録に失敗) ときの終了コード
+
+
+def _copy_verified(src, dst):
+    """src を dst へコピーし、dst の中身が src と同じことを照合し直す。一致すれば True。
+    使用中でコピーできなくても、すでに同じ内容なら True (別の内容が残っているときは False)。"""
+    try:
+        if os.path.isfile(dst) and _file_hash12(dst) == _file_hash12(src):
+            return True  # 同じ内容なら上書きしない (使用中でも失敗しない)
+        try:
+            shutil.copyfile(src, dst)
+        except OSError:
+            pass
+        return os.path.isfile(dst) and _file_hash12(dst) == _file_hash12(src)
+    except OSError:
+        return False
+
+
 def helper_register(slot=1):
-    """管理者権限で実行される --register。成功なら True。"""
+    """管理者権限で実行される --register。RegisterResult を返す (64bit / 32bit を別々に)。"""
     src = softcam_path(slot)
     h = softcam_rev(slot)
     dst_dir = _slot_dir(softcam_install_dir(h), slot)
     os.makedirs(dst_dir, exist_ok=True)
-    pairs = [(src, os.path.join(dst_dir, SOFTCAM_DLL))]
-    if os.path.isfile(softcam32_path(slot)):
-        pairs.append((softcam32_path(slot), os.path.join(dst_dir, SOFTCAM_DLL32)))
-    for s, d in pairs:
-        if os.path.isfile(d) and _file_hash12(d) == _file_hash12(s):
-            continue  # 同じ内容なら上書きしない (使用中でも失敗しない)
-        try:
-            shutil.copyfile(s, d)
-        except OSError:
-            if not os.path.isfile(d):
-                raise  # 同じ版のフォルダに使用中の DLL がある場合は、それをそのまま使う
-    x64, x86 = _regsvr32_paths()
-    if not _run_regsvr32(x64, pairs[0][1]):
-        return False
-    if len(pairs) > 1:
-        _run_regsvr32(x86, pairs[1][1])  # 32bit は失敗しても致命的ではない
-    _cleanup_old_install_dirs(keep_hash=h)
-    return True
+    x64_dst = os.path.join(dst_dir, SOFTCAM_DLL)
+    has32 = os.path.isfile(softcam32_path(slot))
+    x86_dst = os.path.join(dst_dir, SOFTCAM_DLL32)
+    x64_copied = _copy_verified(src, x64_dst)
+    x86_copied = _copy_verified(softcam32_path(slot), x86_dst) if has32 else None
+    x64_exe, x86_exe = _regsvr32_paths()
+    # 中身が一致しない DLL は登録しない (古い DLL を「登録できた」と見せない)
+    x64 = x64_copied and _run_regsvr32(x64_exe, x64_dst)
+    x86 = None
+    if has32:
+        x86 = bool(x86_copied) and _run_regsvr32(x86_exe, x86_dst)
+    if x64:
+        _cleanup_old_install_dirs(keep_hash=h)
+    return RegisterResult(x64, x86)
+
+
+def x86_registration_status(slot=1):
+    """32bit 版の登録状態。"ok" / "missing" / "unavailable"(32bit 版 DLL を同梱していない)。"""
+    try:
+        if not os.path.isfile(softcam32_path(slot)):
+            return "unavailable"
+        installed = softcam_installed_path(slot)
+        reg = softcam_registered_path(slot, 32)
+        if not installed or not reg:
+            return "missing"
+        expected = os.path.join(os.path.dirname(installed), SOFTCAM_DLL32)
+        return "ok" if _same_path(reg, expected) and os.path.isfile(expected) else "missing"
+    except Exception:
+        return "unavailable"
 
 
 def helper_unregister(slot=1):
@@ -375,4 +423,6 @@ def helper_main(argv):
     if not ok:
         _error_box(msg)
         return 1
+    if getattr(ok, "partial", False):
+        return EXIT_REGISTER_PARTIAL
     return 0

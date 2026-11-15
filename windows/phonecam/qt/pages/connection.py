@@ -39,6 +39,7 @@ from phonecam.qt.widgets import (
     ref_palette,
     secondary_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 RATIO_MIN = 1.0 / 3.0
 RATIO_MAX = 1.0
@@ -312,14 +313,14 @@ class ConnectionPage(Page):
         top.setSpacing(8)
         self.dot = Dot()
         top.addWidget(self.dot, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.state_label = QLabel(t("connection.card.off"))
+        self.state_label = PlainLabel(t("connection.card.off"))
         f = self.state_label.font()
         f.setPointSizeF(14.0)
         f.setWeight(QFont.Weight.DemiBold)
         self.state_label.setFont(f)
         self.state_label.setWordWrap(False)
         top.addWidget(self.state_label, 0)
-        self.check = QLabel()
+        self.check = PlainLabel()
         self.check.setFixedSize(18, 18)
         self.check.hide()
         top.addWidget(self.check, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -394,7 +395,7 @@ class ConnectionPage(Page):
         for i, key in enumerate(("res", "latency", "thermal", "battery")):
             grid.setColumnStretch(i, 1)
             cap = Hint(t("connection.num.%s" % key), wrap=False)
-            val = QLabel(NO_VALUE)
+            val = PlainLabel(NO_VALUE)
             f = val.font()
             f.setPointSizeF(11.0)
             val.setFont(f)
@@ -413,7 +414,7 @@ class ConnectionPage(Page):
             return
         card = Card()
         obs = Row("camera", t("multi.obs_name"))
-        self.obs_label = QLabel()
+        self.obs_label = PlainLabel()
         f = self.obs_label.font()
         f.setWeight(QFont.Weight.DemiBold)
         self.obs_label.setFont(f)
@@ -424,7 +425,7 @@ class ConnectionPage(Page):
         self.vcam_button.clicked.connect(lambda: self.ctrl.change_camera_registration("register"))
         card.layout().addWidget(obs)
         self.phone_row = Row("phone", t("multi.this_phone"))
-        self.phone_label = QLabel()
+        self.phone_label = PlainLabel()
         self.phone_row.addControl(self.phone_label)
         change = self.phone_row.addControl(button(t("multi.change")))
         change.clicked.connect(self._change_phone)
@@ -446,7 +447,9 @@ class ConnectionPage(Page):
         self.obs_label.setText(group.obs_name(self.ctrl))
         state = self.ctrl.camera_registration
         busy = self.ctrl.camera_registration_busy
-        if state == "ok":
+        if state == "ok" and self.ctrl.frozen and self.ctrl.camera_partial():
+            self.vcam_status.set_status(t("multi.vcam.ready_x64"), "warning", t("video.vcam.partial_note"))
+        elif state == "ok":
             self.vcam_status.set_status(t("multi.vcam.ready"), "ok")
         elif not self.ctrl.frozen:
             self.vcam_status.set_status(t("video.vcam.src_only"))
@@ -501,7 +504,7 @@ class ConnectionPage(Page):
             return
         section = self.add_section(t("multi.manage"))
         label = section.add_row("camera", t("multi.this_camera"))
-        self.manage_label = QLabel()
+        self.manage_label = PlainLabel()
         label.addControl(self.manage_label)
         self.add_row_ = section.add_row("camera", t("multi.add"), t("multi.add_hint"))
         add = self.add_row_.addControl(button(t("multi.add_button")))
@@ -547,7 +550,7 @@ class ConnectionPage(Page):
         self.idle_combo = bound_combo(self.ctrl, "idle_stop_sec", IDLE_STOP_LABELS, width=110)
         row.addControl(self.idle_combo)
         self.camera_row = sec.add_row("camera", t("connection.run.camera"))
-        self.camera_value = QLabel(NO_VALUE)
+        self.camera_value = PlainLabel(NO_VALUE)
         self.camera_row.addControl(self.camera_value)
 
     # -- status の反映 --------------------------------------------------------------------
