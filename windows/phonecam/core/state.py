@@ -31,6 +31,7 @@ class SharedState:
         self.usb_serial = ""
         self.peer = ""               # Wi-Fi でつないでいる (つなごうとしている) iPhone の IP
         self.transport = ""          # 今つないでいる方式: "usb" / "wifi" / ""
+        self.usb_note = ""           # Wi-Fi 中などに USB について知らせたいこと (準備中 / 信頼を押す、など。表示用の文)
         self.auth_state = ""         # "" / "required" (認証待ち) / "failed" (コード違い) / "refused" (拒否)
 
     def update(self, **kw):
@@ -59,4 +60,5 @@ class SharedState:
                 "transport": self.transport,
                 "peer": self.peer,
                 "usb_serial": self.usb_serial,
+                "usb_note": self.usb_note,
             }

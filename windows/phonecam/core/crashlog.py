@@ -12,6 +12,8 @@ from phonecam.core.paths import _appdata_dir
 
 ERROR_LOG = "phonecam_error.log"
 CRASH_LOG = "phonecam_crash.log"
+CONNECTION_LOG = "phonecam_connection.log"
+CONNECTION_REPEAT_SEC = 60.0
 MAX_BYTES = 512 * 1024
 
 _crash_file = None
@@ -34,6 +36,41 @@ def log_error(tag, exc_text=None):
             pass
         with open(p, "a", encoding="utf-8") as f:
             f.write("[%s] %s\n%s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), tag, exc_text or traceback.format_exc()))
+    except Exception:
+        pass
+
+
+_conn_lock = threading.Lock()
+_conn_last = None      # (直前に書いた文, 書いた時刻, 省略した回数)
+
+
+def log_connection(event, now=None):
+    """接続の切り替え・切断・失敗の理由を 1 行ずつ phonecam_connection.log に残す。
+    直前と同じ文が 60 秒以内に続くときは書かず、次に違う文を書くとき「同じ理由を N 回省略」と添える。ここで例外は出さない。"""
+    global _conn_last
+    try:
+        now = time.monotonic() if now is None else now
+        with _conn_lock:
+            last = _conn_last
+            lines = []
+            if last is not None and last[0] == event and now - last[1] < CONNECTION_REPEAT_SEC:
+                _conn_last = (event, last[1], last[2] + 1)
+                return
+            if last is not None and last[2]:
+                lines.append("(直前と同じ理由を %d 回省略)" % last[2])
+            lines.append(event)
+            _conn_last = (event, now, 0)
+            os.makedirs(_appdata_dir(), exist_ok=True)
+            p = _path(CONNECTION_LOG)
+            try:
+                if os.path.getsize(p) > MAX_BYTES:
+                    os.replace(p, p + ".1")
+            except OSError:
+                pass
+            stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(p, "a", encoding="utf-8") as f:
+                for line in lines:
+                    f.write("[%s] %s\n" % (stamp, line))
     except Exception:
         pass
 
