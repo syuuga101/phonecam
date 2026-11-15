@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
 
 from phonecam.i18n import NO_VALUE
 from phonecam.qt import icons
+from phonecam.qt.plain import PlainLabel
 
 MAX_CONTENT_W = 760   # 内容列の最大幅 (論理px)
 PAGE_PAD_X = 24
@@ -135,7 +136,7 @@ def _fit_wrapped_height(label):
         label.setMinimumHeight(h)
 
 
-class Hint(QLabel):
+class Hint(PlainLabel):
     """二次色の小さめの説明文 (折り返しあり)。親のパレットから色を計算するので、テーマ切替に追従する。"""
 
     _busy = False
@@ -174,7 +175,7 @@ class Hint(QLabel):
 _ICON_REFRESH = _THEME_EVENTS + tuple(x for x in (getattr(QEvent.Type, "DevicePixelRatioChange", None),) if x is not None)
 
 
-class ErrorLabel(QLabel):
+class ErrorLabel(PlainLabel):
     """エラー文 (赤系。ライト/ダークで色を切り替える)。空文字のときは隠す。"""
 
     _busy = False
@@ -210,7 +211,7 @@ class ErrorLabel(QLabel):
         _fit_wrapped_height(self)
 
 
-class IconLabel(QLabel):
+class IconLabel(PlainLabel):
     """16px の線アイコン。文字色で塗り、パレットが変わったら描き直す。"""
 
     def __init__(self, name, size=16, parent=None):
@@ -241,7 +242,7 @@ class IconLabel(QLabel):
 VALUE_MAX_W = 300   # 行の右側の値の最大幅 (論理px)。これより長い値だけ折り返す
 
 
-class _ValueLabel(QLabel):
+class _ValueLabel(PlainLabel):
     """行の右側に出す値。1 行に収まる長さなら折り返さず、全文の幅をとる (「つながっていま / せん」のような 2 行折り返しを防ぐ)。
     VALUE_MAX_W を超える長い文だけ、その幅で折り返す (wrap=False なら折り返さず、超えた分は切る)。"""
 
@@ -279,7 +280,7 @@ class StatusValue(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         self.label = _ValueLabel(text, wrap)   # wrap=False: どんなに長くても折り返さない。True: 長いときだけ折り返す
-        self.icon = QLabel()
+        self.icon = PlainLabel()
         self.icon.setFixedSize(16, 16)
         self.icon.hide()
         layout.addWidget(self.label, 0, Qt.AlignmentFlag.AlignLeft)
@@ -376,7 +377,7 @@ class Row(QWidget):
         text = QVBoxLayout()
         text.setSpacing(1)
         text.setContentsMargins(0, 0, 0, 0)
-        self.title_label = QLabel(title)
+        self.title_label = PlainLabel(title)
         self.hint_label = Hint(hint or "")
         if not hint:
             self.hint_label.setVisible(False)
@@ -432,7 +433,7 @@ class Section(QWidget):
         lay.setSpacing(8)
         self.title_label = None
         if title:
-            self.title_label = QLabel(title)
+            self.title_label = PlainLabel(title)
             f = self.title_label.font()
             f.setWeight(QFont.Weight.DemiBold)
             self.title_label.setFont(f)
@@ -556,7 +557,7 @@ class Expander(Card):
         header_layout.addWidget(IconLabel(icon_name))
         labels = QVBoxLayout()
         labels.setSpacing(2)
-        self.title_label = QLabel(title)
+        self.title_label = PlainLabel(title)
         font = self.title_label.font()
         font.setWeight(QFont.Weight.DemiBold)
         self.title_label.setFont(font)
@@ -919,7 +920,7 @@ class EmptyState(FitBox):
         lay.setSpacing(8)
         icon = IconLabel(icon_name, 24)
         lay.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
-        self.title_label = QLabel(title)
+        self.title_label = PlainLabel(title)
         font = self.title_label.font()
         font.setWeight(QFont.Weight.DemiBold)
         self.title_label.setFont(font)
@@ -1276,7 +1277,7 @@ class SliderValue(QWidget):
         self.slider = Slider()
         self.slider.setRange(0, n)
         self.slider.setFixedWidth(int(width))
-        self.value_label = QLabel()
+        self.value_label = PlainLabel()
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         wmax = max(self.value_label.fontMetrics().horizontalAdvance(fmt(v)) for v in (lo, hi)) + 6
         self.value_label.setMinimumWidth(max(wmax, 64))

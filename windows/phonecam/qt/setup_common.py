@@ -33,6 +33,7 @@ from phonecam.qt.widgets import (
     secondary_color,
     separator_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 # ---------------------------------------------------------------------------
 # 色
@@ -66,7 +67,7 @@ ROLE_COLORS = {
 # ラベル
 # ---------------------------------------------------------------------------
 
-class WrapLabel(QLabel):
+class WrapLabel(PlainLabel):
     """折り返す文章。色は role から (パレットが変わると計算し直す)。
     高さは今の幅に合わせて固定する (入れ子のレイアウトでも、2 行目以降が切れたり重なったりしない)。"""
 
@@ -138,7 +139,7 @@ class WrapLabel(QLabel):
 
 def heading(text, size=20.0, parent=None):
     """見出し (DemiBold)。1 行 (折り返しは WrapLabel の見出しを使う)。"""
-    label = QLabel(text, parent)
+    label = PlainLabel(text, parent)
     f = label.font()
     f.setPointSizeF(float(size))
     f.setWeight(QFont.Weight.DemiBold)
@@ -159,7 +160,7 @@ GLYPHS = {
 }
 
 
-class StatusGlyph(QLabel):
+class StatusGlyph(PlainLabel):
     """状態を表す 16px のアイコン (ok ✓ / warn ⚠ / bad ✗ / idle ○ / skip −)。"""
 
     def __init__(self, state="idle", size=16, parent=None):
@@ -328,7 +329,7 @@ class Fold(QWidget):
                 pass
 
 
-class _Arrow(QLabel):
+class _Arrow(PlainLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._name = "chevron_down"
@@ -366,7 +367,7 @@ class NumberedLines(QWidget):
             row = QHBoxLayout()
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(8)
-            mark = QLabel(("%d." % n) if numbered else "•")
+            mark = PlainLabel(("%d." % n) if numbered else "•")
             mark.setFixedWidth(22)
             mark.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
             if size is not None:

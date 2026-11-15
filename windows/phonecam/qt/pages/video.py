@@ -63,9 +63,15 @@ def build(ctrl):
     def refresh_registration():
         state = ctrl.camera_registration
         hint = t("video.vcam.hint_exe" if ctrl.frozen else "video.vcam.hint_src")
-        text = t(f"video.vcam.status.{state}") if ctrl.frozen else t("video.vcam.src_only")
-        registration.setHint(hint)
-        registration_status.set_status(text, {"ok": "ok", "outdated": "warning"}.get(state))
+        partial = ctrl.frozen and ctrl.camera_partial()
+        if not ctrl.frozen:
+            text = t("video.vcam.src_only")
+        elif partial:
+            text = t("video.vcam.status.partial")
+        else:
+            text = t(f"video.vcam.status.{state}")
+        registration.setHint(t("video.vcam.partial_note") if partial else hint)
+        registration_status.set_status(text, "warning" if partial else {"ok": "ok", "outdated": "warning"}.get(state))
         controls["register"].setEnabled(ctrl.frozen and not ctrl.camera_registration_busy and state != "unavailable")
         controls["unregister"].setEnabled(ctrl.frozen and not ctrl.camera_registration_busy and state in ("ok", "outdated"))
 
