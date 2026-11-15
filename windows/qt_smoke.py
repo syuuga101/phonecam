@@ -434,7 +434,7 @@ def setup_shots(app, ctrl, win, out, scale):
             _settle(app, 100)
         # 本体から開く経路 (初回起動・更新後): controller.setup_requested -> メインウィンドウの上に別ウィンドウ (親子関係つき・前面・中央)。
         # 閉じたら再判定 (setup_dialog_closed) が走る。撮るのは「メインの上にセットアップが出ている」状態
-        from PySide6.QtCore import QPoint
+        from shiboken6 import isValid
         from PySide6.QtGui import QPainter
         from PySide6.QtWidgets import QApplication
         for theme in THEMES:
@@ -472,7 +472,7 @@ def setup_shots(app, ctrl, win, out, scale):
                 failed.append(("setup_open", "overflow: " + line))
             dlg._skip()
             _settle(app, 300)
-            if win.setup_dialog is not None and win.setup_dialog.isVisible():
+            if win.setup_dialog is not None and isValid(win.setup_dialog) and win.setup_dialog.isVisible():
                 failed.append(("setup_open", "closing the wizard did not close the window"))
             if ctrl._setup_open:
                 failed.append(("setup_open", "closing the wizard did not call setup_dialog_closed"))

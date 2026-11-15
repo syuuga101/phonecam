@@ -285,6 +285,7 @@ def _other_windows(win):
 
 
 def test_setup_opens_as_a_child_window_over_the_main_window(app):
+    from shiboken6 import isValid
     from phonecam.qt.setup_wizard import SetupWizardDialog
     ctrl = Controller.demo_connected("ja")
     win = MainWindow(ctrl, tick=False)
@@ -307,15 +308,15 @@ def test_setup_opens_as_a_child_window_over_the_main_window(app):
         # 「あとで」: 閉じて、設定ページから再表示もできる
         dialog._skip()
         _settle(app)
-        assert not dialog.isVisible()
+        assert not isValid(dialog) or not dialog.isVisible()   # 閉じると破棄される
         assert not ctrl._setup_open
         ctrl.setup_requested.emit(False, None)
         _settle(app)
-        assert win.setup_dialog is not None and win.setup_dialog.isVisible()
+        assert win.setup_dialog is not None and isValid(win.setup_dialog) and win.setup_dialog.isVisible()
         win.setup_dialog._skip()
         _settle(app)
     finally:
-        if win.setup_dialog is not None:
+        if win.setup_dialog is not None and isValid(win.setup_dialog):
             try:
                 win.setup_dialog.close()
             except RuntimeError:
