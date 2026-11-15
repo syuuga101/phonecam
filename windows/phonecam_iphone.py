@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover
 
 USBMUX_ADDR = ("127.0.0.1", 27015)
 PHONE_PORT = 5555
+IDENTITY_PORT = 5557   # 読み取り専用の識別ポート。映像のポート (5555) は iPhone が 1 本しか受けず、つなぐと今の接続を切るので、到達確認には使わない
 CLIENT = {"ClientVersionString": "phonecam", "ProgName": "phonecam"}
 
 # 配布元のファイル (AltStore 形式。SideStore も同じ形式を読む)
@@ -165,8 +166,10 @@ def query_usbmux(addr=USBMUX_ADDR, timeout=1.5, connector=None):
     return snap
 
 
-def probe_phonecam(snap, addr=USBMUX_ADDR, port=PHONE_PORT, timeout=2.0, connector=None):
-    """iPhone の PhoneCam アプリ (ポート 5555) へ usbmux 経由でつながるか。つながったらすぐ閉じる。"""
+def probe_phonecam(snap, addr=USBMUX_ADDR, port=IDENTITY_PORT, timeout=2.0, connector=None):
+    """iPhone の PhoneCam アプリへ usbmux 経由で届くか。読み取り専用の識別ポート (5557) だけにつなぎ、すぐ閉じる。
+    映像のポート (5555) には触れない: iPhone は新しい接続が来ると今の接続 (受信ソフトの USB/Wi-Fi) を切ってしまい、
+    接続テストの確認自体が接続を壊していた。"""
     if not snap.get("usb") or snap.get("device_id") is None:
         return False
     connector = connector or socket.create_connection

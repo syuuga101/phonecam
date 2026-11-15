@@ -23,6 +23,8 @@ jobs:
         run: |
           swiftc PhoneCam/AdaptiveBitrate.swift Tests/AdaptiveBitrateChecks.swift -o "$RUNNER_TEMP/phonecam-adaptive-checks"
           "$RUNNER_TEMP/phonecam-adaptive-checks"
+          swiftc PhoneCam/LoopbackAddress.swift Tests/LoopbackChecks.swift -o "$RUNNER_TEMP/phonecam-loopback-checks"
+          "$RUNNER_TEMP/phonecam-loopback-checks"
 
       - name: Install XcodeGen
         run: brew install xcodegen

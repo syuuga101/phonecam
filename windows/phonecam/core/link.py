@@ -342,20 +342,27 @@ class Link:
         fail = self._usb_fail.get(serial)
         if fail and self._clock() < fail[1]:
             return False
+        strict = self.routes is not None and self.routes.multi   # 端末 ID の照合が必須なのは 2 台以上のときだけ
+        usb_id = ""
         try:
             usb_id = device_id(usbmux_probe(serial))
         except PhoneCamError as e:
-            self._note_usb_failure(serial, getattr(e, "kind", "trust"))
-            return False
-        wifi_id = device_id(self.state.phone_status.get("deviceId"))
-        if not wifi_id:
-            log_connection("usb %s: Wi-Fi 側の端末 ID がまだ分からないので乗り換えを保留" % serial)
-            self._set_usb_note(tr("core.link.usb_preparing"))   # Wi-Fi 側の status がまだ。次の周期で
-            return False
-        if not usb_id or usb_id != wifi_id:
-            log_connection("usb %s: 端末 ID が違う/読めないので乗り換えない (usb=%s wifi=%s)" % (serial, usb_id or "-", wifi_id))
-            self._note_usb_failure(serial, "")   # 別の iPhone か、ID が読めない: 勝手に乗り換えない
-            return False
+            if strict:
+                self._note_usb_failure(serial, getattr(e, "kind", "trust"))
+                return False
+            # 1 台だけなら、識別ポート (5557) が開いていない古いアプリでも USB を諦めない。
+            # 本接続の失敗は iPhone 側に影響しない (つながったときだけ今の接続を置き換える) ので、そのまま本接続を試す
+            log_connection("usb %s: 識別ポートに届かない (%s) ので、そのまま本接続を試す" % (serial, e))
+        if strict:
+            wifi_id = device_id(self.state.phone_status.get("deviceId"))
+            if not wifi_id:
+                log_connection("usb %s: Wi-Fi 側の端末 ID がまだ分からないので乗り換えを保留" % serial)
+                self._set_usb_note(tr("core.link.usb_preparing"))   # Wi-Fi 側の status がまだ。次の周期で
+                return False
+            if not usb_id or usb_id != wifi_id:
+                log_connection("usb %s: 端末 ID が違う/読めないので乗り換えない (usb=%s wifi=%s)" % (serial, usb_id or "-", wifi_id))
+                self._note_usb_failure(serial, "")   # 別の iPhone か、ID が読めない: 勝手に乗り換えない
+                return False
         info = {}
         try:
             usb_sock = usbmux_connect(serial=serial, info=info)
