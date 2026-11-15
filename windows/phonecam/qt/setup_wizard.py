@@ -18,7 +18,7 @@ import os
 import threading
 import time
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -160,12 +160,14 @@ class ResultRow(QWidget):
 # ウィザード
 # ---------------------------------------------------------------------------
 
-class SetupWizardDialog(QDialog):
-    """初回セットアップ / やり直し用のウィザード。start="iphone" のときは iPhone の手順だけを開く。"""
+class _WizardLogic:
+    """ウィザードの中身 (画面・ページ・終了処理)。QDialog (単体 / テスト) と QWidget (メインウィンドウの中) の両方に混ぜて使う。
+    start="iphone" のときは iPhone の手順だけを開く。"""
 
-    def __init__(self, controller, parent=None, on_finish=None, on_skip=None, open_url=None, launch=None,
-                 start="setup", update_version=None):
-        super().__init__(parent)
+    EMBEDDED = False   # True: メインウィンドウの中に出す。自分でウィンドウの大きさ・位置を変えない
+
+    def _wizard_init(self, controller, on_finish=None, on_skip=None, open_url=None, launch=None,
+                     start="setup", update_version=None):
         self.controller = controller
         self.update_version = update_version
         self.on_finish = on_finish or (lambda: None)
@@ -190,12 +192,10 @@ class SetupWizardDialog(QDialog):
         self._step_id = ""
         self._reset_refs()
 
-        self.setWindowTitle(t("setup.wizard.setupwizard___init___1"))
-        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
-        self.setModal(True)
         self._build_frame()
         self._timers()
-        fit_to_work_area(self, 700, 580)
+        if not self.EMBEDDED:
+            fit_to_work_area(self, 700, 580)
         self._listener = self._on_controller
         controller.listen(self._listener)
         self.show_page(ps.PAGE_IPHONE if start == "iphone" else (ps.PAGE_INSTALL if start == "guided" else ps.PAGE_WELCOME))
@@ -373,7 +373,7 @@ class SetupWizardDialog(QDialog):
     def _fit_window(self):
         """中身の高さに合わせてウィンドウを高くする (縮めはしない)。作業領域からははみ出させない。
         収まらないぶんは本文のスクロールで受け、下のボタン行は常に見える。"""
-        if self._ended or not self.auto_fit:
+        if self._ended or not self.auto_fit or self.EMBEDDED:
             return
         try:
             if not self.isVisible():
@@ -1108,11 +1108,11 @@ class SetupWizardDialog(QDialog):
         self.controller.unlisten(self._listener)
         for timer in (self._pump_timer, self._hop_timer, self._guided_timer, self._dl_timer):
             timer.stop()
-        QDialog.accept(self)
         try:
-            cb()
+            cb()   # 設定 (setup_done) を先に保存する。閉じたあとの再判定 (setup_dialog_closed) がこの値を見る
         except Exception:
             pass
+        self._accepted()
 
     def reject(self):
         """Esc: ほかの閉じ方と同じく、やめる扱い (インストール中は閉じない)。"""
@@ -1156,6 +1156,45 @@ class SetupWizardDialog(QDialog):
             pass   # 作り直した画面の部品が破棄されていた (次の通知で描き直される)
 
 
+class SetupWizardDialog(_WizardLogic, QDialog):
+    """単体のウィンドウで開くウィザード (--setup-wizard / テスト)。"""
+
+    def __init__(self, controller, parent=None, on_finish=None, on_skip=None, open_url=None, launch=None,
+                 start="setup", update_version=None):
+        QDialog.__init__(self, parent)
+        self.setWindowTitle(t("setup.wizard.setupwizard___init___1"))
+        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+        self.setModal(True)
+        self._wizard_init(controller, on_finish, on_skip, open_url, launch, start, update_version)
+
+    def _accepted(self):
+        QDialog.accept(self)
+
+
+class SetupWizardPanel(_WizardLogic, QWidget):
+    """メインウィンドウの中に出すウィザード (別のウィンドウを開かない)。終わると finished(1) を出す。"""
+
+    EMBEDDED = True
+    finished = Signal(int)
+
+    def __init__(self, controller, parent=None, on_finish=None, on_skip=None, open_url=None, launch=None,
+                 start="setup", update_version=None):
+        QWidget.__init__(self, parent)
+        self.setAutoFillBackground(True)
+        self._wizard_init(controller, on_finish, on_skip, open_url, launch, start, update_version)
+
+    def _accepted(self):
+        self.finished.emit(1)
+
+    def keyPressEvent(self, e):
+        # ダイアログではないので、Enter で「次へ」を押す動きは自分で持つ
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self.next_btn.isVisible() and self.next_btn.isEnabled() \
+                and self.next_btn.isDefault() and not self._ended:
+            self.next_btn.click()
+            return
+        super().keyPressEvent(e)
+
+
 def _overview_row(glyph, title):
     """ようこそ画面の「これから進む段階」の 1 行。"""
     from phonecam.qt.widgets import Row
@@ -1175,6 +1214,27 @@ def make_audio_guard(get, set_):
         return phonecam_audio.RestoreGuard(get, set_)
     except Exception:
         return None
+
+
+def create_setup_panel(ctrl, after_update=None, parent=None):
+    """アプリ本体のウィンドウの中に出すウィザードを作る (別のウィンドウは開かない)。
+    呼ぶ側が表示する。終わる (あとで / 完了) と panel.finished が出る。設定は ctrl 経由で読み書きする。"""
+    from phonecam.core.softcam_reg import bind_setup_host
+    bind_setup_host(link_connected=lambda: bool(ctrl.state.connected))
+
+    def audio_set(key, value):
+        ctrl.changed(key, value)
+        ctrl.save_now()
+
+    controller = ps.SetupController(QtRoot(), audio_guard=make_audio_guard(ctrl.get, audio_set))
+
+    def finish():
+        ctrl.changed("setup_done", True)
+        ctrl.save_now()
+
+    panel = SetupWizardPanel(controller, parent, on_finish=finish, on_skip=finish, update_version=after_update)
+    panel.finished.connect(lambda _result: controller.close())
+    return panel
 
 
 def open_setup_dialog(parent, ctrl, diagnose=False, after_update=None):

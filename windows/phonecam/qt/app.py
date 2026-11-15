@@ -203,6 +203,21 @@ def main():
     except Exception as e:
         _message_box("PySide6 が見つかりません。\n\npython -m pip install -r windows/requirements-qt.txt を実行してください。\n\n%s" % e)
         return 1
+    set_app_user_model_id()
+    from phonecam.core import crashlog
+    crashlog.install()  # Qt のスロット内の例外・ネイティブのクラッシュを %APPDATA%/PhoneCam に記録する
+    app = QApplication(sys.argv)
+    app.setApplicationName("PhoneCam")
+    app.setQuitOnLastWindowClosed(True)
+    # 二重起動の防止: すでに動いていれば、動いている方のウィンドウを前面に出して、こちらは何も開かずに終わる。
+    # 起動に時間がかかって (ダウンロード直後のウイルススキャンなど) 何度もダブルクリックされても、ウィンドウは 1 つだけになる。
+    # 受信ポート・仮想カメラ・設定の保存を 2 つのプロセスで取り合わないように、重い読み込み (設定・Controller) より前に確かめる
+    guard = None
+    if os.environ.get("PHONECAM_ALLOW_MULTIPLE") != "1":
+        from phonecam.qt import single_instance
+        guard = single_instance.claim()
+        if guard is None:
+            return 0
     from phonecam.core.settings import load_settings, migrate_legacy_settings
     from phonecam.i18n import set_language
     migrate_legacy_settings()
@@ -210,17 +225,19 @@ def main():
     set_language(settings.get("language", "system"))
     from phonecam.controller import Controller
     from phonecam.qt.main_window import MainWindow
-    set_app_user_model_id()
-    from phonecam.core import crashlog
-    crashlog.install()  # Qt のスロット内の例外・ネイティブのクラッシュを %APPDATA%/PhoneCam に記録する
     ctrl = Controller(settings=settings)
-    app = QApplication(sys.argv)
-    app.setApplicationName("PhoneCam")
-    app.setQuitOnLastWindowClosed(True)
     configure(app, ctrl)
     win = MainWindow(ctrl)
+    if guard is not None:
+        guard.activated.connect(win.bring_to_front)
+        app.aboutToQuit.connect(guard.close)
+    app._phonecam_guard = guard    # 参照を持ち続ける (消えると待ち受けが終わる)
+    # 初回・更新後のセットアップは、ウィンドウを出す前にこのウィンドウの中へ入れる (最初に見える画面がもうセットアップ。別のウィンドウは開かない)
+    try:
+        ctrl.first_run_setup()
+    except Exception:
+        crashlog.log_error("first_run_setup")
     win.restore_state()
-    from PySide6.QtCore import QTimer
-    QTimer.singleShot(600, ctrl.first_run_setup)
     app.aboutToQuit.connect(win.cameras.close)
+    app.aboutToQuit.connect(crashlog.mark_exit)
     return app.exec()

@@ -395,7 +395,7 @@ class Controller:
         if after_update:
             args.extend(("--after-update", after_update))
         try:
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0)
             self._setup_process = process
             self.run_background(process.wait, lambda result: self._setup_finished(process))
         except OSError as error:
@@ -405,6 +405,7 @@ class Controller:
         """同じプロセスのセットアップ (ウィザード / 診断) が閉じた: 仮想カメラの登録状態を取り直す。"""
         self._setup_open = False
         self.refresh_all_camera_registrations()
+        self.prompt_camera_registration()   # あとで / 完了のあと、専用カメラが未登録・古いままなら、帯で知らせる (ダイアログは出さない)
 
     def _setup_finished(self, process):
         if self._setup_process is not process:
@@ -456,8 +457,8 @@ class Controller:
             camera.refresh_camera_registration()
 
     def prompt_camera_registration(self):
-        """セットアップ済みなのに専用カメラが「更新が必要 / 未登録」のとき、起動時に1回だけ確認を出す
-        (設定ページの表示に気づかなくても、登録の更新ができるようにする)。"""
+        """専用カメラが「更新が必要 / 未登録」のとき、1回だけ画面上部の帯で知らせる (ダイアログは出さない。
+        設定ページの表示に気づかなくても、登録の更新ができるようにする)。UAC は帯の「準備する」を押したときだけ出る。"""
         if self.demo or not self.frozen or self._camera_prompted or self.get("backend") != "phonecam":
             return
         state = registration_status(self.link.vcam.slot)

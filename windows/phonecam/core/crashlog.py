@@ -46,6 +46,11 @@ def install(root=None):
         os.makedirs(_appdata_dir(), exist_ok=True)
         _crash_file = open(_path(CRASH_LOG), "a", encoding="utf-8")
         _crash_file.write("--- %s 起動 ---\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+        # faulthandler は Windows では、処理済みの例外 (0x8001010d = COM の RPC_E_CANTCALLOUT_ININPUTSYNCCALL など) も
+        # 「Windows fatal exception」として書く。本当のクラッシュは access violation や Fatal Python error で、
+        # そのあとに下の「正常終了」の印が無いもの。
+        _crash_file.write("(note) 'Windows fatal exception: code 0x...' alone can be a handled first-chance exception; "
+                          "a real crash has no '正常終了' line after it)\n")
         _crash_file.flush()
         faulthandler.enable(file=_crash_file, all_threads=True)
     except Exception:
@@ -69,3 +74,13 @@ def install(root=None):
                 "tk callback", "".join(traceback.format_exception(et, ev, tb)))
         except Exception:
             pass
+
+
+def mark_exit():
+    """アプリが普通に終わったことを crash.log に残す (この印が無いまま次の「起動」が来たら、前回は落ちている)。"""
+    try:
+        if _crash_file is not None:
+            _crash_file.write("--- %s 正常終了 ---\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+            _crash_file.flush()
+    except Exception:
+        pass

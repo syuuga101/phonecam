@@ -428,21 +428,64 @@ def setup_shots(app, ctrl, win, out, scale):
             diag.close()
             diag.deleteLater()
             _settle(app, 100)
-        # 本体から開く経路: controller.setup_requested -> 同じプロセスのダイアログ。閉じたら再判定 (setup_dialog_closed) が走る
-        ctrl._setup_open = True
-        ctrl.setup_requested.emit(False, None)
-        _settle(app, 500)
-        dialogs = win.findChildren(SetupWizardDialog)
-        if len(dialogs) != 1:
-            failed.append(("setup_open", "expected one in-process wizard dialog, got %d" % len(dialogs)))
-        else:
-            dialogs[0].auto_fit = False
-            dialogs[0]._skip()
+        # 本体から開く経路 (初回起動・更新後): controller.setup_requested -> メインウィンドウの中のセットアップ (別のウィンドウを開かない)。
+        # 閉じたら再判定 (setup_dialog_closed) が走り、普段の画面に戻る
+        from PySide6.QtWidgets import QApplication
+        from phonecam.qt.setup_wizard import SetupWizardPanel
+        for theme in THEMES:
+            ctrl.set_theme(theme)
+            _settle(app)
+            ctrl.changed("setup_done", False)
+            ctrl._setup_open = True
+            ctrl.setup_requested.emit(False, None)
+            _settle(app, 500)
+            panel = win.setup_panel
+            if not isinstance(panel, SetupWizardPanel):
+                failed.append(("setup_open", "expected the wizard inside the main window, got %r" % (panel,)))
+                continue
+            if win.root_stack.currentWidget() is not panel:
+                failed.append(("setup_open", "the wizard is not shown over the main window"))
+            if win.findChildren(SetupWizardDialog):
+                failed.append(("setup_open", "the wizard opened as a separate dialog"))
+            others = [w for w in QApplication.topLevelWidgets() if w is not win and w.isVisible()]
+            if others:
+                failed.append(("setup_open", "extra windows are open: %s" % ", ".join(type(w).__name__ for w in others)))
+            panel.auto_fit = False
+            _settle(app, 350)
+            win.grab().save(os.path.join(out, "firstrun_setup_%s_x%s.png" % (theme, scale)))
+            if not _footer_visible(panel):
+                failed.append(("setup_open", "footer button is outside the window"))
+            for line in _overflow(panel):
+                failed.append(("setup_open", "overflow: " + line))
+            panel._skip()
             _settle(app, 300)
+            if win.setup_panel is not None or win.root_stack.currentWidget() is not win.main_area:
+                failed.append(("setup_open", "closing the wizard did not return to the main screen"))
             if ctrl._setup_open:
-                failed.append(("setup_open", "closing the dialog did not call setup_dialog_closed"))
+                failed.append(("setup_open", "closing the wizard did not call setup_dialog_closed"))
             if not ctrl.get("setup_done"):
-                failed.append(("setup_open", "closing the dialog did not mark setup_done"))
+                failed.append(("setup_open", "closing the wizard did not mark setup_done"))
+        # 仮想カメラの登録の帯 (ダイアログは出さない)。「あとで」で消え、登録できたら消える
+        for theme in THEMES:
+            ctrl.set_theme(theme)
+            _settle(app)
+            win.select(1)
+            for state in ("missing", "outdated"):
+                ctrl.camera_prompt.emit(state)
+                _settle(app, 300)
+                if not win.camera_bar.isVisible():
+                    failed.append(("camera_bar", "the registration bar is not shown for %s" % state))
+                if len(win.camera_bar._buttons) != 2:
+                    failed.append(("camera_bar", "expected the action + later buttons, got %d" % len(win.camera_bar._buttons)))
+                others = [w for w in QApplication.topLevelWidgets() if w is not win and w.isVisible()]
+                if others:
+                    failed.append(("camera_bar", "a window opened for the registration prompt: %s" % ", ".join(type(w).__name__ for w in others)))
+                win.grab().save(os.path.join(out, "camera_bar_%s_%s_x%s.png" % (state, theme, scale)))
+            ctrl.camera_registration = "ok"
+            ctrl.camera_registration_changed.emit()
+            _settle(app, 200)
+            if win.camera_bar.isVisible():
+                failed.append(("camera_bar", "the bar stays after the camera is registered"))
         if not tk_before and "tkinter" in sys.modules:
             failed.append(("setup", "tkinter was imported by the setup wizard / diagnostics"))
     except Exception:
