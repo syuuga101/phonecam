@@ -15,6 +15,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 RELAUNCH_ENV = "PHONECAM_RELAUNCH"
 RELAUNCH_WAIT_SEC = 10.0
 MESSAGE = b"show\n"
+ACK = b"ok\n"
 
 
 def server_name():
@@ -49,6 +50,7 @@ def notify_running(name, timeout_ms=500, send=True):
         socket.write(MESSAGE)
         socket.flush()
         socket.waitForBytesWritten(timeout_ms)
+        socket.waitForReadyRead(timeout_ms)   # 動いている側の「受け取りました」を待つ (待たずに閉じると、受け取る前に切れることがある)
     socket.disconnectFromServer()
     return True
 
@@ -83,7 +85,11 @@ class InstanceGuard(QObject):
 
     def _on_ready(self, client):
         try:
-            client.readAll()
+            data = bytes(client.readAll())
+            if MESSAGE.strip() not in data:
+                return
+            client.write(ACK)
+            client.flush()
         except RuntimeError:
             return
         self.activated.emit()

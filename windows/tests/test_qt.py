@@ -358,20 +358,27 @@ def test_camera_registration_is_announced_by_a_bar_without_any_dialog(app, monke
 
 
 def test_second_launch_hands_over_to_the_running_window(app):
+    import threading
+    import time
+
     from phonecam.qt import single_instance
     name = "PhoneCamReceiver-test-%d" % id(app)
     first = single_instance.claim(name, relaunch_wait=0)
     assert first is not None
     raised = []
     first.activated.connect(lambda: raised.append(True))
+    second = []
     try:
-        assert single_instance.claim(name, relaunch_wait=0) is None      # 2 つめは何も開かずに終わる
-        import time
-        deadline = time.monotonic() + 5
-        while not raised and time.monotonic() < deadline:     # 名前付きパイプの受け渡しには少し時間がかかる
+        # 2 つめは別のプロセスの代わりに別スレッドで起動する (動いている側のイベントループは、こちらで回す)
+        worker = threading.Thread(target=lambda: second.append(single_instance.claim(name, relaunch_wait=0)))
+        worker.start()
+        deadline = time.monotonic() + 10
+        while (worker.is_alive() or not raised) and time.monotonic() < deadline:
             app.processEvents()
-            time.sleep(0.02)
-        assert raised                                                     # 動いている方が前面に出す合図を受け取った
+            time.sleep(0.01)
+        worker.join(1)
+        assert second == [None]        # 2 つめは何も開かずに終わる
+        assert raised                  # 動いている方が前面に出す合図を受け取った
     finally:
         first.close()
     third = single_instance.claim(name, relaunch_wait=0)                  # 終わったあとは、また起動できる
