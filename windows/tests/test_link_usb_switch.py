@@ -124,3 +124,14 @@ def test_usb_session_failure_after_switch_counts_as_failure(env):
     env.link._from_wifi, env.link._usb_confirmed = True, False
     env.link._note_usb_failure(SERIAL, "trust")
     assert env.link._usb_fail[SERIAL][0] == 1
+
+
+def test_connection_log_collapses_repeats(tmp_path, monkeypatch):
+    from phonecam.core import crashlog
+    monkeypatch.setattr(crashlog, "_appdata_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(crashlog, "_conn_last", None)
+    for t in (0, 1, 2, 3):
+        crashlog.log_connection("同じ理由", now=t)
+    crashlog.log_connection("別の理由", now=4)
+    lines = (tmp_path / crashlog.CONNECTION_LOG).read_text(encoding="utf-8").splitlines()
+    assert [l.split("] ", 1)[1] for l in lines] == ["同じ理由", "(直前と同じ理由を 3 回省略)", "別の理由"]

@@ -6,7 +6,7 @@ import json
 import socket
 import threading
 import time
-from phonecam.core.crashlog import log_error
+from phonecam.core.crashlog import log_connection, log_error
 from phonecam.i18n import t as tr
 from phonecam.core.profiling import PROFILE
 from phonecam.core.canvas import CanvasFitter, build_control, canvas_size, flip_image, packed_image, pad_color_for
@@ -317,6 +317,7 @@ class Link:
 
     def _note_usb_failure(self, serial, kind, backoff=True):
         """USB でつなげなかった。kind は表示用 ("app" / "trust" / "" = 表示なし)。backoff なら次に試すまで待つ。"""
+        log_connection("usb %s: 到達確認/接続に失敗 kind=%s 待ち=%s" % (serial, kind or "-", "あり" if backoff else "なし"))
         if backoff:
             count = self._usb_fail.get(serial, [0, 0.0])[0] + 1
             self._usb_fail[serial] = [count, self._clock() + USB_BACKOFF_SEC[min(count, len(USB_BACKOFF_SEC)) - 1]]
@@ -348,9 +349,11 @@ class Link:
             return False
         wifi_id = device_id(self.state.phone_status.get("deviceId"))
         if not wifi_id:
+            log_connection("usb %s: Wi-Fi 側の端末 ID がまだ分からないので乗り換えを保留" % serial)
             self._set_usb_note(tr("core.link.usb_preparing"))   # Wi-Fi 側の status がまだ。次の周期で
             return False
         if not usb_id or usb_id != wifi_id:
+            log_connection("usb %s: 端末 ID が違う/読めないので乗り換えない (usb=%s wifi=%s)" % (serial, usb_id or "-", wifi_id))
             self._note_usb_failure(serial, "")   # 別の iPhone か、ID が読めない: 勝手に乗り換えない
             return False
         info = {}
@@ -366,6 +369,7 @@ class Link:
             usb_sock.close()
             return False
         self._handover = (serial, usb_sock, info)
+        log_connection("usb %s: USB に本接続できたので Wi-Fi(%s) から乗り換える" % (serial, self._ip))
         self.state.update(status_text=tr("core.link.usb_switch"))
         self._last_wifi = None
         try:
@@ -443,6 +447,7 @@ class Link:
                     self._note_usb_failure(self._usb_serial, getattr(e, "kind", ""), backoff=False)
                 self._release_route()
                 self._last_wifi = None
+                log_connection("接続できず mode=%s: %s" % (self._mode, e))
                 self.state.update(status_text=tr("core.link.standby"), error_text=str(e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
@@ -452,6 +457,7 @@ class Link:
                     self._note_usb_failure(self._usb_serial, "trust", backoff=False)
                 self._release_route()
                 self._last_wifi = None
+                log_connection("接続エラー mode=%s: %r" % (self._mode, e))
                 self.state.update(status_text=tr("core.link.standby"), error_text=tr("core.link.connect_error", error=e), connected=False)
                 stop.wait(RECONNECT_SEC)
                 continue
@@ -468,9 +474,13 @@ class Link:
             self._auth_ok.clear()
             self._usb_confirmed = False
             session_t0 = time.monotonic()
+            log_connection("接続 mode=%s peer=%s%s" % (self._mode, self._ip or self._usb_serial or "-",
+                                                      " (Wi-Fi からの乗り換え)" if self._from_wifi else ""))
+            end_reason = "相手が閉じた/こちらが閉じた"
             try:
                 self._session(sock, stop)
             except Exception as e:
+                end_reason = "%s: %s" % (type(e).__name__, e)
                 if not stop.is_set():
                     self.state.update(error_text=tr("core.link.disconnected_error", error=e))
                     if not isinstance(e, (OSError, ConnectionError, PhoneCamError)):
@@ -485,6 +495,9 @@ class Link:
             self.state.update(connected=False, recv_fps=0.0, rx_fps=0.0)
             if stop.is_set():
                 break
+            log_connection("切断 mode=%s peer=%s %.1f秒 映像=%d 認証=%s 乗り換え直後=%s 理由=%s" % (
+                self._mode, self._ip or self._usb_serial or "-", time.monotonic() - session_t0, self._rx_count,
+                self._authed, self._from_wifi, end_reason))
             if self._mode == "usb" and self._from_wifi and not self._usb_confirmed:
                 self._note_usb_failure(self._usb_serial, "trust")   # 乗り換えたのに iPhone の status まで届かなかった
             self._last_wifi = None
