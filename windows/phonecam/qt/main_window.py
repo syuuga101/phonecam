@@ -335,6 +335,38 @@ class MainWindow(QMainWindow):
             self._tick_timer.timeout.connect(self.cameras.tick)
             self._tick_timer.start()
 
+    # -- プレビュードック ------------------------------------------------------------------
+    def _dock_toggled(self, on):
+        self.ctrl.changed("preview_dock", bool(on))
+        self._sync_dock()
+
+    def _sync_dock(self, key=None):
+        """ドックを今のページ・ウィンドウ幅に合わせる (対象ページで、トグルが入っているときだけ出す)。"""
+        if key is None:
+            row = self.nav.currentRow()
+            key = NAV_ITEMS[row][0] if row >= 0 else ""
+        wide = self.width() >= WIDE_W
+        if wide != self._dock_wide:
+            self._dock_wide = wide
+            self._body.removeWidget(self.dock)
+            self._pagecol.removeWidget(self.dock)
+            if wide:
+                self._body.addWidget(self.dock, 0, Qt.AlignmentFlag.AlignTop)
+            else:
+                self._pagecol.insertWidget(1, self.dock)
+        self.dock.set_wide(wide)
+        want = key in DOCK_PAGES and bool(self.ctrl.get("preview_dock", True))
+        if want:
+            self.dock.set_camera(self._dock_camera)
+            self.dock.set_audio(key == "audio")
+        self.dock.setVisible(want)
+        self.dock.set_active(want)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "dock") and (self.width() >= WIDE_W) != self._dock_wide:
+            self._sync_dock()
+
     # -- ページ --------------------------------------------------------------------
     def current_camera(self):
         return self.cameras.cameras[self.camera_index]
