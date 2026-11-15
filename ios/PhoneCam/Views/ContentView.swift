@@ -37,6 +37,7 @@ struct ContentView: View {
 
             ZoomHUD()
             blackOverlay
+            PairPopupOverlay()
         }
         .overlay(alignment: .top) {
             toastOverlay

@@ -26,6 +26,12 @@ jobs:
           swiftc PhoneCam/LoopbackAddress.swift Tests/LoopbackChecks.swift -o "$RUNNER_TEMP/phonecam-loopback-checks"
           "$RUNNER_TEMP/phonecam-loopback-checks"
 
+      - name: Test pair request rules
+        working-directory: ios
+        run: |
+          swiftc PhoneCam/PairRequest.swift PhoneCam/Packet.swift Tests/PairRequestChecks.swift -o "$RUNNER_TEMP/phonecam-pair-checks"
+          "$RUNNER_TEMP/phonecam-pair-checks"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

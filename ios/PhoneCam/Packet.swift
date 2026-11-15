@@ -30,7 +30,11 @@ enum Packet {
 /// 受信バイト列からメッセージを取り出すパーサ
 struct PacketParser {
     private var buffer = Data()
-    private static let maxPayload = 16 * 1024 * 1024
+    static let defaultMaxPayload = 16 * 1024 * 1024
+    /// 1 メッセージの本体の上限。認証前の接続では小さくしておき、認証が通ったら戻す。
+    var maxPayload = PacketParser.defaultMaxPayload
+    /// 上限を超えるメッセージが来た (壊れたストリーム / 認証前の大きすぎるメッセージ)
+    private(set) var overflowed = false
 
     mutating func append(_ data: Data) {
         buffer.append(data)
@@ -46,9 +50,10 @@ struct PacketParser {
         let b3 = Int(buffer[base + 3])
         let b4 = Int(buffer[base + 4])
         let len = (b1 << 24) | (b2 << 16) | (b3 << 8) | b4
-        if len > PacketParser.maxPayload {
+        if len > maxPayload {
             // 壊れたストリーム: 破棄する
             buffer = Data()
+            overflowed = true
             return nil
         }
         guard buffer.count >= 5 + len else { return nil }
