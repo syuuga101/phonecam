@@ -102,8 +102,11 @@ def check_expander_headers(win, failed):
         _settle(win._smoke_app, 120)
         for ex in win.current_page().findChildren(Expander):
             where = "%s/%s" % (key, ex.title_label.text())
-            if not ex.description_label.text_full():
+            desc = ex.description_label.text_full()
+            if not desc:
                 failed.append((key, "expander '%s' has no description" % where))
+            elif not desc.startswith(("・", "• ")) or not 2 <= desc.count("・" if desc.startswith("・") else "• ") <= 4:
+                failed.append((key, "expander '%s': the description is not a list of 2-4 short items: %r" % (where, desc)))
             if ex.summary_label.text_full().strip() in ("", NO_VALUE) and ex.summary_label.isVisible():
                 failed.append((key, "expander '%s' shows an empty summary" % where))
             header = ex.header
@@ -428,10 +431,11 @@ def setup_shots(app, ctrl, win, out, scale):
             diag.close()
             diag.deleteLater()
             _settle(app, 100)
-        # 本体から開く経路 (初回起動・更新後): controller.setup_requested -> メインウィンドウの中のセットアップ (別のウィンドウを開かない)。
-        # 閉じたら再判定 (setup_dialog_closed) が走り、普段の画面に戻る
+        # 本体から開く経路 (初回起動・更新後): controller.setup_requested -> メインウィンドウの上に別ウィンドウ (親子関係つき・前面・中央)。
+        # 閉じたら再判定 (setup_dialog_closed) が走る。撮るのは「メインの上にセットアップが出ている」状態
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QPainter
         from PySide6.QtWidgets import QApplication
-        from phonecam.qt.setup_wizard import SetupWizardPanel
         for theme in THEMES:
             ctrl.set_theme(theme)
             _settle(app)
@@ -439,28 +443,36 @@ def setup_shots(app, ctrl, win, out, scale):
             ctrl._setup_open = True
             ctrl.setup_requested.emit(False, None)
             _settle(app, 500)
-            panel = win.setup_panel
-            if not isinstance(panel, SetupWizardPanel):
-                failed.append(("setup_open", "expected the wizard inside the main window, got %r" % (panel,)))
+            dlg = win.setup_dialog
+            if not isinstance(dlg, SetupWizardDialog):
+                failed.append(("setup_open", "expected the wizard as a separate window, got %r" % (dlg,)))
+                ctrl._setup_open = False
                 continue
-            if win.root_stack.currentWidget() is not panel:
-                failed.append(("setup_open", "the wizard is not shown over the main window"))
-            if win.findChildren(SetupWizardDialog):
-                failed.append(("setup_open", "the wizard opened as a separate dialog"))
+            if dlg.parent() is not win:
+                failed.append(("setup_open", "the wizard window has no parent (a taskbar button would be added)"))
             others = [w for w in QApplication.topLevelWidgets() if w is not win and w.isVisible()]
-            if others:
-                failed.append(("setup_open", "extra windows are open: %s" % ", ".join(type(w).__name__ for w in others)))
-            panel.auto_fit = False
+            if len(others) != 1 or others[0] is not dlg:
+                failed.append(("setup_open", "expected exactly the main window and the wizard, got: %s" % ", ".join(type(w).__name__ for w in others)))
+            wc, dc = win.geometry().center(), dlg.geometry().center()
+            if abs(wc.x() - dc.x()) > 40 or abs(wc.y() - dc.y()) > 40:
+                failed.append(("setup_open", "the wizard is not centered over the main window (%s vs %s)" % (wc, dc)))
+            dlg.auto_fit = False
             _settle(app, 350)
-            win.grab().save(os.path.join(out, "firstrun_setup_%s_x%s.png" % (theme, scale)))
-            if not _footer_visible(panel):
+            dlg.grab()
+            _settle(app, 150)
+            shot = win.grab()
+            painter = QPainter(shot)
+            painter.drawPixmap(dlg.geometry().topLeft() - win.geometry().topLeft(), dlg.grab())
+            painter.end()
+            shot.save(os.path.join(out, "firstrun_setup_%s_x%s.png" % (theme, scale)))
+            if not _footer_visible(dlg):
                 failed.append(("setup_open", "footer button is outside the window"))
-            for line in _overflow(panel):
+            for line in _overflow(dlg):
                 failed.append(("setup_open", "overflow: " + line))
-            panel._skip()
+            dlg._skip()
             _settle(app, 300)
-            if win.setup_panel is not None or win.root_stack.currentWidget() is not win.main_area:
-                failed.append(("setup_open", "closing the wizard did not return to the main screen"))
+            if win.setup_dialog is not None and win.setup_dialog.isVisible():
+                failed.append(("setup_open", "closing the wizard did not close the window"))
             if ctrl._setup_open:
                 failed.append(("setup_open", "closing the wizard did not call setup_dialog_closed"))
             if not ctrl.get("setup_done"):

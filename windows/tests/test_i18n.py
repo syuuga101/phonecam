@@ -264,3 +264,15 @@ def test_no_translation_at_import_time():
     for path in sources:
         walk(ast.parse(path.read_text(encoding="utf-8-sig")), False, path.relative_to(WINDOWS).as_posix())
     assert not errors, ("import 時に t() を評価しています (言語の切り替えに追従しません):\n" + "\n".join(errors))
+
+
+def test_expander_descriptions_are_short_item_lists():
+    import json
+    from pathlib import Path
+    for lang, bullet in (("ja", "・"), ("en", "• ")):
+        data = json.loads((Path(__file__).resolve().parents[1] / "locales" / ("%s.json" % lang)).read_text(encoding="utf-8"))
+        for key, text in data.items():
+            if key.startswith("compact.desc."):
+                assert text.startswith(bullet), (lang, key, text)
+                assert 2 <= text.count(bullet) <= 4, (lang, key, text)
+                assert "。" not in text and "、" not in text, (lang, key, text)   # 文章ではなく項目の並び

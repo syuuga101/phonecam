@@ -1,5 +1,6 @@
 # 指定したプロセス名 (onefile の exe は親と子の 2 つ) が持つ、見えているトップレベルウィンドウの一覧を出す。
-# 使い方: ./count_windows.ps1 PhoneCamReceiver   → 1 行に 1 ウィンドウ ("pid|クラス名|タイトル") を標準出力へ
+# 使い方: ./count_windows.ps1 PhoneCamReceiver   → 1 行に 1 ウィンドウ ("pid|クラス名|タイトル|owner") を標準出力へ。
+# owner は親 (オーナー) ウィンドウのハンドル (16 進。親が無い独立したウィンドウは 0)。親子のウィンドウはタスクバーに別のボタンを作らない
 param([Parameter(Mandatory = $true)][string]$ProcessName)
 Add-Type -TypeDefinition @"
 using System;
@@ -11,6 +12,7 @@ public static class PcWindows {
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
     public static List<string> Visible(uint[] pids) {
@@ -21,7 +23,8 @@ public static class PcWindows {
             if (set.Contains(pid) && IsWindowVisible(h)) {
                 var t = new StringBuilder(256); GetWindowText(h, t, 256);
                 var c = new StringBuilder(256); GetClassName(h, c, 256);
-                list.Add(pid + "|" + c + "|" + t);
+                IntPtr o = GetWindow(h, 4);   // GW_OWNER
+                list.Add(pid + "|" + c + "|" + t + "|" + o.ToInt64().ToString("x"));
             }
             return true;
         }, IntPtr.Zero);
