@@ -915,6 +915,7 @@ def dock_shots(app, ctrl, win, out, scale):
                     animate=False, save=False,
                 )
             win.current_page().verticalScrollBar().setValue(0)
+            win.current_page().horizontalScrollBar().setValue(0)
             _settle(app, 450)
             dock = win.dock
             name = "dock_%s_%s_%s_x%s" % (page, shape, theme, scale)

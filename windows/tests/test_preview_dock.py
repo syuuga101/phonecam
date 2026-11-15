@@ -2,6 +2,7 @@ import pytest
 
 pytest.importorskip("PySide6.QtWidgets")
 np = pytest.importorskip("numpy")
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from phonecam.controller import Controller  # noqa: E402
@@ -64,7 +65,11 @@ def test_dock_moves_between_side_column_and_top_band(app, window):
     app.processEvents()
     assert win._body.indexOf(win.dock) >= 0
     assert win.dock.surface.width() == preview_dock.WIDE_PREVIEW_W
-    win.resize(900, 700)
+    win.resize(preview_dock.WIDE_W, 700)
+    app.processEvents()
+    assert win._body.indexOf(win.dock) >= 0
+    assert win.current_page().horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    win.resize(preview_dock.WIDE_W - 1, 700)
     app.processEvents()
     assert win._pagecol.indexOf(win.dock) >= 0
     assert win._body.indexOf(win.dock) < 0

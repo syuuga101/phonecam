@@ -481,6 +481,9 @@ class MainWindow(QMainWindow):
             if key != "cameras":
                 from phonecam.qt.compact import compact_page
                 compact_page(page, ctrl, key)
+            if key in DOCK_PAGES:
+                # ドックを横に並べたときも、幅のある設定行の操作部まで届くようにする。
+                page.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         except Exception as e:   # 1ページの不具合でアプリ本体を止めない
             import traceback
             traceback.print_exc()
