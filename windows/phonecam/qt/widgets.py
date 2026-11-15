@@ -537,7 +537,7 @@ def _flush_deferred():
 
 
 class Expander(Card):
-    """折りたたみ。左にアイコン、中央に題名 (太字) と「中で何ができるか」を「・A　・B」の短い項目で並べた説明、
+    """折りたたみ。左にアイコン、中央に題名 (太字) と「中で何ができるか」を「A・B」の短い項目を 1 行で並べた説明、
     右 (∨ の左) に今の値の要約。開閉の状態は設定に保存する。"""
 
     def __init__(self, ctrl, key, icon_name, title, description="", summary="", parent=None):
@@ -621,8 +621,8 @@ class Expander(Card):
 
     def _refresh_header_text(self):
         # 幅が足りなくて「…」になっても、全文はマウスを乗せると読める / 読み上げにも渡る
-        # 説明は「・A　・B」の並びなので、ツールチップでは 1 項目ずつ改行して見せる
-        description = re.sub(r"\s+(?=[・•])", "\n", self._description)
+        # 説明は「A・B」の並び (英語は「A · B」) なので、ツールチップでは 1 項目ずつ改行して見せる
+        description = re.sub(r"・| · ", "\n", self._description)
         full = "\n".join(part for part in (description, self._summary) if part)
         self.header.setToolTip(full)
         self.header.setAccessibleDescription(full.replace("\n", " "))

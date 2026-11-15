@@ -269,10 +269,12 @@ def test_no_translation_at_import_time():
 def test_expander_descriptions_are_short_item_lists():
     import json
     from pathlib import Path
-    for lang, bullet in (("ja", "・"), ("en", "• ")):
+    for lang, sep in (("ja", "・"), ("en", " · ")):
         data = json.loads((Path(__file__).resolve().parents[1] / "locales" / ("%s.json" % lang)).read_text(encoding="utf-8"))
         for key, text in data.items():
             if key.startswith("compact.desc."):
-                assert text.startswith(bullet), (lang, key, text)
-                assert 2 <= text.count(bullet) <= 4, (lang, key, text)
+                assert 2 <= len(text.split(sep)) <= 4, (lang, key, text)       # 2〜4 項目を 1 行で
+                assert "\n" not in text and not text.startswith(("・", "•", " ")), (lang, key, text)
                 assert "。" not in text and "、" not in text, (lang, key, text)   # 文章ではなく項目の並び
+                if lang == "ja":
+                    assert " ・" not in text and "・ " not in text and "　" not in text, (lang, key, text)

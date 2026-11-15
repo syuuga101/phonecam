@@ -17,6 +17,7 @@ tkinter が読み込まれないことも確かめる。
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -105,8 +106,8 @@ def check_expander_headers(win, failed):
             desc = ex.description_label.text_full()
             if not desc:
                 failed.append((key, "expander '%s' has no description" % where))
-            elif not desc.startswith(("・", "• ")) or not 2 <= desc.count("・" if desc.startswith("・") else "• ") <= 4:
-                failed.append((key, "expander '%s': the description is not a list of 2-4 short items: %r" % (where, desc)))
+            elif not 2 <= len(re.split(r"・| · ", desc)) <= 4 or "\n" in desc or desc.startswith(("・", "•")):
+                failed.append((key, "expander '%s': the description is not 2-4 short items on one line: %r" % (where, desc)))
             if ex.summary_label.text_full().strip() in ("", NO_VALUE) and ex.summary_label.isVisible():
                 failed.append((key, "expander '%s' shows an empty summary" % where))
             header = ex.header
