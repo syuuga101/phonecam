@@ -239,4 +239,5 @@ def main():
         crashlog.log_error("first_run_setup")
     win.restore_state()
     app.aboutToQuit.connect(win.cameras.close)
+    app.aboutToQuit.connect(crashlog.mark_exit)
     return app.exec()

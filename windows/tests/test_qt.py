@@ -358,26 +358,34 @@ def test_camera_registration_is_announced_by_a_bar_without_any_dialog(app, monke
 
 
 def test_second_launch_hands_over_to_the_running_window(app):
-    import threading
+    import os
+    import subprocess
+    import sys
     import time
+    from pathlib import Path
 
     from phonecam.qt import single_instance
-    name = "PhoneCamReceiver-test-%d" % id(app)
+    name = "PhoneCamReceiver-test-%d" % os.getpid()
     first = single_instance.claim(name, relaunch_wait=0)
     assert first is not None
     raised = []
     first.activated.connect(lambda: raised.append(True))
-    second = []
     try:
-        # 2 つめは別のプロセスの代わりに別スレッドで起動する (動いている側のイベントループは、こちらで回す)
-        worker = threading.Thread(target=lambda: second.append(single_instance.claim(name, relaunch_wait=0)))
-        worker.start()
-        deadline = time.monotonic() + 10
-        while (worker.is_alive() or not raised) and time.monotonic() < deadline:
+        # 2 つめは本物と同じく別のプロセスで起動する (動いている側のイベントループは、こちらで回す)
+        code = ("from PySide6.QtWidgets import QApplication\n"
+                "app = QApplication([])\n"
+                "from phonecam.qt import single_instance\n"
+                "import sys\n"
+                "sys.exit(0 if single_instance.claim(%r, relaunch_wait=0) is None else 1)\n" % name)
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+        proc = subprocess.Popen([sys.executable, "-c", code], cwd=str(Path(__file__).resolve().parents[1]), env=env)
+        deadline = time.monotonic() + 30
+        while (proc.poll() is None or not raised) and time.monotonic() < deadline:
             app.processEvents()
             time.sleep(0.01)
-        worker.join(1)
-        assert second == [None]        # 2 つめは何も開かずに終わる
+        if proc.poll() is None:
+            proc.kill()
+        assert proc.returncode == 0    # 2 つめは何も開かずに終わる
         assert raised                  # 動いている方が前面に出す合図を受け取った
     finally:
         first.close()
