@@ -115,6 +115,7 @@ def test_register_fails_when_old_dll_cannot_be_replaced(monkeypatch, tmp_path):
                         Mock(side_effect=lambda s, d: (_ for _ in ()).throw(PermissionError()) if d.endswith("softcam.dll") else real_copy(s, d)))
     run = Mock(return_value=True)
     monkeypatch.setattr(softcam_reg, "_run_regsvr32", run)
+    monkeypatch.setattr(softcam_reg, "_error_box", Mock())   # Windows では本物の MessageBox が出て止まる
     result = softcam_reg.helper_register(1)
     assert result.x64 is False and not result
     assert all(call.args[1] != str(dst / "softcam.dll") for call in run.call_args_list)   # 古い DLL は登録しない
