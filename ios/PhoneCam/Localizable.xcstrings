@@ -2816,6 +2816,28 @@
           }
         }
       }
+    },
+    "録画ファイルはファイル App からも見えます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings are also visible in the Files app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画ファイルはファイル App からも見えます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "録画ファイルはファイル App からも見えます"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
