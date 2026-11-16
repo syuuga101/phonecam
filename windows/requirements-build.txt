@@ -1,0 +1,2 @@
+# exe のビルド (CI) だけで使う。requirements-build.lock はこのファイルから作る (docs/DEVELOPMENT.md)
+pyinstaller==6.22.3

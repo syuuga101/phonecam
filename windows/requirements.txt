@@ -1,7 +1,9 @@
 # CI の exe ビルド (v2.7.0) で実際に使われた版に固定 (ビルドを再現できるように)。
 # 上げるときは CI の Build Windows receiver と qt-screenshots が通るのを確かめてから。
+# 6.11.3: Qt 6.8.3 が影響を受ける CVE-2026-101201 (JSON 解析) / CVE-2026-8168 (SVG) の修正を含む最小の版 (PyPI に 6.8.9 以降の 6.8.x は無い)。
+# 上げたら requirements*.lock を作り直す (docs/DEVELOPMENT.md)。
 # PySide6 は Essentials だけ (Core/Gui/Widgets/Network/Svg で足りる。Addons の約130MBを入れない)。
-PySide6-Essentials==6.8.3
+PySide6-Essentials==6.11.3
 av==19.0.2
 numpy==2.5.4
 pyvirtualcam==0.15.0
