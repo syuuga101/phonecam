@@ -33,4 +33,4 @@ def test_dbg():
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     r = subprocess.run([sys.executable, "-X", "faulthandler", "-c", CODE], capture_output=True, text=True, env=env, cwd=os.path.dirname(os.path.dirname(__file__)))
     print(r.stdout[-3000:]); print(r.stderr[-6000:])
-    assert r.returncode == 0, r.stdout[-1500:] + "\n----\n" + r.stderr[-4000:]
+    assert False, "rc=%s " % r.returncode + r.stdout[-1500:] + "\n----\n" + r.stderr[-4000:]
