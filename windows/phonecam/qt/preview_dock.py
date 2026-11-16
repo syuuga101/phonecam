@@ -16,13 +16,14 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWi
 from phonecam.core.profiling import PROFILE
 from phonecam.core.settings import PREVIEW_FPS_CHOICES
 from phonecam.i18n import t
-from phonecam.labels import LENS_LABELS, METER_MIN_DB
-from phonecam.qt.compact import fps_summary, join_summary, mic_summary
+from phonecam.labels import LENS_LABELS, METER_MIN_DB, mic_state_text
+from phonecam.qt.compact import fps_summary, join_summary
 from phonecam.qt.pages.audio import InputLevelMeter
 from phonecam.qt.pages.connection import frame_to_image
 from phonecam.qt.widgets import (
     _THEME_EVENTS, Switch, border_color, card_color, ref_palette, secondary_color,
 )
+from phonecam.qt.plain import PlainLabel
 
 DOCK_PAGES = ("video", "quality", "effects", "audio")   # ドックを出すページ
 WIDE_W = 1100        # ウィンドウ幅 (論理px) がこれ以上なら右の列、未満なら上の帯
@@ -144,7 +145,7 @@ class PreviewDock(QWidget):
         self.level.setMinimumWidth(100)
         self.level.setAccessibleName(t("audio.level.label"))
         self.level.setFixedHeight(20)
-        self.mic_label = QLabel()
+        self.mic_label = PlainLabel()
         self.mic_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         arow.addWidget(self.level, 1)
         arow.addWidget(self.mic_label, 0)
@@ -257,7 +258,9 @@ class PreviewDock(QWidget):
         if self.camera is None:
             return
         self.surface.set_label(dock_text(self.camera))
-        text = mic_summary(self.camera.get("mic_enabled", True), self.camera.get("mic_mute"))
+        status = getattr(self.camera, "status", None)
+        phone_muted = bool(getattr(status, "phone_muted", False)) if status else False
+        text = mic_state_text(self.camera.get("mic_enabled", True), self.camera.get("mic_mute"), phone_muted)
         if text != self.mic_label.text():
             self.mic_label.setText(text)
 
@@ -281,7 +284,7 @@ def make_toggle(ctrl):
     lay = QHBoxLayout(box)
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(8)
-    label = QLabel(t("dock.toggle"))
+    label = PlainLabel(t("dock.toggle"))
     switch = Switch()
     switch.setChecked(bool(ctrl.get("preview_dock", True)))
     switch.setAccessibleName(t("dock.toggle"))

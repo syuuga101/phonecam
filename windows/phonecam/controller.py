@@ -24,7 +24,7 @@ from phonecam.core.audio_engine import AudioEngine, find_vbcable_control_panel
 from phonecam.core.canvas import canvas_size
 from phonecam.core.deps import av, np, phonecam_dshowctl, phonecam_hotkeys, phonecam_update, pyvirtualcam
 from phonecam.core.elevate import run_elevated
-from phonecam.core.softcam_reg import camera_namespace, registration_status
+from phonecam.core.softcam_reg import EXIT_REGISTER_PARTIAL, camera_namespace, registration_status, x86_registration_status
 from phonecam.core.version import APP_REPO, APP_VERSION
 from phonecam.core.link import Link
 from phonecam.core.settings import (
@@ -53,6 +53,7 @@ from phonecam.core.callbacks import CallbackList
 from phonecam.i18n import NO_VALUE, get_language, resolve_language, set_language, t
 from phonecam.labels import (
     auto_unsupported_note,
+    clip_text,
     LENS_LABELS,
     METER_MIN_DB,
     PHONE_NOTE_SECONDS,
@@ -134,6 +135,7 @@ class Controller:
         if self.frozen and not secondary and not demo and phonecam_update is not None:
             phonecam_update.cleanup_old(os.path.dirname(sys.executable), prefix=Path(sys.executable).stem)
         self.camera_registration = registration_status(self.link.vcam.slot) if self.frozen and not demo else "unavailable"
+        self.camera_x86 = self._read_x86()
         self.camera_registration_busy = False
         self.camera_registration_changed = CallbackList()
         self.camera_prompt = CallbackList()     # emit(state)   起動時に専用カメラの登録/更新を確認する ("missing" / "outdated")
@@ -440,11 +442,22 @@ class Controller:
             return
         self.prompt_camera_registration()
 
+    def _read_x86(self):
+        """32bit 版の登録状態 ("ok" / "missing" / "unavailable")。exe 版以外・デモでは "unavailable"。"""
+        if self.demo or not self.frozen:
+            return "unavailable"
+        return x86_registration_status(self.link.vcam.slot)
+
+    def camera_partial(self):
+        """64bit だけ登録できていて 32bit が登録されていない (32bit 版の OBS などには映らない)。"""
+        return self.camera_registration == "ok" and self.camera_x86 == "missing"
+
     def refresh_camera_registration(self):
         if self.demo or not self.frozen:
             return
         try:
             self.camera_registration = registration_status(self.link.vcam.slot)
+            self.camera_x86 = self._read_x86()
             self.camera_registration_changed.emit()
             self.link.vcam.request_reset()
         except Exception:
@@ -463,9 +476,13 @@ class Controller:
             return
         state = registration_status(self.link.vcam.slot)
         self.camera_registration = state
+        self.camera_x86 = self._read_x86()
         if state in ("missing", "outdated"):
             self._camera_prompted = True
             self.camera_prompt.emit(state)
+        elif self.camera_partial():
+            self._camera_prompted = True
+            self.camera_prompt.emit("partial")
 
     def run_background(self, work, done):
         def run():
@@ -487,12 +504,17 @@ class Controller:
         def finished(result):
             self.camera_registration_busy = False
             self.camera_registration = registration_status(self.link.vcam.slot)
+            self.camera_x86 = self._read_x86()
             self.camera_registration_changed.emit()
             self.link.vcam.request_reset()
             kind = result[0] if isinstance(result, tuple) else "error"
             expected = ("ok",) if action == "register" else ("missing", "unavailable")
             word = t(f"video.vcam.word_{action}")
-            if kind == "ok" and self.camera_registration in expected:
+            if action == "register" and self.camera_registration == "ok" and (
+                    self.camera_partial() or (kind == "failed" and result[1] == EXIT_REGISTER_PARTIAL)):
+                self.toast.emit(t("video.vcam.partial"), "error")
+                self.camera_prompt.emit("partial")
+            elif kind == "ok" and self.camera_registration in expected:
                 self.toast.emit(t("video.vcam.registered" if action == "register" else "video.vcam.unregistered"), "info")
             else:
                 key = {"ok": "unchanged", "cancelled": "cancelled", "timeout": "timeout"}.get(kind, "failed")
@@ -925,7 +947,7 @@ class Controller:
         device = ""
         sub = ""
         if connected:
-            name = st.get("deviceName") or st.get("name") or t("connection.device.default")
+            name = clip_text(st.get("deviceName") or st.get("name")) or t("connection.device.default")
             device = "%s · %s" % (name, way)
             sub = self.stream_state_text if key != "live" else ""
         elif self.wanted:

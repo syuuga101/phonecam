@@ -55,6 +55,7 @@ from phonecam.qt.setup_common import (
     plain_button,
 )
 from phonecam.qt.widgets import Card, FitBox, button
+from phonecam.qt.plain import PlainLabel
 
 COL_MAX = 720
 STATE_GLYPH = {ps.STATE_OK: "ok", ps.STATE_MISSING: "idle", ps.STATE_WARN: "warn"}
@@ -100,7 +101,7 @@ class ComponentRow(QWidget):
         col.setSpacing(2)
         head = QHBoxLayout()
         head.setSpacing(8)
-        name = QLabel(comp["name"])
+        name = PlainLabel(comp["name"])
         semibold(name)
         head.addWidget(name)
         head.addWidget(WrapLabel(state_word(state), STATE_ROLE.get(state, "warn"), 9.0, wrap=False))
@@ -143,7 +144,7 @@ class ResultRow(QWidget):
         col = QVBoxLayout()
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(2)
-        name = QLabel(comp["name"])
+        name = PlainLabel(comp["name"])
         semibold(name)
         col.addWidget(name)
         if result.get("detail"):
