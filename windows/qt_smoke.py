@@ -727,6 +727,8 @@ def child(scale, out):
         failed.append(("connection", "empty state squeezed (%d < %d)" % (box.height(), need)))
     # プレビュードック: 映像ページ (「レンズ・出力」を開いた状態) と音声ページを、広い (右の列) / 狭い (上の帯) で撮る
     failed += dock_shots(app, ctrl, win, out, scale)
+    # つなげる相手 (USB で見えている / Wi-Fi で見つかった) がいる未接続の状態: 状態カードと緑の「接続」ボタン、端末の行の「USB 接続済み」
+    failed += usb_ready_shots(app, ctrl, win, out, scale)
     # カメラが 2 台以上のとき: カメラページ (1 台接続中・1 台未接続) / 2 台目の接続ページ / 音声ページ / ウィザード / 選択ダイアログ
     from phonecam.qt.multicam import AddCameraWizard, DevicePickDialog
     known2 = Device("0d2e6a52-3c1b-4f0a-9d4e-7a1b2c3d4e5f", "リビングのiPhone", ("172.20.10.1",), "", "iPhone 15 Pro", "", "22" * 32)
@@ -891,6 +893,101 @@ def child(scale, out):
             print("PAGE ERROR %s: %s" % (key, err), file=sys.stderr)
         return 1
     return 0
+
+
+def usb_ready_shots(app, ctrl, win, out, scale):
+    """「USB で見えている未接続」など、つなげる相手の見え方ごとに、接続ページ (状態カード + 接続ボタン) と端末の行を撮る。"""
+    from phonecam.core.ready import CABLE, READY, UsbSeen
+    from phonecam.core.wireless import Device
+    from phonecam.i18n import t
+    from phonecam.qt.main_window import NAV_ITEMS
+    from phonecam.qt.widgets import Expander
+    from phonecam.qt.wireless import UsbLine
+    failed = []
+    conn = next(i for i, (key, _icon) in enumerate(NAV_ITEMS) if key == "connection")
+    serial = "00008110-001A2B3C4D5E6F01"
+    known = Device("5f1c0c1e-9a53-4a0e-8b8e-0b6f2f1d3a11", "iPhone 13", ("192.168.1.81",), "", "iPhone 13", "", "11" * 32)
+    found = [Device(known.id, "iPhone 13", ("192.168.1.81",), "", "iPhone 13")]
+    saved = dict(known=ctrl.settings.get("known_devices"), found=ctrl.demo_discovered, usb=ctrl.demo_usb_seen,
+                 phone=ctrl.state.snapshot()["phone_status"], mode=ctrl.settings["mode"])
+    win.resize(W, H)
+    win.select(conn)
+    _settle(app)
+    page = win.current_page()
+    wireless = page.wireless
+    saved["wireless"] = wireless.discovered
+    ctrl.settings["known_devices"] = [known.stored()]
+    ctrl.settings["mode"] = "auto"
+    ready_text = t("connection.card.ready")
+    # (名前, USB で見えているもの, Wi-Fi で見つかったもの, つなごうとしている最中か, 期待する [ボタンの見た目, ボタンの文, 有効か, 状態カードの見出し, 端末の行の USB の文])
+    scenes = (
+        ("usb", {serial: UsbSeen(READY, known.id)}, found, False,
+         ("go", t("connection.button.connect_usb"), True, ready_text, t("wireless.usb.ready"))),
+        ("wifi", {}, found, False,
+         ("go", t("connection.button.connect_wifi"), True, ready_text, None)),
+        ("cable", {serial: UsbSeen(CABLE, "")}, [], False,
+         ("plain", t("connection.button.connect"), True, t("connection.card.off"), t("wireless.usb.cable"))),
+        ("none", {}, [], False,
+         ("plain", t("connection.button.connect"), True, t("connection.card.off"), None)),
+        ("trying", {serial: UsbSeen(READY, known.id)}, found, True,
+         ("plain", t("connection.button.connecting"), False, t("connection.button.connecting"), None)),
+    )
+    for theme in THEMES:
+        ctrl.set_theme(theme)
+        _settle(app)
+        for name, seen, discovered, trying, (look, text, enabled, headline, usb_line) in scenes:
+            ctrl.demo_usb_seen = dict(seen)
+            ctrl.demo_discovered = list(discovered)
+            wireless.discovered = list(discovered)
+            wireless.scanned = True
+            wireless._signature = None
+            ctrl.wanted = trying
+            ctrl.state.update(connected=False, transport="", peer="", phone_status={}, status_text="未接続")
+            ctrl.poll()
+            _settle(app, 250)
+            tag = "usb_ready %s %s" % (name, theme)
+            if (page.connect_btn.look, page.connect_btn.text(), page.connect_btn.isEnabled()) != (look, text, enabled):
+                failed.append((tag, "connect button is %r" % ((page.connect_btn.look, page.connect_btn.text(), page.connect_btn.isEnabled()),)))
+            if page.state_label.text() != headline:
+                failed.append((tag, "state card says %r, expected %r" % (page.state_label.text(), headline)))
+            if (name in ("usb", "wifi")) != (page.dot.key == "ready"):
+                failed.append((tag, "state dot should be green only when ready (key=%s)" % page.dot.key))
+            if trying != page.spinner.isVisible():
+                failed.append((tag, "spinner visibility is wrong"))
+            page.verticalScrollBar().setValue(0)
+            _settle(app, 150)
+            win.grab()
+            _settle(app, 150)
+            win.grab().save(os.path.join(out, "ready_%s_%s_x%s.png" % (name, theme, scale)))
+            if name == "trying":
+                continue
+            for expander in page.findChildren(Expander):
+                expander.set_expanded(True, animate=False, save=False)
+            _settle(app, 250)
+            lines = [line.label.text() for line in page.findChildren(UsbLine)]
+            if lines != ([usb_line] if usb_line else []):
+                failed.append((tag, "device row USB line is %r, expected %r" % (lines, usb_line)))
+            top = wireless.devices_box.mapTo(page.widget(), wireless.devices_box.rect().topLeft()).y()
+            page.verticalScrollBar().setValue(max(0, top - 80))
+            _settle(app, 150)
+            win.grab()
+            _settle(app, 150)
+            win.grab().save(os.path.join(out, "ready_%s_devices_%s_x%s.png" % (name, theme, scale)))
+            for expander in page.findChildren(Expander):
+                expander.set_expanded(False, animate=False, save=False)
+            _settle(app, 150)
+    # 元の状態 (接続中) に戻す
+    ctrl.settings["known_devices"] = saved["known"]
+    ctrl.settings["mode"] = saved["mode"]
+    ctrl.demo_usb_seen = saved["usb"]
+    ctrl.demo_discovered = saved["found"]
+    wireless.discovered = saved["wireless"]
+    wireless._signature = None
+    ctrl.wanted = True
+    ctrl.state.update(connected=True, status_text="接続中", transport="usb", peer="", phone_status=saved["phone"])
+    ctrl.poll()
+    _settle(app, 250)
+    return failed
 
 
 def dock_shots(app, ctrl, win, out, scale):

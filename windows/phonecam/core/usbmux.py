@@ -130,6 +130,23 @@ def usbmux_probe(serial, mux_addr=USBMUX_ADDR, timeout=1.5):
         sock.close()
 
 
+def usbmux_app_state(serial, mux_addr=USBMUX_ADDR, timeout=0.8):
+    """USB の iPhone で PhoneCam アプリが応答しているかを見る。識別ポート (5557) にだけつなぐ (映像の 5555 には触れない)。
+    -> ("ready", 端末 ID の行。読めなければ "") / ("cable", "") (ケーブルは見えるが、アプリが応答していない)"""
+    try:
+        sock = usbmux_connect(port=IDENTITY_PORT, mux_addr=mux_addr, timeout=timeout, serial=serial)
+    except PhoneCamError:
+        return "cable", ""
+    try:
+        sock.settimeout(timeout)
+        with sock.makefile("rb") as stream:
+            return "ready", stream.readline(37).decode("ascii", "replace").strip()
+    except (OSError, ConnectionError):
+        return "ready", ""
+    finally:
+        sock.close()
+
+
 def usbmux_available(mux_addr=USBMUX_ADDR):
     return bool(usbmux_devices(mux_addr))
 

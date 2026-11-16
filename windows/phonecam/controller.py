@@ -28,6 +28,7 @@ from phonecam.core.elevate import run_elevated
 from phonecam.core.softcam_reg import EXIT_REGISTER_PARTIAL, camera_namespace, registration_status, x86_registration_status
 from phonecam.core.version import APP_REPO, APP_VERSION
 from phonecam.core.link import Link
+from phonecam.core.ready import usb_watcher
 from phonecam.core.secure import load_identity
 from phonecam.core.wireless import read_device
 from phonecam.core.settings import (
@@ -92,6 +93,7 @@ class Controller:
         self.persist = bool(persist)
         self.demo = bool(demo)
         self.demo_latency_ms = None   # demo: 遅延 (ms) の固定表示値
+        self.demo_usb_seen = {}       # demo: USB で見えている端末 {シリアル: UsbSeen}
         if settings is None:
             if self.persist:
                 migrate_legacy_settings()
@@ -808,11 +810,20 @@ class Controller:
     # ------------------------------------------------------------------
     # 周期処理
     # ------------------------------------------------------------------
+    def usb_seen(self):
+        """USB で見えている iPhone {シリアル: UsbSeen}。usbmux を 2 秒ごとに見張るスレッドの結果を読むだけ (ここでは何もつながない)。"""
+        return dict(self.demo_usb_seen) if self.demo else usb_watcher().snapshot()
+
     def tick(self, now=None):
         """UI のタイマーから 50ms 前後ごとに呼ぶ。保存/送信の期限処理 + 周期的な status 更新。"""
         if self.closing:
             return
         now = time.monotonic() if now is None else now
+        if not self.demo:
+            watcher = usb_watcher()
+            watcher.set_busy(id(self), self.wanted)   # つなごうとしている間・つないでいる間は、USB の見張りを止める
+            if not self.secondary and self.persist:
+                watcher.ensure_started()
         self._flush(now)
         self._poll_hotkeys()
         while True:
@@ -1009,6 +1020,7 @@ class Controller:
             error_text=snap["error_text"],
             auth_state=snap["auth_state"],
             usb_note=snap.get("usb_note", ""),
+            usb=tuple(sorted((serial, seen.state, seen.ident) for serial, seen in self.usb_seen().items())),   # USB で見えている端末 (見張りの結果)
             peer=snap.get("peer", ""),
             transport=snap.get("transport") or ("wifi" if self.settings.get("mode") == "wifi" else "usb"),
             res_fps=res_fps,

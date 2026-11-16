@@ -110,6 +110,28 @@ def ok_color(palette):
     return QColor("#6ccb5f") if is_dark(palette) else QColor("#0f7b0f")
 
 
+# 「つなげる」ことを示す緑 (Apple の systemGreen)。緑はここだけで決める。
+# fill: 点・ボタンの塗り / hover・press: ボタンの状態 / ring: フォーカスの線 / text: 緑の文字・アイコン (ライトは読みやすさのため暗め)
+GO_GREEN = {
+    "light": {"fill": "#34C759", "hover": "#4AD16B", "press": "#2BA84D", "ring": "#1E7F3B", "text": "#248A3D"},
+    "dark": {"fill": "#30D158", "hover": "#4BDB71", "press": "#27B84C", "ring": "#8EF0A9", "text": "#30D158"},
+}
+
+
+def go_green(palette):
+    return GO_GREEN["dark" if is_dark(palette) else "light"]
+
+
+def go_color(palette):
+    """点・塗りの緑 (ライト #34C759 / ダーク #30D158)。"""
+    return QColor(go_green(palette)["fill"])
+
+
+def go_text_color(palette):
+    """緑の文字・アイコンの色 (ライト #248A3D / ダーク #30D158)。"""
+    return QColor(go_green(palette)["text"])
+
+
 _THEME_EVENTS = tuple(x for x in (getattr(QEvent.Type, n, None) for n in
                                   ("PaletteChange", "ApplicationPaletteChange", "ThemeChange", "StyleChange"))
                       if x is not None)
@@ -237,6 +259,14 @@ class IconLabel(PlainLabel):
     def showEvent(self, e):
         super().showEvent(e)
         self._render()
+
+
+class GoIcon(IconLabel):
+    """緑のアイコン (「USB 接続済み」の USB マークなど)。"""
+
+    def _render(self):
+        dpr = self.devicePixelRatioF() if hasattr(self, "devicePixelRatioF") else 1.0
+        self.setPixmap(icons.pixmap(self._name, self._size, go_text_color(ref_palette(self)), dpr))
 
 
 VALUE_MAX_W = 300   # 行の右側の値の最大幅 (論理px)。これより長い値だけ折り返す
@@ -883,6 +913,25 @@ class _ExpanderContent(FitBox):
         self._fit()
 
 
+class GoHint(Hint):
+    """緑の小さめの文字 (「USB 接続済み」)。折り返さず、少し太くする。"""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, False, parent)
+        font = self.font()
+        font.setWeight(QFont.Weight.DemiBold)
+        self.setFont(font)
+
+    def _apply(self):
+        if self._busy:
+            return
+        self._busy = True
+        try:
+            _own_text_palette(self, go_text_color(ref_palette(self.parentWidget())))
+        finally:
+            self._busy = False
+
+
 class FixedHint(Hint):
     """折り返す説明文だが、heightForWidth を使わず、今の幅での高さを固定する。
     heightForWidth は入れ子のレイアウトの途中で最小高さが無視され、親が足りない高さを割り当てて重なることがある。
@@ -1159,6 +1208,72 @@ def button(text, primary=False, parent=None):
     b.setMinimumWidth(88)
     b.setMinimumHeight(30)
     return b
+
+
+def _action_sheet(look, palette):
+    """ActionButton の見た目 (QSS)。角丸は Windows 11 のボタンと同じ 4px。色はパレットと GO_GREEN から。"""
+    dark = is_dark(palette)
+    text = _role(palette, QPalette.ColorRole.WindowText)
+    accent = _role(palette, QPalette.ColorRole.Highlight)
+    if look == "go":
+        g = go_green(palette)
+        colors = dict(bg=g["fill"], fg="#ffffff", bd=g["fill"], bg_h=g["hover"], fg_h="#ffffff", bd_h=g["hover"],
+                      bg_p=g["press"], bd_p=g["press"], ring=g["ring"],
+                      bg_d="#3a3a3a" if dark else "#d6d6d6", fg_d="#8a8a8a" if dark else "#9a9a9a",
+                      bd_d="#3a3a3a" if dark else "#d6d6d6", weight=600)
+    else:
+        hover_text = error_color(palette).name() if look == "stop" else text.name()
+        colors = dict(bg="#2d2d2d" if dark else "#fdfdfd", fg=text.name(), bd="#4a4a4a" if dark else "#d0d0d0",
+                      bg_h="#383838" if dark else "#f3f3f3", fg_h=hover_text, bd_h="#5a5a5a" if dark else "#c0c0c0",
+                      bg_p="#262626" if dark else "#e9e9e9", bd_p="#4a4a4a" if dark else "#d0d0d0", ring=accent.name(),
+                      bg_d="#2a2a2a" if dark else "#f5f5f5", fg_d="#7a7a7a" if dark else "#a0a0a0",
+                      bd_d="#353535" if dark else "#e5e5e5", weight=400)
+    return (
+        "QPushButton {{ background:{bg}; color:{fg}; border:1px solid {bd}; border-radius:4px; padding:3px 14px; font-weight:{weight}; }}"
+        "QPushButton:hover {{ background:{bg_h}; color:{fg_h}; border-color:{bd_h}; }}"
+        "QPushButton:pressed {{ background:{bg_p}; border-color:{bd_p}; }}"
+        "QPushButton:focus {{ border:2px solid {ring}; padding:2px 13px; }}"
+        "QPushButton:disabled {{ background:{bg_d}; color:{fg_d}; border-color:{bd_d}; }}"
+    ).format(**colors)
+
+
+class ActionButton(QPushButton):
+    """見た目を切り替えられるボタン。look: "go" (緑の塗り・白い文字: 今つなげる) / "plain" (中立の枠線) / "stop" (切断: 中立で、ホバーだけ赤っぽい文字)。
+    ホバーで少し明るく、押すと少し暗く、無効のときはグレー。テーマが変わったら作り直す。"""
+
+    def __init__(self, text="", look="plain", parent=None):
+        super().__init__(text, parent)
+        self._look = look
+        self._sheet = None
+        self.setAutoDefault(False)
+        self.setMinimumWidth(88)
+        self.setMinimumHeight(30)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._restyle()
+
+    @property
+    def look(self):
+        return self._look
+
+    def set_look(self, look):
+        if look != self._look:
+            self._look = look
+            self._restyle()
+
+    def _restyle(self):
+        sheet = _action_sheet(self._look, ref_palette(self))
+        if sheet != self._sheet:   # setStyleSheet は StyleChange を起こすので、同じ内容なら何もしない (再入しない)
+            self._sheet = sheet
+            self.setStyleSheet(sheet)
+
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() in _THEME_EVENTS or e.type() == QEvent.Type.ParentChange:
+            self._restyle()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        self._restyle()
 
 
 def _listen(ctrl, key, fn):

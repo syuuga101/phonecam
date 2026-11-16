@@ -11,7 +11,7 @@ from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QPainter, QPen, QPixmap
 from PySide6.QtNetwork import QNetworkInterface
 from PySide6.QtWidgets import (
-    QButtonGroup, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QVBoxLayout, QWidget,
+    QButtonGroup, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from phonecam.core.handshake import PairSession
@@ -19,12 +19,13 @@ from phonecam.core.usbmux import wifi_connect
 from phonecam.core.wireless import (
     PAIR_SECONDS, Device, Pairing, discover, hotspot_on, ipv4, merge_devices, on_tether, read_device, route_of,
 )
+from phonecam.core.ready import READY, connect_ready, usb_pick, usb_state_of
 from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
 from phonecam.labels import clip_text
 from phonecam.qt import icons
 from phonecam.qt.widgets import (
-    EmptyState, FitBox, FixedHint, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
+    ActionButton, EmptyState, FitBox, FixedHint, GoHint, GoIcon, IconLabel, Hint, Row, refit, StatusValue, _ExpanderHeader, _THEME_EVENTS, bound_line, button, ref_palette,
     secondary_color, separator_color, text_color,
 )
 from phonecam.qt.plain import PlainLabel
@@ -378,7 +379,13 @@ class Entry:
     def needs_repair(self):
         return self.device.needs_repair
 
-    def detail(self, state=""):
+    def detail(self, state="", usb=""):
+        """2 行目の文。usb (READY / CABLE) のときは、先頭に出す「USB 接続済み」などの後ろに続く部分だけ (機種名と IP は省く)。"""
+        if usb and not state and not self.needs_repair:
+            parts = [t("wireless.route." + self.route)] if self.found else []
+            if self.registered:
+                parts.append(t("wireless.route.registered"))
+            return " · ".join(parts)
         parts = [self.device.model, self.address]
         if self.needs_repair:
             parts.append(t("wireless.route.repair"))
@@ -399,6 +406,29 @@ class Entry:
         return (d.id, d.title, d.model, d.key, d.repair, self.address, self.route, self.found)
 
 
+class UsbLine(QWidget):
+    """端末の行の 2 行目: [USB アイコン] USB 接続済み (緑) · 同じWi-Fi · 登録済み。
+    ケーブルだけ見えている (アプリが応答していない) ときは、緑にせず「USB（PhoneCam を開いてください）」を通常の色で出す。"""
+
+    def __init__(self, usb, rest, parent=None):
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        ready = usb == READY
+        lay.addWidget((GoIcon if ready else IconLabel)("usb", 14), 0, Qt.AlignmentFlag.AlignVCenter)
+        if ready:
+            self.label = GoHint(t("wireless.usb.ready"))
+        else:
+            self.label = Hint(t("wireless.usb.cable"), wrap=False)
+        lay.addWidget(self.label, 0, Qt.AlignmentFlag.AlignVCenter)
+        if rest:
+            lay.addWidget(FixedHint("· " + rest), 1, Qt.AlignmentFlag.AlignVCenter)
+        else:
+            lay.addStretch(1)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+
 class DeviceRow(FitBox):
     """見つかった iPhone 1 台: アイコン | 名前 + 詳細 | 状態 / つなぐ・切断 / …"""
 
@@ -416,7 +446,12 @@ class DeviceRow(FitBox):
         font.setWeight(QFont.Weight.Bold)
         name.setFont(font)
         texts.addWidget(name)
-        texts.addWidget(FixedHint(entry.detail(state)))
+        usb = "" if state else owner.usb_of(entry)
+        if usb and not entry.needs_repair:
+            texts.addWidget(UsbLine(usb, entry.detail(state, usb)))
+        else:
+            usb = ""
+            texts.addWidget(FixedHint(entry.detail(state)))
         lay.addLayout(texts, 1)
         if entry.registered:
             name.setToolTip(t("wireless.rename_tip"))
@@ -433,7 +468,9 @@ class DeviceRow(FitBox):
         if group and len(group.cameras) > 1 and camera is not None:
             lay.addWidget(Hint(t("multi.in_use", camera=group.label(camera)), wrap=False), 0,
                           Qt.AlignmentFlag.AlignVCenter)
-        action = button(t("wireless.disconnect") if state else t("wireless.repair") if entry.needs_repair else t("wireless.connect"))
+        # USB で見えていて今つなげるときだけ緑の塗り。切断は中立 (ホバーで赤っぽい文字)
+        action = ActionButton(t("wireless.disconnect") if state else t("wireless.repair") if entry.needs_repair else t("wireless.connect"),
+                              "stop" if state else "go" if usb == READY else "plain")
         action.setMinimumWidth(84)
         if state:
             action.clicked.connect(lambda: owner.disconnect(entry))
@@ -699,6 +736,37 @@ class WirelessOptions:
         group = getattr(self.ctrl, "camera_group", None)
         return group.for_device(entry.device.id, entry.device.addresses) if group else self.ctrl
 
+    def usb_of(self, entry, seen=None):
+        """この端末の USB の状態: READY (USB で見えていてアプリも応答) / CABLE (ケーブルだけ) / "" 。
+        端末 ID が合うもの、次にそのカメラが覚えている USB の端末、最後に「登録も USB も 1 台だけ」で ID が読めない端末。"""
+        seen = self.ctrl.usb_seen() if seen is None else seen
+        if not seen:
+            return ""
+        known = self._known()
+        camera = self._camera(entry)
+        serial = ""
+        if camera is not None and camera.get("target_device") in (entry.device.id, "", None):
+            serial = camera.get("usb_serial") or ""
+        sole = len(known) == 1 and known[0].id == entry.device.id
+        return usb_state_of(seen, entry.device.id, serial, sole)
+
+    def ready(self):
+        """このカメラが今すぐつなげる相手 (core.ready.Ready)。USB で見えている端末が先、次に Wi-Fi で見つかった登録済みの端末。"""
+        ctrl = self.ctrl
+        group = getattr(ctrl, "camera_group", None)
+        multi = bool(group and len(group.cameras) > 1)
+        taken = {c.get("usb_serial") for c in group.cameras if c is not ctrl and c.get("usb_serial")} if group else set()
+        target = ctrl.get("target_device") or ""
+        pick = usb_pick(ctrl.usb_seen(), target, ctrl.get("usb_serial") or "", multi, taken)
+        usb_state, usb_name = "", ""
+        if pick:
+            usb_state, _serial, ident = pick
+            usb_name = next((clip_text(d.title) for d in self._known() if ident and d.id == ident), "") \
+                or t("connection.device.default")
+        wifi = next((e.name for e in self.entries()
+                     if e.found and e.device.paired and (e.device.id == target if target else self._camera(e) in (None, ctrl))), "")
+        return connect_ready(usb_state, usb_name, wifi, ctrl.get("mode"))
+
     def _state(self, entry):
         camera = self._camera(entry)
         if camera is None or not camera.wanted:
@@ -736,7 +804,9 @@ class WirelessOptions:
         group = getattr(self.ctrl, "camera_group", None)
         slots = tuple((camera.get("camera_slot"), camera.get("target_device"))
                       for camera in group.cameras) if group else ()
-        signature = (tuple(e.key() for e in entries), tuple(states), scanning, self.scanned, summary, slots)
+        seen = self.ctrl.usb_seen()
+        usbs = tuple(self.usb_of(entry, seen) if not state else "" for entry, state in zip(entries, states))
+        signature = (tuple(e.key() for e in entries), tuple(states), scanning, self.scanned, summary, slots, usbs)
         if signature == self._signature:
             return
         self._signature = signature
@@ -763,6 +833,9 @@ class WirelessOptions:
             self.list.addWidget(DeviceRow(entry, state, self))
         self._render_trouble()
         refit(self.devices_box)   # 行の増減・空の状態への切り替えのたびに、折りたたみの高さを中身に合わせ直す
+        notify = getattr(self.page, "refresh_connect", None)
+        if callable(notify):
+            notify()   # 見つかった端末が変わった: 接続ページの「接続」ボタンと状態カードを合わせ直す
 
     def _empty(self, scanning):
         """空の状態: 探し中はアイコン + 「探しています…」だけ。見つからなかったときは説明とボタンも出す。"""

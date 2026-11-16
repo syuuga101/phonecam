@@ -19,12 +19,14 @@ from PySide6.QtWidgets import (
 import time
 
 from phonecam.core.profiling import PROFILE
+from phonecam.core.ready import TRY_SEC, connect_view, is_trying
 from phonecam.core.deps import np
 from phonecam.labels import IDLE_STOP_LABELS, RUN_MODE_LABELS
 from phonecam.i18n import NO_VALUE, t
 from phonecam.qt import icons
-from phonecam.qt.wireless import WirelessOptions
+from phonecam.qt.wireless import Spinner, WirelessOptions
 from phonecam.qt.widgets import (
+    ActionButton,
     Card,
     ErrorLabel,
     Hint,
@@ -35,6 +37,7 @@ from phonecam.qt.widgets import (
     border_color,
     button,
     card_color,
+    go_color,
     ok_color,
     ref_palette,
     secondary_color,
@@ -266,7 +269,7 @@ class PreviewView(QWidget):
 
 
 class Dot(QWidget):
-    """状態の点 (10px)。接続中 (配信中/待機中) は緑、それ以外は二次色。"""
+    """状態の点 (10px)。接続中 (配信中/待機中) は緑、つなげる準備ができている ("ready") は明るい緑、それ以外は二次色。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -282,7 +285,10 @@ class Dot(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         pal = self.palette()
-        col = ok_color(pal) if self.key in ("live", "idle") else secondary_color(pal)
+        if self.key == "ready":
+            col = go_color(pal)
+        else:
+            col = ok_color(pal) if self.key in ("live", "idle") else secondary_color(pal)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(col)
         p.drawEllipse(QRectF(0, 0, self.width(), self.height()))
@@ -293,6 +299,10 @@ class ConnectionPage(Page):
     def __init__(self, ctrl):
         super().__init__()
         self.ctrl = ctrl
+        self._last = None             # 最後に受け取った status
+        self._wanted_since = None     # 「接続」を押した (つなごうとしている) 時刻
+        self._try_timer = QTimer(self, singleShot=True)
+        self._try_timer.timeout.connect(self.refresh_connect)
         self._build_header()
         self._build_camera_card()
         self._build_preview()
@@ -324,6 +334,8 @@ class ConnectionPage(Page):
         self.state_label.setFont(f)
         self.state_label.setWordWrap(False)
         top.addWidget(self.state_label, 0)
+        self.spinner = Spinner()   # 「接続中…」の間だけ回る
+        top.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignVCenter)
         self.check = PlainLabel()
         self.check.setFixedSize(18, 18)
         self.check.hide()
@@ -353,7 +365,8 @@ class ConnectionPage(Page):
         row.setSpacing(8)
         self.start_btn = button(t("connection.button.start"), primary=True)
         self.start_btn.clicked.connect(self.ctrl.start_pause)
-        self.connect_btn = button(t("connection.button.connect"), primary=True)
+        # つなげる相手がいるときは緑の塗り、いないときは中立の枠線、つないでいるとき (切断) は中立 (core.ready.connect_view が決める)
+        self.connect_btn = ActionButton(t("connection.button.connect"), "plain")
         self.connect_btn.setMinimumWidth(104)
         self.connect_btn.clicked.connect(lambda: self.ctrl.toggle_connect())
         row.addWidget(self.connect_btn)
@@ -367,7 +380,48 @@ class ConnectionPage(Page):
     def _fit_btn_row(self, w):
         self.btn_row.setFixedWidth(max(w, self.btn_row.minimumSizeHint().width()))
 
-    def _card_text(self, s):
+    def _connect_state(self, s):
+        """(ConnectView, Ready): つなげる相手 (USB で見えている / Wi-Fi で見つかっている) とボタン・カードの見せ方。"""
+        ready = self.wireless.ready()
+        elapsed = None if self._wanted_since is None else time.monotonic() - self._wanted_since
+        failed = bool(s.error_text or s.get("usb_note") or s.get("auth_state") in AUTH_FAILURES)
+        trying = is_trying(s.wanted, s.connected, elapsed, failed)
+        return connect_view(ready, s.wanted, s.connected, trying), ready
+
+    def _track_wanted(self, s):
+        if s.wanted and not s.connected:
+            if self._wanted_since is None:
+                self._wanted_since = time.monotonic()
+                self._try_timer.start(int(TRY_SEC * 1000) + 150)   # 8 秒たったら「切断」で止められるように見せ直す
+        else:
+            self._wanted_since = None
+            self._try_timer.stop()
+
+    def refresh_connect(self):
+        """USB・Wi-Fi の見つかり方や経過時間が変わったときに、状態のカードと「接続」ボタンだけ作り直す。"""
+        if self._last is not None and getattr(self, "wireless", None) is not None:
+            self._show_connect(self._last)
+
+    def _show_connect(self, s):
+        view, ready = self._connect_state(s)
+        headline, sub, checked = self._card_text(s, view, ready)
+        self.dot.set_key("ready" if view.card == "ready" else s.key)
+        self.state_label.setText(headline)
+        self.check.setVisible(checked)
+        if checked:
+            self.check.setPixmap(icons.pixmap("check", 18, ok_color(ref_palette(self)), self.devicePixelRatioF()))
+        self.sub_label.setText(sub)
+        self.sub_label.setVisible(bool(sub))
+        if view.busy:
+            if not self.spinner.isVisible():
+                self.spinner.start()
+        else:
+            self.spinner.stop()
+        self.connect_btn.set_look(view.look)
+        self.connect_btn.setText(t(view.text))
+        self.connect_btn.setEnabled(view.enabled)
+
+    def _card_text(self, s, view=None, ready=None):
         """上のカードの (見出し, 補足, ✓ を出すか)。方式を選ばせない (auto) ときは 3 つの状態だけを出す。"""
         auto = self.ctrl.get("mode") == "auto"
         way = t("wireless.way.wifi" if s.get("transport") == "wifi" else "wireless.way.usb")
@@ -379,6 +433,11 @@ class ConnectionPage(Page):
                 sub = s.usb_note   # Wi-Fi 中で USB へ乗り換え待ち (準備中 / 信頼を押す、など)
             return t("connection.card.connected", name=self.wireless.display_name(s.get("peer"), name), way=way), \
                 sub, True
+        if view is not None and view.card == "connecting":
+            return t("connection.button.connecting"), "", False
+        if view is not None and view.card == "ready":
+            return t("connection.card.ready"), t("connection.card.ready_usb" if ready.kind == "usb" else "connection.card.ready_wifi",
+                                                 name=ready.name), False
         if not auto:
             return s.state_text, s.sub, False
         if not s.wanted:
@@ -570,25 +629,18 @@ class ConnectionPage(Page):
     def update_status(self, s):
         if not s:
             return
+        self._last = s
+        self._track_wanted(s)
         self.wireless.status(s)
-        headline, sub, checked = self._card_text(s)
-        self.dot.set_key(s.key)
-        self.state_label.setText(headline)
-        self.check.setVisible(checked)
-        if checked:
-            self.check.setPixmap(icons.pixmap("check", 18, ok_color(ref_palette(self)), self.devicePixelRatioF()))
-        self.sub_label.setText(sub)
-        self.sub_label.setVisible(bool(sub))
+        self._show_connect(s)
         # 自動のときの「見つかりません」は上の見出しが言うので、赤字は認証の失敗などだけ出す
         hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in AUTH_FAILURES
         self.error_label.setText("" if hide_error else s.error_text)
         self.start_btn.setText(t("connection.button.pause") if s.start_is_pause else t("connection.button.start"))
-        # 主ボタン (accent) は「つなぐ」「開始」。切断・一時停止は通常色
+        # 主ボタン (accent) は「開始」。一時停止は通常色。「接続」は _show_connect が緑・中立を決める
         self._set_primary(self.start_btn, not s.start_is_pause)
-        self._set_primary(self.connect_btn, not s.wanted)
         self.start_btn.setEnabled(bool(s.start_enabled))
         self.start_btn.setVisible(bool(s.start_enabled))   # つないでいる間だけ (主ボタンは「つなぐ / 切断」の1つ)
-        self.connect_btn.setText(t("connection.button.disconnect") if s.wanted else t("connection.button.connect"))
         self.num["res"].setText(s.res_fps)
         self.num["latency"].setText(s.latency_text)
         self.num["thermal"].setText(s.thermal_text)
