@@ -204,6 +204,7 @@
  "core.link.used_by_other": "この iPhone は別のカメラ出力で使われています",
  "core.protocol.bad_length": "不正なメッセージ長です",
  "core.protocol.closed": "接続が閉じられました",
+ "core.protocol.timeout": "受信が途切れたため切断しました",
  "core.reg.details": "{message}\n\n詳細: {error}",
  "core.reg.hint_exe": "「接続・映像」タブの「登録する（更新）」ボタンを押してください",
  "core.reg.hint_src": "register.bat を実行してください（管理者権限が必要です）",

@@ -110,6 +110,8 @@ final class Recorder {
     private var lastAudioRate = 0
     private var sessionSettings = Settings()
     private var sessionFps = 30
+    /// 録画セッションの世代 (lk で保護)。完了結果が今の録画のものかの判定に使う
+    private var sessionGate = RecordingSessionGate()
 
     // recordQueue 上でのみ触る
     private var writer: AVAssetWriter?
@@ -123,6 +125,9 @@ final class Recorder {
     private var baseName = ""
     private var expectedLongSide = 0
     private var armedAt = Date()
+    /// 今の writer が属する録画セッションとファイル。停止直後に次の録画が始まっても取り違えないよう、writer と一緒に持つ
+    private var writerSession: UInt64 = 0
+    private var writerURL: URL?
     private var lastSpaceCheck = Date.distantPast
     /// カメラのバッファを長く持たないよう、書き込み用にコピーしたフレームを使う (recordQueue 上のみ)
     private let copier = FrameDownscaler(maxBuffers: 8)
@@ -316,6 +321,7 @@ final class Recorder {
         currentURL = nil
         droppedFrames = 0
         sessionSettings = settings
+        _ = sessionGate.begin()
         lk.unlock()
 
         recordQueue.async { [weak self] in
@@ -589,7 +595,9 @@ final class Recorder {
             lk.lock()
             fileName = url.lastPathComponent
             currentURL = url
+            writerSession = sessionGate.current
             lk.unlock()
+            writerURL = url
             onChanged?()
             return true
         } catch {
@@ -603,7 +611,9 @@ final class Recorder {
         guard let wr = writer else { return }
         let vi = videoInput
         let ai = audioInput
-        let url = currentFileURL()
+        let url = writerURL
+        let session = writerSession
+        writerURL = nil
         writer = nil
         videoInput = nil
         audioInput = nil
@@ -622,46 +632,46 @@ final class Recorder {
             guard let self = self else { return }
             if wr.status == .completed {
                 if let u = url {
-                    self.addFinishedBytes(u)
+                    self.addFinishedBytes(u, session: session)
                     if save {
-                        self.saveToPhotoLibrary(u)
+                        self.saveToPhotoLibrary(u, session: session)
                     }
                 }
             } else {
-                self.setError(String(localized: "録画ファイルの保存に失敗しました"))
+                self.setError(String(localized: "録画ファイルの保存に失敗しました"), session: session)
             }
             self.onChanged?()
         }
     }
 
-    private func currentFileURL() -> URL? {
-        lk.lock()
-        defer { lk.unlock() }
-        return currentURL
-    }
-
-    private func addFinishedBytes(_ url: URL) {
+    private func addFinishedBytes(_ url: URL, session: UInt64) {
         var size: Int64 = 0
         if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
            let n = attrs[.size] as? NSNumber {
             size = n.int64Value
         }
         lk.lock()
-        finishedBytes += size
-        if currentURL == url { currentURL = nil }
+        // 古い録画のサイズは今の録画のカウンターに足さない (ファイルは残る)
+        if sessionGate.shouldApplyToDisplay(resultSession: session) {
+            finishedBytes += size
+            if currentURL == url { currentURL = nil }
+        }
         lk.unlock()
     }
 
-    private func setError(_ message: String) {
+    /// 完了結果のエラーを表示用に反映する。古い録画のエラーは今の録画に見せない
+    private func setError(_ message: String, session: UInt64) {
         lk.lock()
-        errorText = message
+        if sessionGate.shouldApplyToDisplay(resultSession: session) {
+            errorText = message
+        }
         lk.unlock()
     }
 
-    private func saveToPhotoLibrary(_ url: URL) {
+    private func saveToPhotoLibrary(_ url: URL, session: UInt64) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
             guard status == .authorized || status == .limited else {
-                self?.setError(String(localized: "写真への保存が許可されていません"))
+                self?.setError(String(localized: "写真への保存が許可されていません"), session: session)
                 self?.onChanged?()
                 return
             }
@@ -672,7 +682,7 @@ final class Recorder {
                 request.addResource(with: .video, fileURL: url, options: options)
             }, completionHandler: { success, _ in
                 if !success {
-                    self?.setError(String(localized: "写真への保存に失敗しました"))
+                    self?.setError(String(localized: "写真への保存に失敗しました"), session: session)
                     self?.onChanged?()
                 }
             })

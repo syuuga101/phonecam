@@ -5,7 +5,10 @@
 import plistlib
 import socket
 import struct
-from phonecam.core.protocol import PHONE_PORT, PhoneCamError, USBMUX_ADDR, read_exact
+import time
+from phonecam.core.crashlog import log_error
+from phonecam.core.protocol import (
+    MAX_USBMUX_LENGTH, PHONE_PORT, USBMUX_ADDR, USBMUX_READ_SEC, PayloadTooLarge, PhoneCamError, read_exact)
 from phonecam.i18n import t
 
 
@@ -26,10 +29,19 @@ def usbmux_pack(payload_dict, tag):
     return struct.pack("<IIII", 16 + len(body), 1, 8, tag) + body
 
 
-def usbmux_recv(sock):
-    header = read_exact(sock, 16)
+def usbmux_recv(sock, timeout=None):
+    """usbmux の 1 メッセージを読む。宣言された長さが MAX_USBMUX_LENGTH を超えるときは本体を読まずに切る。
+    1 メッセージを timeout 秒 (省略時はソケットのタイムアウト、無ければ USBMUX_READ_SEC) で読み切れなければ ReceiveTimeout。"""
+    if timeout is None:
+        timeout = sock.gettimeout() or USBMUX_READ_SEC
+    deadline = time.monotonic() + timeout
+    header = read_exact(sock, 16, idle=timeout, deadline=deadline, what="usbmux ヘッダ")
     length, _version, _msg, _tag = struct.unpack("<IIII", header)
-    body = read_exact(sock, length - 16) if length > 16 else b""
+    if length < 16 or length > MAX_USBMUX_LENGTH:
+        err = PayloadTooLarge("usbmux", length, MAX_USBMUX_LENGTH)
+        log_error("usbmux", err.log_line())
+        raise err
+    body = read_exact(sock, length - 16, idle=timeout, deadline=deadline, what="usbmux 本体") if length > 16 else b""
     return plistlib.loads(body)
 
 

@@ -369,7 +369,7 @@ class AudioEngine:
         """ネットワークスレッドから呼ぶ。解析 → リサンプル → 追加。"""
         if self.ring is None:
             return
-        parsed = parse_audio(payload)
+        parsed = parse_audio(payload, self.rate)   # 変換する前に、サンプル数と変換後の見込みサイズを検査する
         if parsed is None:
             return
         capture, src_rate, pcm = parsed
