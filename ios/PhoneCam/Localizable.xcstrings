@@ -2048,6 +2048,22 @@
           }
         }
       }
+    },
+    "録画ファイルはファイル App からも見えます": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "録画ファイルはファイル App からも見えます"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordings are also visible in the Files app"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

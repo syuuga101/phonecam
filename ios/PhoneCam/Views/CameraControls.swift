@@ -662,8 +662,13 @@ struct RecordingsView: View {
                 Text("録画はまだありません")
                     .foregroundStyle(.secondary)
             }
-            ForEach(store.items) { item in
-                RecordingRow(item: item)
+            Section {
+                ForEach(store.items) { item in
+                    RecordingRow(item: item)
+                }
+            } footer: {
+                // Info.plist の UIFileSharingEnabled / LSSupportsOpeningDocumentsInPlace を残している理由
+                Text("録画ファイルはファイル App からも見えます")
             }
         }
         .listStyle(.insetGrouped)
