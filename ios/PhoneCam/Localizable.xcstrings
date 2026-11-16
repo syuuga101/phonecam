@@ -72,19 +72,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your pairing code will be sent to this PC. Check its name before continuing."
+            "value" : "Pair with this PC. Check its name before continuing."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
+            "value" : "この PC とペアリングします。PC 名を確認してください。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "この PC にペアリングコードを送信します。PC 名を確認してください。"
+            "value" : "この PC とペアリングします。PC 名を確認してください。"
           }
         }
       }
@@ -226,19 +226,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Could not reach the PC. Check the network and whether the QR code has expired."
+            "value" : "Could not pair with the PC. Check the network and whether the QR code has expired. A QR code that does not match the PC also fails."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
+            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。PC の画面の QR コードでない場合も失敗します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。"
+            "value" : "PC に接続できませんでした。ネットワークと QR コードの有効期限を確認してください。PC の画面の QR コードでない場合も失敗します。"
           }
         }
       }
@@ -573,28 +573,6 @@
         }
       }
     },
-    "コードを変更" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Change code"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コードを変更"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "コードを変更"
-          }
-        }
-      }
-    },
     "接続" : {
       "localizations" : {
         "en" : {
@@ -613,28 +591,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "接続"
-          }
-        }
-      }
-    },
-    "PCの『ペアリングコード』欄に入力します。USB接続では不要です。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enter this in the \"Pairing code\" field on your PC. Not needed for USB."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "PCの『ペアリングコード』欄に入力します。USB接続では不要です。"
           }
         }
       }
@@ -2835,6 +2791,138 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "録画ファイルはファイル App からも見えます"
+          }
+        }
+      }
+    },
+    "settings.pairing.waiting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for a PC to pair. Enter this code on the PC"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PC のペアリング待ち。このコードを PC に入力してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PC のペアリング待ち。このコードを PC に入力してください"
+          }
+        }
+      }
+    },
+    "settings.pairing.reset %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forget all paired PCs (%lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペアリング済みの PC をすべて解除（%lld 台）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "ペアリング済みの PC をすべて解除（%lld 台）"
+          }
+        }
+      }
+    },
+    "settings.pairing.reset_ask" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each PC will need to be paired again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解除すると、それぞれの PC で再ペアリングが必要になります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "解除すると、それぞれの PC で再ペアリングが必要になります。"
+          }
+        }
+      }
+    },
+    "settings.pairing.reset_do" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forget all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて解除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "すべて解除"
+          }
+        }
+      }
+    },
+    "settings.pairing.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To connect over Wi-Fi, pick this iPhone on your PC or scan its QR code to pair. Traffic is encrypted after pairing. USB needs no pairing steps."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi でつなぐには、PC の接続画面で iPhone を選ぶか、QR コードを読み取ってペアリングします。ペアリングしたあとの通信は暗号化されます。USB 接続ではペアリングの操作は要りません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Wi-Fi でつなぐには、PC の接続画面で iPhone を選ぶか、QR コードを読み取ってペアリングします。ペアリングしたあとの通信は暗号化されます。USB 接続ではペアリングの操作は要りません。"
+          }
+        }
+      }
+    },
+    "settings.legacy_usb" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The PC app is an older version. USB works, but please update both the PC and iPhone apps."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PC のアプリが古い版です。USB ではつながりますが、PC と iPhone の両方を最新版にしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PC のアプリが古い版です。USB ではつながりますが、PC と iPhone の両方を最新版にしてください。"
           }
         }
       }
