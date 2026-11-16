@@ -25,7 +25,7 @@ def test_components_have_iloader_and_no_altserver_or_icloud():
 
 def test_iloader_source_is_official_msi_over_https():
     src = ps.SOURCES["iloader"]
-    assert src["url"] == "https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.msi"
+    assert src["url"] == "https://github.com/nab138/iloader/releases/download/v2.4.1/iloader-windows-x64.msi"
     assert src["kind"] == "msi" and src["file"].endswith(".msi")
     assert src["page"].startswith("https://github.com/nab138/iloader")
     assert ps.SIGNATURES["msi"]
@@ -92,9 +92,14 @@ def test_iloader_signature_policy_follows_altserver_style_unsigned_rule():
 
 
 def test_guided_flow_opens_iloader_msi_with_msiexec(tmp_path, monkeypatch):
+    import hashlib
+    fake = b"\xd0\xcf\x11\xe0 fake msi"
+    # 実物の固定値は SOURCES にある。ここでは偽のファイルの値に差し替えて、照合が通る場合の流れを見る
+    monkeypatch.setitem(ps.SOURCES["iloader"], "sha256", hashlib.sha256(fake).hexdigest())
+
     def download(url, path, kind, *, progress, cancel):
         assert url.endswith("iloader-windows-x64.msi") and kind == "msi"
-        Path(path).write_bytes(b"\xd0\xcf\x11\xe0 fake msi")
+        Path(path).write_bytes(fake)
 
     launcher = Mock(return_value=Mock())
     monkeypatch.setattr(ps, "check_installer_signature", lambda *a: (True, "", True))

@@ -11,6 +11,7 @@ OBS の「ビデオの設定」で開くシステムのカメラ設定ダイア�
 Windows 以外では open() が False を返し、他のメソッドは何もしない。
 """
 import math
+import re
 import struct
 import sys
 import threading
@@ -67,6 +68,33 @@ def exposure_to_shutter(value, snap=None):
     return int(round(n))
 
 
+# ---- アクセス権 (DACL) ----
+# 共有メモリとミューテックスは、今のユーザーだけに全権限を与える DACL で作る (NULL DACL は使わない)。
+# DirectShow フィルタ (DLL) は OBS など同じユーザーのプロセスに読み込まれるので、ユーザーの SID だけで足りる。
+# 保護された DACL (P) なので、継承でほかの許可が足されることもない。
+_SID_RE = re.compile(r"S-1-\d+(-\d+){1,15}")
+_ADMINS_SID = "S-1-5-32-544"   # BUILTIN\Administrators
+_SYSTEM_SID = "S-1-5-18"
+
+
+def build_sddl(user_sid):
+    """今のユーザーだけに全権限 (GA) を与える SDDL。SID の形が正しくなければ ValueError。"""
+    if not isinstance(user_sid, str) or not _SID_RE.fullmatch(user_sid):
+        raise ValueError("invalid SID")
+    return "D:P(A;;GA;;;%s)" % user_sid
+
+
+def owner_allowed(owner_sid, user_sid):
+    """すでに存在した共有オブジェクトの所有者として認める SID か。今のユーザー・Administrators (昇格したプロセスが作ると
+    所有者がこちらになる)・SYSTEM だけ。ほかのユーザーが先に作った偽のオブジェクトにはつながない。"""
+    return owner_sid in (user_sid, _ADMINS_SID, _SYSTEM_SID)
+
+
+# 制御メッセージの値の範囲 (スロットごとの最小・最大)。共有メモリの中身は信用せず、読んだ値はここに収める
+SLOT_LIMITS = [(d[0], d[1]) for d in DEFAULTS]
+VALID_FLAGS = (AUTO, MANUAL)
+
+
 # ---- メモリ背景 (Windows の共有メモリ / テスト用 bytearray) ----
 class _BytesBackend:
     """テスト用: bytearray をそのまま使う。"""
@@ -110,31 +138,95 @@ class _WinBackend:
         k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
         k.ReleaseMutex.argtypes = [wintypes.HANDLE]
         k.CloseHandle.argtypes = [wintypes.HANDLE]
-        a.InitializeSecurityDescriptor.argtypes = [ctypes.c_void_p, wintypes.DWORD]
-        a.SetSecurityDescriptorDacl.argtypes = [ctypes.c_void_p, wintypes.BOOL, ctypes.c_void_p, wintypes.BOOL]
+        a.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+        a.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                          ctypes.POINTER(wintypes.DWORD)]
+        a.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+        a.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                                                                           ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
+        a.GetSecurityInfo.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p,
+                                      ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+        a.GetSecurityInfo.restype = wintypes.DWORD
+        k.GetCurrentProcess.restype = wintypes.HANDLE
+        k.LocalFree.argtypes = [ctypes.c_void_p]
+        k.LocalFree.restype = ctypes.c_void_p
 
         class SECURITY_ATTRIBUTES(ctypes.Structure):
             _fields_ = [("nLength", wintypes.DWORD), ("lpSecurityDescriptor", ctypes.c_void_p),
                         ("bInheritHandle", wintypes.BOOL)]
 
-        sd = ctypes.create_string_buffer(64)  # SECURITY_DESCRIPTOR は 40 バイト以下
-        sa = None
-        if a.InitializeSecurityDescriptor(sd, 1) and a.SetSecurityDescriptorDacl(sd, True, None, False):
-            sa = SECURITY_ATTRIBUTES(ctypes.sizeof(SECURITY_ATTRIBUTES), ctypes.cast(sd, ctypes.c_void_p), False)
-        psa = ctypes.byref(sa) if sa is not None else None
+        def sid_to_string(psid):
+            out = ctypes.c_void_p()
+            if not a.ConvertSidToStringSidW(psid, ctypes.byref(out)):
+                return None
+            try:
+                return ctypes.wstring_at(out.value)
+            finally:
+                k.LocalFree(out)
+
+        def current_user_sid():
+            tok = wintypes.HANDLE()
+            if not a.OpenProcessToken(k.GetCurrentProcess(), 0x8, ctypes.byref(tok)):   # TOKEN_QUERY
+                return None
+            try:
+                n = wintypes.DWORD(0)
+                a.GetTokenInformation(tok, 1, None, 0, ctypes.byref(n))   # TokenUser
+                if not 0 < n.value <= 1024:
+                    return None
+                buf = ctypes.create_string_buffer(n.value)
+                if not a.GetTokenInformation(tok, 1, buf, n, ctypes.byref(n)):
+                    return None
+                return sid_to_string(ctypes.cast(buf, ctypes.POINTER(ctypes.c_void_p))[0])   # TOKEN_USER の先頭が SID へのポインタ
+            finally:
+                k.CloseHandle(tok)
+
+        def owner_ok(handle):
+            """既存のオブジェクトの所有者が想定どおりか。確認の API が失敗したときは、確認できないだけなので通す。"""
+            owner, psd = ctypes.c_void_p(), ctypes.c_void_p()
+            if a.GetSecurityInfo(handle, 6, 1, ctypes.byref(owner), None, None, None, ctypes.byref(psd)) != 0:   # SE_KERNEL_OBJECT / OWNER
+                return True
+            try:
+                name = sid_to_string(owner)
+                return name is None or owner_allowed(name, self._user_sid)
+            finally:
+                k.LocalFree(psd)
+
+        # 今のユーザーだけに権限を与える DACL。作れなかったときは NULL DACL にはせず、プロセス既定の DACL (psa=None) を使う
+        self._psd = ctypes.c_void_p()
+        self._user_sid = None
+        psa = None
+        try:
+            self._user_sid = current_user_sid()
+            if self._user_sid and a.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                    build_sddl(self._user_sid), 1, ctypes.byref(self._psd), None):   # SDDL_REVISION_1
+                sa = SECURITY_ATTRIBUTES(ctypes.sizeof(SECURITY_ATTRIBUTES), self._psd, False)
+                psa = ctypes.byref(sa)
+        except Exception:
+            psa = None
+        self._k = k
+
+        def fail(msg):
+            for h in (getattr(self, "mutex", None), getattr(self, "map", None)):
+                if h:
+                    k.CloseHandle(h)
+            if self._psd:
+                k.LocalFree(self._psd)
+            raise OSError(msg)
+
         self.mutex = k.CreateMutexW(psa, False, MUTEX_NAME.replace("PhoneCam/", namespace + "/"))
         if not self.mutex:
-            raise OSError("CreateMutexW failed")
+            fail("CreateMutexW failed")
+        if ctypes.get_last_error() == 183 and self._user_sid and not owner_ok(self.mutex):   # ERROR_ALREADY_EXISTS
+            fail("mutex owner is not allowed")
         INVALID = wintypes.HANDLE(-1)
         self.map = k.CreateFileMappingW(INVALID, psa, 0x04, 0, BLOCK_SIZE, MAP_NAME.replace("PhoneCam/", namespace + "/"))  # PAGE_READWRITE
         if not self.map:
-            k.CloseHandle(self.mutex)
-            raise OSError("CreateFileMappingW failed")
+            fail("CreateFileMappingW failed")
+        if ctypes.get_last_error() == 183 and self._user_sid and not owner_ok(self.map):
+            fail("shared memory owner is not allowed")
         self.view = k.MapViewOfFile(self.map, 0xF001F, 0, 0, BLOCK_SIZE)  # FILE_MAP_ALL_ACCESS
         if not self.view:
-            k.CloseHandle(self.map)
-            k.CloseHandle(self.mutex)
-            raise OSError("MapViewOfFile failed")
+            fail("MapViewOfFile failed")
         self._held = False
 
     def lock(self):
@@ -158,6 +250,8 @@ class _WinBackend:
             self.k.UnmapViewOfFile(self.view)
             self.k.CloseHandle(self.map)
             self.k.CloseHandle(self.mutex)
+            if self._psd:
+                self.k.LocalFree(self._psd)
         except Exception:
             pass
 
@@ -265,7 +359,12 @@ class ControlBridge:
         return [c["control"] for c in self.poll_changes() if not c.get("redundant")]
 
     def _slot_to_changes(self, i, s):
-        lo, hi, value, flags = s[0], s[1], s[4], s[5]
+        value, flags = s[4], s[5]
+        # 共有メモリの中身は信用しない: 要求の種類 (自動/手動) が不正なら捨て、値はスロットごとの決まった範囲に収める
+        # (スロットの min/max も共有メモリにあるので、範囲は SLOT_LIMITS を使う)
+        if flags not in VALID_FLAGS or not 0 <= i < SLOT_COUNT or not DEFAULTS[i][6] & flags:
+            return []
+        lo, hi = SLOT_LIMITS[i]
         auto = flags == AUTO
         value = _clamp(value, lo, hi)
 

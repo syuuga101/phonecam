@@ -94,6 +94,7 @@ _JA = {
  "setup.wizard.evaluate_signature_7": "インストーラーの電子署名が無効です（改ざんされているか、PCの時刻・証明書の更新が古い可能性があります）。実行しませんでした。ダウンロードをやり直すか、「公式ページを開く」から手動で入れてください",
  "setup.wizard.evaluate_signature_8": "インストーラーの署名を確認できなかったため、実行しませんでした。もう一度試すか、「公式ページを開く」から手動で入れてください（詳細: {detail}）",
  "setup.wizard.evaluate_signature_9": "不明なエラー",
+ "setup.wizard.evaluate_signature_10": "インストーラーの署名は確認できましたが、証明書が失効していないかをネットワークで確認できなかったため、実行しませんでした。インターネットにつながっているか確認してもう一度試すか、「公式ページを開く」から手動で入れてください",
  "setup.wizard.execute_step_1": "カメラの登録に失敗しました。OBSやDiscordなどを閉じてから、もう一度お試しください",
  "setup.wizard.execute_step_2": "インストーラーが見つかりません。もう一度ダウンロードからやり直してください",
  "setup.wizard.execute_step_3": "インストーラーの検証情報がないため実行しませんでした。もう一度ダウンロードからやり直してください",
@@ -191,6 +192,7 @@ _JA = {
  "setup.wizard.run_diagnostics_9": "サービスを開始してください（Windowsキー → 「サービス」→ Apple Mobile Device Service →「開始」）。直らないときはPCを再起動します",
  "setup.wizard.run_installer_1": "インストーラーが変更されていたため実行しませんでした。もう一度インストールをやり直してください",
  "setup.wizard.run_installer_2": "終了コード {code}",
+ "setup.wizard.run_installer_3": "インストーラーと一緒にダウンロードしたファイルが、確認済みの内容と違っていたため実行しませんでした。もう一度インストールをやり直してください",
  "setup.wizard.run_job_1": "ジョブファイルの検証情報がないため実行しませんでした",
  "setup.wizard.run_job_2": "ジョブファイルが変更されています",
  "setup.wizard.run_job_3": "セットアップの準備でエラーが起きました。もう一度お試しください（詳細: {detail}）",
@@ -282,6 +284,7 @@ _JA = {
  "setup.wizard.validate_download_4": "ダウンロードが途中で切れました。ネットワークを確認して、もう一度お試しください",
  "setup.wizard.validate_download_5": "ダウンロードしたファイルの形式が正しくありません。「公式ページを開く」から手動で入れてください",
  "setup.wizard.validate_download_6": "zipファイルが壊れています。もう一度ダウンロードしてください",
+ "setup.wizard.verify_pinned_sha256_1": "ダウンロードしたファイルが、確認済みの配布物と一致しません（SHA-256の不一致）。配布元がファイルを更新したか、途中で改ざんされた可能性があるため、実行しませんでした。「公式ページを開く」から手動で入れてください",
  "setup.wizard.verify_authenticode_1": "Windows 以外では確認できません",
  "setup.wizard.vpn_copy": "URLをコピー",
  "setup.wizard.vpn_page": "App Storeのページを開く",
@@ -389,15 +392,20 @@ SOURCES = {
         "winget": "Apple.iTunes",
         "page": "https://www.apple.com/itunes/",
     },
-    # iloader (SideStore を iPhone に入れる PC 用ツール)。公式配布 (GitHub のリリース) の MSI。ファイル名に版を含まないので
-    # latest/download で常に最新が取れる。公式の案内は「Windows は MSI を推奨」
+    # iloader (SideStore を iPhone に入れる PC 用ツール)。公式配布 (GitHub のリリース) の MSI。公式の案内は「Windows は MSI を推奨」。
+    # 版を固定し (latest は使わない)、配布物全体を固定の SHA-256 で照合する (sha256)。版を上げるときは url とこの値を一緒に更新する。
+    # この値は v2.4.1 のリリースで GitHub が示す digest (sha256) と、CI でダウンロードして計算した値が一致したもの
     "iloader": {
-        "url": "https://github.com/nab138/iloader/releases/latest/download/iloader-windows-x64.msi",
+        "url": "https://github.com/nab138/iloader/releases/download/v2.4.1/iloader-windows-x64.msi",
         "file": "iloader-windows-x64.msi", "kind": "msi",
+        "sha256": "8bfe528197db1b82f51fbcdb74652f355e7ae025e616e07a10a819d60f7d2691",
         "page": ILOADER_PAGE_URL,
     },
+    # VB-CABLE。ダウンロードした zip 全体 (同梱のドライバー・.inf・.cat を含む) を固定の SHA-256 で照合する。
+    # ベンダーが同じ URL の中身を差し替えると不一致で止まる (手動で入れる案内になる)。その場合は url と sha256 を更新する
     "vbcable": {
         "url": "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack46.zip", "file": "VBCABLE_Driver_Pack46.zip",
+        "sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
         "kind": "zip", "page": "https://vb-audio.com/Cable/",
     },
 }
@@ -802,6 +810,20 @@ def download_file(url, dest, kind, progress=None, cancel=None, opener=None, time
     return dest
 
 
+def verify_pinned_sha256(path, sha256):
+    """ダウンロードしたパッケージ全体 (zip・msi など) が、固定した SHA-256 と一致するか確かめる。
+    固定値が無い (None) ときは何もしない。不一致なら、そのファイルを消して DownloadError。"""
+    if not sha256:
+        return
+    try:
+        actual = sha256_file(path)
+    except OSError:
+        raise DownloadError(t("setup.wizard.validate_download_1"))
+    if actual.lower() != str(sha256).strip().lower():
+        _silent_remove(path)
+        raise DownloadError(t("setup.wizard.verify_pinned_sha256_1"), technical="sha256=%s" % actual)
+
+
 def _silent_remove(path):
     try:
         os.remove(path)
@@ -809,14 +831,53 @@ def _silent_remove(path):
         pass
 
 
-def safe_extract_zip(zip_path, dest):
-    """zip を dest へ展開する (dest の外へ出るパスは拒否)。"""
+def read_verified_zip(zip_path, sha256=None):
+    """zip を1回だけ読み (照合から展開までの間に差し替えられないように)、固定の SHA-256 があれば照合して、バイト列を返す。"""
+    with open(zip_path, "rb") as f:
+        data = f.read()
+    if sha256 and hashlib.sha256(data).hexdigest() != str(sha256).strip().lower():
+        _silent_remove(zip_path)
+        raise DownloadError(t("setup.wizard.verify_pinned_sha256_1"), technical="sha256=%s" % hashlib.sha256(data).hexdigest())
+    return data
+
+
+def zip_member_hashes(data):
+    """zip の中身 (ファイルだけ) → {"/ 区切りの相対パス": SHA-256}。展開したあと、同梱ファイルが変わっていないかの照合に使う。"""
+    import io
+    out = {}
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if not info.is_dir():
+                out[info.filename.replace("\\", "/")] = hashlib.sha256(z.read(info)).hexdigest()
+    return out
+
+
+def verify_tree(root, expected):
+    """root の下のファイル一式が、expected ({相対パス: SHA-256}) とちょうど一致するか (足りない・余分・内容の違いがあれば False)。"""
+    if not isinstance(expected, dict) or not expected:
+        return False
+    found = {}
+    root = os.path.abspath(root)
+    for base, _dirs, files in os.walk(root):
+        for name in files:
+            full = os.path.join(base, name)
+            if os.path.islink(full):
+                return False
+            found[os.path.relpath(full, root).replace(os.sep, "/")] = full
+    if set(found) != set(expected):
+        return False
+    return all(sha256_file(found[k]).lower() == str(v).lower() for k, v in expected.items())
+
+
+def safe_extract_zip(zip_path, dest, data=None):
+    """zip を dest へ展開する (dest の外へ出るパスは拒否)。data に検証済みのバイト列を渡すと、ファイルを読み直さずそれを展開する。"""
+    import io
     if os.path.isdir(dest):
         shutil.rmtree(dest, ignore_errors=True)
     os.makedirs(dest, exist_ok=True)
     root = os.path.abspath(dest)
     total = 0
-    with zipfile.ZipFile(zip_path) as z:
+    with zipfile.ZipFile(io.BytesIO(data) if data is not None else zip_path) as z:
         for info in z.infolist():
             name = info.filename.replace("\\", "/")
             target = os.path.abspath(os.path.join(root, info.filename))
@@ -868,7 +929,7 @@ SIGNER_POLICY = {
     "itunes": {"publisher": "Apple Inc.", "names": ["Apple Inc."], "match": "exact", "unsigned_ok": False},
     "vbcable": {"publisher": "VB-Audio Software (Vincent Burel)", "names": ["VB-Audio", "Vincent Burel"], "match": "contains", "unsigned_ok": False},
     # iloader は配布物が署名されているか確認できていない。署名されていれば発行元を確認し、
-    # 署名が無いときだけは「SHA-256 による改ざん検知」(ダウンロード後に控えた値と、実行直前の値の照合) に頼って実行する。
+    # 署名が無いときは、固定した SHA-256 (SOURCES["iloader"]["sha256"]。ダウンロード直後と管理者ヘルパーの実行直前に照合) に頼って実行する。
     "iloader": {"publisher": "iloader (nab138)", "names": ["nab138", "iloader"], "match": "contains", "unsigned_ok": True},
 }
 
@@ -877,12 +938,22 @@ TRUST_E_NOSIGNATURE = 0x800B0100
 TRUST_E_SUBJECT_FORM_UNKNOWN = 0x800B0003
 TRUST_E_PROVIDER_UNKNOWN = 0x800B0001
 _UNSIGNED_CODES = (TRUST_E_NOSIGNATURE, TRUST_E_SUBJECT_FORM_UNKNOWN, TRUST_E_PROVIDER_UNKNOWN, 0x80070002, 0x80070003)
+# 失効の確認ができなかった (署名そのものは確認できたが、失効リスト / OCSP に届かない。オフライン・ファイアウォールなど)
+CRYPT_E_NO_REVOCATION_CHECK = 0x80092012
+CRYPT_E_REVOCATION_OFFLINE = 0x80092013
+_REVOCATION_UNKNOWN_CODES = (CRYPT_E_NO_REVOCATION_CHECK, CRYPT_E_REVOCATION_OFFLINE)
+# 失効の確認 (WinVerifyTrust): 証明書の連鎖すべて (ルートを含む) の失効を調べる
+WTD_REVOKE_WHOLECHAIN = 1
+WTD_REVOCATION_CHECK_CHAIN = 0x00000040
 
 
 def classify_trust_result(ret, last_error):
-    """WinVerifyTrust の結果 → "valid" / "unsigned" (署名なし) / "invalid" (署名はあるが無効・改ざん・失効など)。"""
+    """WinVerifyTrust の結果 → "valid" / "unsigned" (署名なし) / "revocation_unknown" (失効を確認できなかった) /
+    "invalid" (署名はあるが無効・改ざん・失効済みなど)。"""
     if (ret & 0xFFFFFFFF) == 0:
         return "valid"
+    if (ret & 0xFFFFFFFF) in _REVOCATION_UNKNOWN_CODES:
+        return "revocation_unknown"
     if (last_error & 0xFFFFFFFF) in _UNSIGNED_CODES or (ret & 0xFFFFFFFF) in _UNSIGNED_CODES:
         return "unsigned"
     return "invalid"
@@ -903,7 +974,7 @@ def _signer_matches(policy, signers):
 
 
 def evaluate_signature(cid, info):
-    """署名確認の結果 info = {"result": "valid"/"unsigned"/"invalid"/"error", "signers": [名前...], "code": int}
+    """署名確認の結果 info = {"result": "valid"/"unsigned"/"revocation_unknown"/"invalid"/"error", "signers": [名前...], "code": int}
     から実行してよいかを決める。戻り値: (許可するか, 日本語メッセージ, 署名なしで許可したか)"""
     policy = SIGNER_POLICY.get(cid)
     if policy is None:
@@ -920,6 +991,9 @@ def evaluate_signature(cid, info):
         return False, (t("setup.wizard.evaluate_signature_6", publisher=policy["publisher"])), False
     if result == "invalid":
         return False, (t("setup.wizard.evaluate_signature_7")), False
+    if result == "revocation_unknown":
+        # 失効を確認できない署名は、管理者権限で実行するものには使わない (ネットワークを直してやり直すか、手動で入れてもらう)
+        return False, (t("setup.wizard.evaluate_signature_10")), False
     return False, (t("setup.wizard.evaluate_signature_8", detail=(info or {}).get("detail") or t("setup.wizard.evaluate_signature_9"))), False
 
 
@@ -952,8 +1026,8 @@ def _wintrust():
 
 
 def verify_authenticode(path):
-    """WinVerifyTrust (WINTRUST_ACTION_GENERIC_VERIFY_V2 / 失効確認なし / UI なし) で署名を検証し、署名者名を読む。
-    戻り値: {"result": "valid"/"unsigned"/"invalid"/"error", "code": 戻り値, "signers": [CN, O], "detail": str}。
+    """WinVerifyTrust (WINTRUST_ACTION_GENERIC_VERIFY_V2 / 失効確認あり (連鎖すべて) / UI なし) で署名を検証し、署名者名を読む。
+    戻り値: {"result": "valid"/"unsigned"/"revocation_unknown"/"invalid"/"error", "code": 戻り値, "signers": [CN, O], "detail": str}。
     Windows 以外・例外のときは "error" (呼び出し側は実行しない)。"""
     if os.name != "nt":
         return {"result": "error", "code": 0, "signers": [], "detail": t("setup.wizard.verify_authenticode_1")}
@@ -978,7 +1052,8 @@ def verify_authenticode(path):
         data = WT_DATA()
         data.cbStruct = ctypes.sizeof(WT_DATA)
         data.dwUIChoice = 2            # WTD_UI_NONE
-        data.fdwRevocationChecks = 0   # WTD_REVOKE_NONE
+        data.fdwRevocationChecks = WTD_REVOKE_WHOLECHAIN   # 失効の確認を明示する (確認できないときは revocation_unknown)
+        data.dwProvFlags = WTD_REVOCATION_CHECK_CHAIN
         data.dwUnionChoice = 1         # WTD_CHOICE_FILE
         data.pFile = ctypes.cast(ctypes.pointer(fi), ctypes.c_void_p)
         data.dwStateAction = 1         # WTD_STATEACTION_VERIFY (署名者を読むため、状態を残す)
@@ -1032,8 +1107,8 @@ def step_exe(cid, title, path, args, ok_codes=(0, 3010, 1641), timeout=900, retr
             "stage_dir": stage_dir}
 
 
-def step_msi(cid, title, path, ok_codes=(0, 3010, 1641), timeout=900, stage_dir=None):
-    return {"id": cid, "type": "msi", "title": title, "path": path, "sha256": sha256_file(path),
+def step_msi(cid, title, path, ok_codes=(0, 3010, 1641), timeout=900, stage_dir=None, sha256=None):
+    return {"id": cid, "type": "msi", "title": title, "path": path, "sha256": sha256 or sha256_file(path),
             "ok_codes": list(ok_codes), "timeout": timeout, "stage_dir": stage_dir}
 
 
@@ -1078,11 +1153,13 @@ def _run_cmd(runner, args, timeout):
     return runner(args, **kw).returncode
 
 
-def _stage_for_run(path, stage_dir=None):
+def _stage_for_run(path, stage_dir=None, expected_files=None):
     """管理者権限で実行するファイルを、一般ユーザーが書き換えられない場所 (ProgramData 以下に管理者が作った
     フォルダ) へコピーする。確認 (SHA-256・署名) と実行の間に差し替えられるのを防ぐため。
     戻り値: (実行するパス, 後始末する関数)。Windows 以外 (テスト) ではそのまま使う。"""
     if os.name != "nt":
+        if expected_files and stage_dir and not verify_tree(stage_dir, expected_files):
+            raise RuntimeError(t("setup.wizard.run_installer_3"))
         return path, (lambda: None)
     import uuid
     base = os.path.join(os.environ.get("ProgramData") or r"C:\ProgramData", "PhoneCam", "run-" + uuid.uuid4().hex)
@@ -1091,6 +1168,10 @@ def _stage_for_run(path, stage_dir=None):
         src_root = os.path.abspath(stage_dir)
         dst_root = os.path.join(base, "pkg")
         shutil.copytree(src_root, dst_root)
+        # コピーした (一般ユーザーが触れない) 一式が、ダウンロードして照合したパッケージの中身と同じか確かめる
+        if expected_files and not verify_tree(dst_root, expected_files):
+            shutil.rmtree(base, ignore_errors=True)
+            raise RuntimeError(t("setup.wizard.run_installer_3"))
         rel = os.path.relpath(os.path.abspath(path), src_root)
         if rel.startswith(".."):
             raise RuntimeError(t("setup.wizard.stage_for_run_1"))
@@ -1179,7 +1260,7 @@ def execute_step(step, runner=None, verifier=None):
                 res["detail"] = t("setup.wizard.execute_step_3")
                 return res
             # 一般ユーザーが触れない場所へコピーしてから、その実物を確認して実行する
-            path, cleanup = _stage_for_run(path, step.get("stage_dir"))
+            path, cleanup = _stage_for_run(path, step.get("stage_dir"), step.get("files"))
             try:
                 return _run_installer(step, kind, path, res, runner, verifier)
             finally:
@@ -1206,23 +1287,152 @@ def execute_step(step, runner=None, verifier=None):
     return res
 
 
+class JobRejected(RuntimeError):
+    """job.json が許可リストに合わない (管理者権限では実行しない)。"""
+
+
+# 管理者ヘルパーが実行してよいステップの許可リスト。job.json に何が書かれていても、ここにないものは実行しない。
+#   exe : コンポーネント ID → (ファイル名, 引数。固定)
+#   msi : コンポーネント ID → ファイル名
+JOB_MAX_BYTES = 1024 * 1024
+JOB_MAX_STEPS = 16
+JOB_MAX_TIMEOUT = 3600
+JOB_OK_CODES = frozenset((0, 1638, 3010, 1641))
+JOB_RESULT_NAME = "result.json"
+JOB_PROGRESS_NAME = "progress.log"
+
+
+def _allowed_exe_steps():
+    return {
+        "vcredist": (SOURCES["vcredist"]["file"], list(SOURCES["vcredist"]["args"])),
+        "itunes": (SOURCES["itunes"]["file"], list(SOURCES["itunes"]["args"])),
+        "vbcable": ("vbcable_setup_x64.exe", ["-i", "-h"]),
+    }
+
+
+def _same_or_inside(path, root):
+    p = os.path.normcase(os.path.realpath(path))
+    r = os.path.normcase(os.path.realpath(root))
+    return p == r or p.startswith(r.rstrip("\\/") + os.sep)
+
+
+def _need_inside(path, root, what):
+    if not isinstance(path, str) or not path or not _same_or_inside(path, root):
+        raise JobRejected("%s is outside the managed folder" % what)
+    return path
+
+
+def validate_job(job, job_path):
+    """job.json の内容を許可リストで確かめ、実行してよい項目だけを写した新しい dict を返す (違反は JobRejected)。
+    - 手順の種類: register_camera / exe / msi / winget だけ
+    - exe・msi: コンポーネント ID ごとの固定のファイル名・引数。置き場所は job.json と同じアプリ管理のフォルダの下だけ
+    - 出力先 (result・progress): 同じフォルダの決まった名前のファイルだけ
+    - winget: ALLOWED_WINGET のパッケージ ID だけ"""
+    if not isinstance(job, dict):
+        raise JobRejected("job is not an object")
+    root = os.path.dirname(os.path.abspath(job_path))
+    if os.name == "nt" and os.path.basename(root).casefold() != "phonecamsetup":
+        raise JobRejected("job folder is not the PhoneCam setup folder")
+    result = os.path.join(root, JOB_RESULT_NAME)
+    progress = os.path.join(root, JOB_PROGRESS_NAME)
+    for key, want in (("result", result), ("progress", progress)):
+        got = job.get(key)
+        if got is not None and (not isinstance(got, str) or os.path.normcase(os.path.abspath(got)) != os.path.normcase(want)):
+            raise JobRejected("%s path is not allowed" % key)
+    steps_in = job.get("steps")
+    if not isinstance(steps_in, list) or len(steps_in) > JOB_MAX_STEPS:
+        raise JobRejected("steps are missing or too many")
+    exe_allowed = _allowed_exe_steps()
+    steps, seen = [], set()
+    for st in steps_in:
+        if not isinstance(st, dict):
+            raise JobRejected("step is not an object")
+        kind, cid = st.get("type"), st.get("id")
+        if not isinstance(cid, str) or cid in seen:
+            raise JobRejected("step id is invalid or duplicated")
+        seen.add(cid)
+        title = st.get("title") if isinstance(st.get("title"), str) else ""
+        timeout = st.get("timeout", 900)
+        if isinstance(timeout, bool) or not isinstance(timeout, int) or not 1 <= timeout <= JOB_MAX_TIMEOUT:
+            raise JobRejected("timeout is out of range")
+        if kind == "register_camera":
+            if cid != "camera":
+                raise JobRejected("register_camera id is not allowed")
+            steps.append({"id": cid, "type": kind, "title": title})
+            continue
+        if kind == "winget":
+            if st.get("pkg") not in ALLOWED_WINGET:
+                raise JobRejected("winget package is not allowed")
+            steps.append({"id": cid, "type": kind, "title": title, "pkg": st["pkg"], "timeout": timeout})
+            continue
+        if kind not in ("exe", "msi"):
+            raise JobRejected("step type is not allowed")
+        if kind == "exe":
+            if cid not in exe_allowed:
+                raise JobRejected("installer id is not allowed")
+            fname, args = exe_allowed[cid]
+            if list(st.get("args") or []) != args or st.get("retry_args") is not None:
+                raise JobRejected("installer arguments are not allowed")
+        else:
+            if cid != "iloader":
+                raise JobRejected("installer id is not allowed")
+            fname = SOURCES["iloader"]["file"]
+            if st.get("args"):
+                raise JobRejected("installer arguments are not allowed")
+        path = _need_inside(st.get("path"), root, "installer")
+        if os.path.basename(path).casefold() != fname.casefold():
+            raise JobRejected("installer file name is not allowed")
+        stage_dir = st.get("stage_dir")
+        if stage_dir:
+            if cid != "vbcable":
+                raise JobRejected("stage_dir is not allowed")
+            _need_inside(stage_dir, root, "stage_dir")
+        sha = st.get("sha256")
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", sha):
+            raise JobRejected("installer hash is missing")
+        ok_codes = st.get("ok_codes", [0])
+        if (not isinstance(ok_codes, list) or not ok_codes
+                or any(isinstance(c, bool) or not isinstance(c, int) or c not in JOB_OK_CODES for c in ok_codes)):
+            raise JobRejected("exit codes are not allowed")
+        files = st.get("files")
+        if files is not None:
+            if (cid != "vbcable" or not isinstance(files, dict) or not 0 < len(files) <= 64
+                    or any(not isinstance(k, str) or not isinstance(v, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", v)
+                           for k, v in files.items())):
+                raise JobRejected("files are not allowed")
+            files = {k: v.lower() for k, v in files.items()}
+        steps.append({"id": cid, "type": kind, "title": title, "path": path, "args": list(exe_allowed[cid][1]) if kind == "exe" else [],
+                      "sha256": sha.lower(), "ok_codes": list(ok_codes), "timeout": timeout, "retry_args": None,
+                      "lenient": bool(st.get("lenient")) and cid == "vbcable", "reboot": bool(st.get("reboot")) and cid == "vbcable",
+                      "stage_dir": stage_dir if stage_dir else None, "files": files})
+    return {"version": 1, "result": result, "progress": progress, "steps": steps}
+
+
+def read_job(job_path, expected_sha):
+    """job.json を1回だけ読み、そのバイト列でハッシュの照合と JSON の解釈を両方行う (照合のあとに差し替えられても影響しない)。"""
+    if not expected_sha:
+        raise RuntimeError(t("setup.wizard.run_job_1"))
+    with open(job_path, "rb") as f:
+        data = f.read(JOB_MAX_BYTES + 1)
+    if len(data) > JOB_MAX_BYTES:
+        raise RuntimeError(t("setup.wizard.run_job_2"))
+    if hashlib.sha256(data).hexdigest() != str(expected_sha).strip().lower():
+        raise RuntimeError(t("setup.wizard.run_job_2"))
+    return json.loads(data.decode("utf-8"))
+
+
 def run_job(job_path, expected_sha=None, runner=None, verifier=None):
     """管理者権限で実行される --setup。結果を result.json へ書き、終了コードを返す。
     0 = 全て成功 / 3010 = 成功・要再起動 / 1 = 失敗あり。"""
     result = {"steps": [], "error": ""}
-    result_path = None
+    root = os.path.dirname(os.path.abspath(job_path))
+    result_path = os.path.join(root, JOB_RESULT_NAME)   # 書き込み先は常にここ (job.json の値は使わない)
     try:
         # 管理者権限で何を実行するかは job.json で決まるので、呼び出し側が渡したハッシュと一致するものだけ実行する
-        # (ハッシュが渡されていない場合も実行しない)
-        if not expected_sha:
-            raise RuntimeError(t("setup.wizard.run_job_1"))
-        if sha256_file(job_path).lower() != str(expected_sha).strip().lower():
-            raise RuntimeError(t("setup.wizard.run_job_2"))
-        with open(job_path, "r", encoding="utf-8") as f:
-            job = json.load(f)
-        result_path = job.get("result") or os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
-        progress = job.get("progress")
-        steps = job.get("steps") or []
+        # (ハッシュが渡されていない場合も実行しない)。読むのは1回だけで、許可リストにないものは実行しない
+        job = validate_job(read_job(job_path, expected_sha), job_path)
+        progress = job["progress"]
+        steps = job["steps"]
         total = len(steps)
         for i, step in enumerate(steps):
             if progress:
@@ -1233,8 +1443,6 @@ def run_job(job_path, expected_sha=None, runner=None, verifier=None):
     except Exception as e:
         result["error"] = t("setup.wizard.run_job_3", detail=e)
     try:
-        if result_path is None:
-            result_path = os.path.join(os.path.dirname(os.path.abspath(job_path)), "result.json")
         _write_json(result_path, result)
     except Exception:
         pass
@@ -1528,6 +1736,7 @@ class GuidedFlow:
         emit("progress", value=0.0)
         try:
             self.downloader(src["url"], dest, src["kind"], progress=prog, cancel=cancel)
+            verify_pinned_sha256(dest, src.get("sha256"))   # パッケージ全体を固定の SHA-256 で照合 (あるものだけ)
             emit("log", text=t("setup.wizard.guidedflow_prepare_5", name=name))
             emit("stage", text=t("setup.wizard.guidedflow_prepare_6", name=name))
             job = self._locate(cid, dest)
@@ -1556,11 +1765,14 @@ class GuidedFlow:
             # 配布物は MSI そのもの (zip ではない)。msiexec /i で普通のウィンドウとして開く
             return {"path": dest, "args": [], "cwd": os.path.dirname(dest), "msi": True}
         if cid == "vbcable":
-            root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
+            data = read_verified_zip(dest, SOURCES["vbcable"].get("sha256"))
+            files = zip_member_hashes(data)
+            root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"), data=data)
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
             if not exe:
                 raise DownloadError(t("setup.wizard.guidedflow__locate_1"))
-            return {"path": exe, "args": [], "cwd": os.path.dirname(exe)}
+            # files: 展開した一式 (ドライバーなど同梱ファイルも) の照合用。開く直前にもう一度確かめる
+            return {"path": exe, "args": [], "cwd": os.path.dirname(exe), "files": files, "files_root": root}
         return {"path": dest, "args": [], "cwd": os.path.dirname(dest)}
 
     # -- 開く -------------------------------------------------------------
@@ -1572,6 +1784,9 @@ class GuidedFlow:
         job = self.job
         try:
             if sha256_file(job["path"]) != job.get("sha256"):
+                self._fail(t("setup.wizard.guidedflow_launch_1"))
+                return False
+            if job.get("files") and not verify_tree(job["files_root"], job["files"]):
                 self._fail(t("setup.wizard.guidedflow_launch_1"))
                 return False
         except Exception:
@@ -1868,16 +2083,24 @@ class SetupEngine:
         dest = os.path.join(self.dir, src["file"])
         emit("stage", text=t("setup.wizard.guidedflow_prepare_4", name=COMPONENT_BY_ID[cid]["name"]))
         self.downloader(src["url"], dest, src["kind"], progress=progress, cancel=cancel)
+        verify_pinned_sha256(dest, src.get("sha256"))   # パッケージ全体を固定の SHA-256 で照合 (あるものだけ)
         title = t("setup.wizard.setupengine__prepare_1", name=COMPONENT_BY_ID[cid]["name"])
         if cid == "iloader":
-            return step_msi(cid, title, dest)
+            # 管理者ヘルパーも、コピーした MSI がこの固定値と一致することを確かめる
+            return step_msi(cid, title, dest, sha256=src["sha256"])
         if cid == "vbcable":
-            root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"))
+            data = read_verified_zip(dest, src.get("sha256"))
+            files = zip_member_hashes(data)
+            root = safe_extract_zip(dest, os.path.join(self.dir, "vbcable"), data=data)
             exe = find_file(root, ["vbcable_setup_x64.exe", "vbcable_setup.exe"])
             if not exe:
                 raise DownloadError(t("setup.wizard.setupengine__prepare_2"))
-            # VB-CABLE は終了コードがあてにならないので、導入後の再検出で判定する
-            return step_exe(cid, title, exe, ["-i", "-h"], timeout=300, lenient=True, reboot=True, stage_dir=root)
+            # VB-CABLE は終了コードがあてにならないので、導入後の再検出で判定する。
+            # 同梱のドライバーなども含めた一式の SHA-256 (files) を渡し、管理者ヘルパーが安全な場所へコピーした一式と照合する
+            step = step_exe(cid, title, exe, ["-i", "-h"], timeout=300, lenient=True, reboot=True, stage_dir=root)
+            step["files"] = files
+            step["sha256"] = files.get(os.path.relpath(exe, root).replace(os.sep, "/"), step["sha256"])
+            return step
         return step_exe(cid, title, dest, src["args"], ok_codes=src.get("ok_codes", (0, 3010, 1641)))
 
     def run(self, ids, emit=None, cancel=None):

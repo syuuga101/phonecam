@@ -12,6 +12,10 @@
 //   Slot i at 64 + 64*i: i32 min,max,step,default,value,flags,caps,supported | u32 changed_seq | i32 reserved[7]
 //   flags / caps use the DirectShow values: Auto = 1, Manual = 2 (caps may be 3).
 //   Slots: 0 Brightness 1 Contrast 2 Saturation 3 Sharpness 4 WhiteBalance 5 Zoom 6 Focus 7 Exposure
+// Access control: the mutex and the mapping are created with a protected DACL that grants full access only to the
+// current user ("D:P(A;;GA;;;<user SID>)"; see UserOnlySecurity). The filter runs inside OBS & co. as the same user as
+// the receiver. An object that somebody else created first is used only if its owner is the current user,
+// Administrators or SYSTEM. Nothing read from the block is trusted: values are clamped to kLimits.
 // The filter (this file) bumps request_seq and slot.changed_seq on every Set(); the receiver consumes
 // changes with changed_seq > ack_seq and then stores ack_seq = request_seq.
 // A block whose magic is 0 (freshly created mapping) is initialised with the defaults below by whichever
@@ -19,6 +23,8 @@
 
 #include <cstdint>
 #include <cstring>
+#include <sddl.h>      // ConvertStringSecurityDescriptorToSecurityDescriptorW / ConvertSidToStringSidW
+#include <aclapi.h>    // GetSecurityInfo
 
 namespace phonecam {
 
@@ -84,6 +90,85 @@ inline void FillDefaults(CtlBlock* b)
     b->h.magic = kMagic;   // last
 }
 
+// Allowed range of every slot (the shared block is not trusted: whatever it holds is clamped to these).
+// Same as the table in FillDefaults and as SLOT_LIMITS in phonecam_dshowctl.py.
+static const int32_t kLimits[kSlotCount][2] = {
+    { -50, 50 }, { 50, 150 }, { 0, 200 }, { 0, 100 }, { 2500, 8000 }, { 100, 1000 }, { 0, 100 }, { -13, -1 },
+};
+
+// Security for the named mutex / mapping: full access for the current user only (protected DACL),
+// "D:P(A;;GA;;;<user SID>)". The filter is loaded by OBS & co. running as the same user as the PhoneCam receiver,
+// so the user's SID is enough (no NULL DACL). If the descriptor cannot be built, attributes() returns nullptr, which
+// means the process default DACL (never a NULL DACL).
+class UserOnlySecurity
+{
+public:
+    UserOnlySecurity() : m_sd(nullptr), m_haveSid(false)
+    {
+        m_sa.nLength = sizeof(m_sa);
+        m_sa.lpSecurityDescriptor = nullptr;
+        m_sa.bInheritHandle = FALSE;
+        std::memset(m_sid, 0, sizeof(m_sid));
+        HANDLE tok = nullptr;
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &tok)) return;
+        BYTE buf[1024];
+        DWORD n = 0;
+        if (GetTokenInformation(tok, TokenUser, buf, sizeof(buf), &n))
+        {
+            PSID sid = reinterpret_cast<TOKEN_USER*>(buf)->User.Sid;
+            LPWSTR str = nullptr;
+            if (ConvertSidToStringSidW(sid, &str))
+            {
+                if (lstrlenW(str) < 180)
+                {
+                    lstrcpynW(m_sid, str, 200);
+                    m_haveSid = true;
+                    WCHAR sddl[256];
+                    wsprintfW(sddl, L"D:P(A;;GA;;;%s)", str);
+                    if (ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &m_sd, nullptr))
+                    {
+                        m_sa.lpSecurityDescriptor = m_sd;
+                    }
+                }
+                LocalFree(str);
+            }
+        }
+        CloseHandle(tok);
+    }
+    ~UserOnlySecurity() { if (m_sd) LocalFree(m_sd); }
+
+    SECURITY_ATTRIBUTES* attributes() { return m_sd ? &m_sa : nullptr; }
+
+    // For an object that already existed (somebody else created it first): accept it only if it is owned by the
+    // current user, Administrators (an elevated process owns what it creates) or SYSTEM. If the owner cannot be
+    // read the answer is "yes" (nothing to compare), a different owner is "no".
+    bool ownerAllowed(HANDLE h) const
+    {
+        if (!m_haveSid) return true;
+        PSID owner = nullptr;
+        PSECURITY_DESCRIPTOR psd = nullptr;
+        if (GetSecurityInfo(h, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &psd) != ERROR_SUCCESS)
+            return true;
+        bool ok = true;
+        LPWSTR str = nullptr;
+        if (owner && ConvertSidToStringSidW(owner, &str))
+        {
+            ok = lstrcmpW(str, m_sid) == 0 || lstrcmpW(str, L"S-1-5-32-544") == 0 || lstrcmpW(str, L"S-1-5-18") == 0;
+            LocalFree(str);
+        }
+        if (psd) LocalFree(psd);
+        return ok;
+    }
+
+private:
+    SECURITY_ATTRIBUTES m_sa;
+    PSECURITY_DESCRIPTOR m_sd;
+    WCHAR m_sid[200];
+    bool m_haveSid;
+    UserOnlySecurity(const UserOnlySecurity&);
+    UserOnlySecurity& operator=(const UserOnlySecurity&);
+};
+
 // Access to the block. Falls back to a private in-memory copy if the shared one cannot be used
 // (the dialog still opens; changes just do not reach the receiver).
 class ControlBlock
@@ -109,7 +194,11 @@ public:
         Guard g(this);
         const CtlSlot& s = g.b->s[slot];
         if (!s.supported) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-        *mn = s.vmin; *mx = s.vmax; *st = s.step > 0 ? s.step : 1; *df = s.def; *caps = s.caps;
+        LONG lo, hi;
+        slotRange(slot, s, &lo, &hi);
+        *mn = lo; *mx = hi; *st = s.step > 0 ? s.step : 1;
+        *df = s.def < lo ? lo : (s.def > hi ? hi : s.def);
+        *caps = s.caps & (kFlagAuto | kFlagManual);
         return S_OK;
     }
 
@@ -120,7 +209,9 @@ public:
         Guard g(this);
         const CtlSlot& s = g.b->s[slot];
         if (!s.supported) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-        *value = s.value;
+        LONG lo, hi;
+        slotRange(slot, s, &lo, &hi);
+        *value = s.value < lo ? lo : (s.value > hi ? hi : s.value);
         *flags = (s.flags == kFlagAuto) ? kFlagAuto : kFlagManual;
         return S_OK;
     }
@@ -139,8 +230,10 @@ public:
         else if (flags == kFlagManual)
         {
             if (!(s.caps & kFlagManual)) return E_INVALIDARG;
-            if (value < s.vmin) value = s.vmin;
-            if (value > s.vmax) value = s.vmax;
+            LONG lo, hi;
+            slotRange(slot, s, &lo, &hi);
+            if (value < lo) value = lo;
+            if (value > hi) value = hi;
             s.value = value;
             s.flags = kFlagManual;
         }
@@ -162,12 +255,23 @@ private:
         ~Guard() { c->release(); }
     };
 
+    // The range in the shared block, narrowed to the fixed limits of the slot (the block is not trusted).
+    static void slotRange(int slot, const CtlSlot& s, LONG* lo, LONG* hi)
+    {
+        LONG a = s.vmin < kLimits[slot][0] ? kLimits[slot][0] : s.vmin;
+        LONG b = s.vmax > kLimits[slot][1] ? kLimits[slot][1] : s.vmax;
+        if (a > kLimits[slot][1]) a = kLimits[slot][1];
+        if (b < a) b = a;
+        *lo = a; *hi = b;
+    }
+
     CCritSec  m_cs;
     HANDLE    m_mutex;
     HANDLE    m_map;
     CtlBlock* m_view;
     bool      m_held;
     bool      m_tried;
+    UserOnlySecurity m_security;
     DWORD     m_lastTry;
     CtlBlock  m_local;
 
@@ -179,22 +283,28 @@ private:
         m_tried = true;
         m_lastTry = now;
 
-        // NULL DACL: the receiver and OBS may run at different integrity levels.
-        SECURITY_DESCRIPTOR sd;
-        SECURITY_ATTRIBUTES sa;
-        SECURITY_ATTRIBUTES* psa = nullptr;
-        if (InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION) &&
-            SetSecurityDescriptorDacl(&sd, TRUE, nullptr, FALSE))
+        // Full access for the current user only (see UserOnlySecurity). The receiver and OBS run as the same user.
+        SECURITY_ATTRIBUTES* psa = m_security.attributes();
+        if (!m_mutex)
         {
-            sa.nLength = sizeof(sa);
-            sa.lpSecurityDescriptor = &sd;
-            sa.bInheritHandle = FALSE;
-            psa = &sa;
+            m_mutex = CreateMutexW(psa, FALSE, L"PhoneCam/ControlsMutex");
+            if (m_mutex && GetLastError() == ERROR_ALREADY_EXISTS && !m_security.ownerAllowed(m_mutex))
+            {
+                CloseHandle(m_mutex);   // created by somebody else: do not use it
+                m_mutex = nullptr;
+            }
         }
-        if (!m_mutex) m_mutex = CreateMutexW(psa, FALSE, L"PhoneCam/ControlsMutex");
         if (!m_mutex) return false;
-        if (!m_map) m_map = CreateFileMappingW(INVALID_HANDLE_VALUE, psa, PAGE_READWRITE, 0, kBlockSize,
-                                               L"PhoneCam/Controls");   // returns the existing one if present
+        if (!m_map)
+        {
+            m_map = CreateFileMappingW(INVALID_HANDLE_VALUE, psa, PAGE_READWRITE, 0, kBlockSize,
+                                       L"PhoneCam/Controls");   // returns the existing one if present
+            if (m_map && GetLastError() == ERROR_ALREADY_EXISTS && !m_security.ownerAllowed(m_map))
+            {
+                CloseHandle(m_map);
+                m_map = nullptr;
+            }
+        }
         if (!m_map) return false;
         void* p = MapViewOfFile(m_map, FILE_MAP_ALL_ACCESS, 0, 0, kBlockSize);
         if (!p) return false;

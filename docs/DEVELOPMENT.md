@@ -78,6 +78,20 @@ python -m pip install -r windows/requirements-test.txt
 python -m pytest windows/tests -ra
 ```
 
+### CI の依存ロック
+
+CI は、ハッシュ付きのロックファイル（`windows/requirements.lock`、`requirements-test.lock`、`requirements-build.lock`）から `pip install --require-hashes` で入れます。`requirements.txt` などを変えたら、ロックも作り直します（Windows・Python 3.12 で作ること。環境によって入るものが違うため）。
+
+```powershell
+python -m pip install pip-tools
+cd windows
+python -m piptools compile --generate-hashes --allow-unsafe -o requirements.lock requirements.txt
+python -m piptools compile --generate-hashes --allow-unsafe -o requirements-test.lock requirements-test.txt
+python -m piptools compile --generate-hashes --allow-unsafe -o requirements-build.lock requirements-build.txt
+```
+
+GitHub Actions の `uses:` はコミットの SHA で固定し、行末のコメントにタグを書きます。softcam（`SOFTCAM_SHA`）と XcodeGen（`XCODEGEN_VERSION` と `XCODEGEN_SHA256`）も同じように固定しているので、上げるときは値を一緒に変えます。更新の署名の鍵は `docs/release-signing.md` を見てください。
+
 Qt のテストは既定で `QT_QPA_PLATFORM=offscreen` を使います。iPhone、仮想カメラの登録、ネットワーク接続は不要です。
 Qt の見た目を確認するときは既存の `python windows/qt_smoke.py --out qt-screens` を使います。
 GitHub Actions では Windows の pytest ジョブに失敗すると exe ビルドがスキップされ、リリースも公開されません。

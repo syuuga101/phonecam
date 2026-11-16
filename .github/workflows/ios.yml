@@ -16,7 +16,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Test adaptive bitrate
         working-directory: ios
@@ -38,8 +38,18 @@ jobs:
           swiftc PhoneCam/RecordingSession.swift Tests/RecordingSessionChecks.swift -o "$RUNNER_TEMP/phonecam-recording-checks"
           "$RUNNER_TEMP/phonecam-recording-checks"
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      # XcodeGen は版とハッシュを固定して取得する (brew install は取得した時点の最新版になるため使わない)。
+      # 上げるときは XCODEGEN_VERSION と XCODEGEN_SHA256 (リリースの xcodegen.zip の SHA-256) を一緒に変える
+      - name: Install XcodeGen (pinned)
+        env:
+          XCODEGEN_VERSION: "2.46.0"
+          XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q -o "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen-dist"
+          echo "$RUNNER_TEMP/xcodegen-dist/xcodegen/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/xcodegen-dist/xcodegen/bin/xcodegen" --version
 
       - name: Generate Xcode project
         working-directory: ios
@@ -47,8 +57,15 @@ jobs:
 
       - name: Build (unsigned)
         working-directory: ios
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          PHONECAM_REPO_NAME: ${{ github.repository }}
         run: |
           VERSION=$(tr -d '[:space:]' < ../VERSION 2>/dev/null || echo 0.0.0)
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION は x.y.z の形式にしてください"
+            exit 1
+          fi
           xcodebuild \
             -project PhoneCam.xcodeproj \
             -scheme PhoneCam \
@@ -60,8 +77,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             MARKETING_VERSION="$VERSION" \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            PHONECAM_REPO="${{ github.repository }}" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            PHONECAM_REPO="$PHONECAM_REPO_NAME" \
             build
 
       - name: Package IPA
@@ -90,7 +107,7 @@ jobs:
           zip -qry PhoneCam.ipa Payload
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: PhoneCam-ipa
           path: ios/PhoneCam.ipa

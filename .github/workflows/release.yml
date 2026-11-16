@@ -25,32 +25,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # VERSION は x.y.z の形だけを受け付ける (後の手順でシェルやファイル名に使うため、それ以外は止める)
       - name: Read version
         id: ver
-        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION は x.y.z の形式にしてください"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Download IPA
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: PhoneCam-ipa
           path: out
 
       - name: Download receiver
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: PhoneCamReceiver
           path: out
 
+      # 更新マニフェスト (version と exe の SHA-256)。Secret UPDATE_SIGNING_KEY (Ed25519 の秘密鍵) があれば署名も付ける。
+      # アプリに公開鍵が入るまでは、署名がなくてもアプリは今までどおり (GitHub のハッシュで) 更新できる。docs/release-signing.md
+      - name: Create update manifest
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          UPDATE_KEY_ROTATION: ${{ vars.UPDATE_KEY_ROTATION }}
+        run: python3 .github/scripts/make_update_manifest.py --exe out/PhoneCamReceiver.exe --version "$VERSION" --out out
+
       # SideStore / AltStore 共通のソース。releases/latest/download/sidestore-source.json (と従来の altstore-source.json) が
       # 常に最新のリリースを指す。2つは sourceURL 以外同じ内容
       - name: Generate SideStore / AltStore source
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          REPO: ${{ github.repository }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           python3 .github/scripts/make_altstore_source.py \
-            --repo "${{ github.repository }}" \
-            --version "${{ steps.ver.outputs.version }}" \
-            --build "${{ github.run_number }}" \
+            --repo "$REPO" \
+            --version "$VERSION" \
+            --build "$RUN_NUMBER" \
             --ipa out/PhoneCam.ipa \
             --out out/altstore-source.json \
             --also-out out/sidestore-source.json
@@ -63,6 +83,7 @@ jobs:
       - name: Prepare release notes
         env:
           VERSION: ${{ steps.ver.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
           awk -v ver="v${VERSION}" '
             /^## / {
@@ -88,8 +109,8 @@ jobs:
             echo
             echo "- **Windows**: \`PhoneCamReceiver.exe\` をダウンロードして、古い exe と置き換えるだけです（初めての方はそのまま起動するとセットアップが始まります）。"
             echo "- **iPhone**: SideStore を開き、LocalDevVPN をオンにして Wi-Fi につないだ状態で、「My Apps」の PhoneCam を更新します（ソースは自動で最新になります）。"
-            echo "- SideStore に追加する配布元: \`https://github.com/${{ github.repository }}/releases/latest/download/sidestore-source.json\` （これまでの \`altstore-source.json\` も引き続き使えます）"
-            echo "- くわしい手順は [使い方ガイド](https://github.com/${{ github.repository }}/wiki) を見てください。"
+            echo "- SideStore に追加する配布元: \`https://github.com/${REPO}/releases/latest/download/sidestore-source.json\` （これまでの \`altstore-source.json\` も引き続き使えます）"
+            echo "- くわしい手順は [使い方ガイド](https://github.com/${REPO}/wiki) を見てください。"
             echo
             echo "---"
             echo
@@ -108,3 +129,5 @@ jobs:
             out/PhoneCamReceiver.exe
             out/altstore-source.json
             out/sidestore-source.json
+            out/update-manifest.json
+            out/update-manifest.json.sig

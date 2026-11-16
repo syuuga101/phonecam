@@ -13,11 +13,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Push wiki/ to the GitHub Wiki
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          git clone -q "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki-repo
+          git clone -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki-repo
           find wiki-repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -r wiki/. wiki-repo/
           cd wiki-repo
