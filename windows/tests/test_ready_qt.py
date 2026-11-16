@@ -1,7 +1,7 @@
 """USB で見えている未接続 → 接続ページ (状態カード・緑の接続ボタン・端末の行)。PySide6 が無い環境では skip。"""
 import pytest
 
-pytest.skip("debug", allow_module_level=True)
+pytest.importorskip("PySide6.QtWidgets")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from phonecam.controller import Controller  # noqa: E402
