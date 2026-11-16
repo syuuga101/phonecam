@@ -44,7 +44,10 @@ final class AppModel: ObservableObject {
     @Published var recError = ""
     @Published var micText = String(localized: "オフ")
     @Published var wifiAllowed = false
+    /// PC のペアリング待ちの間だけ入る 6 桁の照合コード (設定画面にも出す。待っていないときは空)
     @Published var pairingCode = ""
+    @Published var pairedPCCount = 0       // この iPhone が覚えている PC の数
+    @Published var legacyUSBPeer = false   // v1 の PC と USB でつないでいる (両方を最新版にするよう案内する)
     @Published var pairPopup: PairPopup?   // PC からの要求でコードを出しているとき
     // 手元操作 (すべてメインスレッドで更新する)
     @Published var lens = "wide"
@@ -96,7 +99,7 @@ final class AppModel: ObservableObject {
         audioServer = StreamServer(port: StreamServer.audioPort, ignoreIncoming: true, audioCapMs: 60,
                                    role: .audio, security: sec)
         wifiAllowed = sec.wifiAllowed
-        pairingCode = sec.pairingCode
+        pairedPCCount = sec.pinned.count
     }
 
     // encoder のコールバックは任意のスレッドから来るため lock で保護する
@@ -295,12 +298,30 @@ final class AppModel: ObservableObject {
         }
 
         // サーバ
-        // PC のペアリング要求: アプリが前面にあるときだけコードをポップアップで出す (通知は出さない)
-        server.onPairRequest = { [weak self] id, name, _, respond in
-            self?.handlePairRequest(id: id, name: name, respond: respond)
+        // PC のペアリング: アプリが前面にあるときだけコードをポップアップで出す (通知は出さない)
+        server.deviceInfo = { [weak self] in
+            let identity = self?.wirelessIdentity
+            return (identity?.id ?? UUID().uuidString.lowercased(), identity?.name ?? "iPhone",
+                    identity?.model ?? "iPhone", WirelessIdentity.addresses())
+        }
+        server.onPairShow = { [weak self] id, name, _, code, respond in
+            self?.handlePairShow(id: id, name: name, code: code, respond: respond)
         }
         server.onPairDismiss = { [weak self] id in
-            DispatchQueue.main.async { self?.dismissPairPopup(id: id) }
+            DispatchQueue.main.async {
+                self?.dismissPairPopup(id: id)
+                self?.pairingCode = ""
+            }
+        }
+        server.onPaired = { [weak self] name in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.pairedPCCount = self.security.pinned.count
+                self.showToast(String(localized: "wireless.scan.success"), haptic: .success)
+            }
+        }
+        server.onLegacyPeer = { [weak self] in
+            DispatchQueue.main.async { self?.legacyUSBPeer = true }
         }
         // バックグラウンドへ移るとき (アプリスイッチャーの画像にコードが写らないよう) ポップアップは閉じる
         NotificationCenter.default.addObserver(
@@ -357,6 +378,7 @@ final class AppModel: ObservableObject {
             self.updateCameraRunning()
             DispatchQueue.main.async {
                 self.isConnected = false
+                self.legacyUSBPeer = false
                 self.connectionKind = ""
                 self.outputCanvas = nil
                 self.showToast(String(localized: "PCとの接続が切れました"), haptic: .warning)
@@ -869,22 +891,24 @@ final class AppModel: ObservableObject {
         timerQueue.async { [weak self] in self?.sendFullStatus() }
     }
 
-    // MARK: PC からのペアリング要求 (ポップアップ)
+    // MARK: PC からのペアリング (照合コードのポップアップ)
 
-    /// StreamServer の queue から呼ばれる。前面にいるときだけコードを出し、"shown" / "background" を返す。
-    private func handlePairRequest(id: String, name: String, respond: @escaping (String) -> Void) {
+    /// StreamServer の queue から呼ばれる。前面にいるときだけポップアップを出し、"shown" / "background" を返す。
+    /// コードは設定画面にも (待っている間だけ) 出す。コードそのものはネットワークには流れない。
+    private func handlePairShow(id: String, name: String, code: String, respond: @escaping (String) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.pairingCode = code
             guard UIApplication.shared.applicationState == .active else {
                 respond("background")
                 return
             }
-            self.pairPopup = PairPopup(id: id, pcName: name, code: self.security.pairingCode)
+            self.pairPopup = PairPopup(id: id, pcName: name, code: code)
             respond("shown")
         }
     }
 
-    /// ポップアップを閉じる (「閉じる」/ PC が切れた / 認証成功)。id を渡したときは、その要求のものだけ。
+    /// ポップアップを閉じる (「閉じる」/ PC が切れた / コードが合った)。id を渡したときは、その要求のものだけ。
     func dismissPairPopup(id: String? = nil) {
         guard let p = pairPopup, id == nil || p.id == id else { return }
         pairPopup = nil
@@ -894,12 +918,22 @@ final class AppModel: ObservableObject {
     func declinePairPopup() {
         guard let p = pairPopup else { return }
         pairPopup = nil
+        pairingCode = ""
         server.declinePair(id: p.id)
     }
 
-    func regeneratePairingCode() {
-        pairingCode = security.regenerateCode()
-        // 古いコードで認証済みの Wi-Fi 接続は切る (USB はそのまま)
+    /// 覚えている PC をすべて忘れる (次からは PC で再ペアリングが要る)。つながっている Wi-Fi の接続は切る (USB はそのまま)
+    /// QR でのペアリング (WirelessScanner) が使う、この iPhone の鍵と覚えている PC
+    var secureIdentity: DeviceIdentity { return security.identity }
+    var pinnedPCs: PinnedPCStore { return security.pinned }
+
+    func pairedPCsChanged() {
+        pairedPCCount = security.pinned.count
+    }
+
+    func resetPairings() {
+        security.pinned.removeAll()
+        pairedPCCount = 0
         server.disconnectNonLoopback()
         audioServer.disconnectNonLoopback()
     }

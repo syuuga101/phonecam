@@ -26,13 +26,26 @@ def test_auto_prefers_usb_without_probing_wifi(monkeypatch, known_iphone):
 def test_auto_finds_registered_device_at_new_address(monkeypatch, known_iphone):
     monkeypatch.setattr(transport, "usbmux_available", lambda: None)
     monkeypatch.setattr(transport, "local_ipv4", lambda: ("192.168.1.100",))
-    found = wireless.read_device({**known_iphone, "addresses": ["192.168.1.8"], "code": "999999"})
+    found = wireless.read_device({**known_iphone, "addresses": ["192.168.1.8"]})
     discover = Mock(return_value=[found])
     monkeypatch.setattr(transport, "discover", discover)
     link = make_link("auto", known_devices=[known_iphone])
-    assert link._resolve() == ("wifi", "192.168.1.8", "012345")
-    assert link._resolve() == ("wifi", "192.168.1.8", "012345")
+    mode, ip, device = link._resolve()
+    assert (mode, ip) == ("wifi", "192.168.1.8") and device.key == known_iphone["key"]
+    assert link._resolve()[:2] == ("wifi", "192.168.1.8")
     discover.assert_called_once_with(("192.168.1.100",))
+
+
+def test_v1_registration_needs_repairing_and_never_connects(monkeypatch, legacy_iphone):
+    """v1 で登録した端末 (鍵なし) は、PIN があっても Wi-Fi につながない。再ペアリングを促す。"""
+    monkeypatch.setattr(transport, "usbmux_available", lambda: None)
+    discover = Mock()
+    monkeypatch.setattr(transport, "discover", discover)
+    link = make_link("auto", known_devices=[legacy_iphone])
+    with pytest.raises(transport.PhoneCamError) as e:
+        link._resolve()
+    assert "再ペアリング" in str(e.value)
+    discover.assert_not_called()
 
 
 def test_wifi_only_does_not_check_usb(monkeypatch):
@@ -76,6 +89,7 @@ def test_control_sender_coalesces_newest_values(monkeypatch):
 def test_send_failure_shuts_down_socket():
     link = make_link("usb")
     link._sock = Mock()
+    link._wire = transport.Wire(None)
     link._sock.sendall.side_effect = OSError("disconnected")
     assert not link._send_control_now({"bitrate": 20})
     link._sock.shutdown.assert_called_once_with(transport.socket.SHUT_RDWR)
@@ -126,81 +140,15 @@ def test_known_devices_drop_invalid_records(known_iphone):
     data = {**known_iphone, "name": " iPhone ", "alias": " Desk ",
             "addresses": ["1.1.1.1", *known_iphone["addresses"]]}
     config = sanitize_settings({**DEFAULT_SETTINGS, "known_devices": [
-        None, {**data, "code": 123456}, {**data, "id": "not-a-uuid"},
-        {**data, "addresses": ["127.0.0.1"]}, data,
+        None, {**data, "key": "zz"}, {**data, "id": "not-a-uuid"}, {**data, "key": 123},
+        {**data, "key": "", "addresses": ["127.0.0.1"]}, {k: v for k, v in data.items() if k != "key"}, data,
     ]})
-    assert config["known_devices"] == [{**known_iphone, "alias": "Desk"}]
+    expected = {**known_iphone, "alias": "Desk", "fp": wireless.read_device(known_iphone).fp}
+    assert config["known_devices"] == [expected]
 
 
-@pytest.fixture
-def pairing(monkeypatch, known_iphone):
-    # Drive each connection with a fake socket so no network service or phone is needed.
-    monkeypatch.setattr(wireless.socket, "socket", MagicMock())
-    monkeypatch.setattr(wireless, "Thread", Mock())
-    clock = Mock(return_value=100)
-    monkeypatch.setattr(wireless.time, "monotonic", clock)
-    accepted = Mock()
-    with closing(wireless.Pairing(["192.168.1.3"], accepted, seconds=10)) as server:
-        payload = {**known_iphone, "alias": "untrusted", "token": server._token, "v": wireless.VERSION}
-        yield server, payload, accepted, clock
-
-
-def pairing_socket(payload):
-    conn = MagicMock()
-    conn.__enter__.return_value = conn
-    conn.recv.side_effect = [json.dumps(payload).encode() + b"\n", b""]
-    return conn
-
-
-def handle(server, conn, accepted):
-    with server._lock:
-        server._active += 1
-    server._handle(conn, "192.168.1.8", accepted)
-
-
-def test_pairing_rejects_invalid_input_then_accepts_once(pairing):
-    server, payload, accepted, _ = pairing
-    for invalid in ([1], {**payload, "token": "incorrect"}, {**payload, "v": -1},
-                    {**payload, "code": "invalid"}):
-        conn = pairing_socket(invalid)
-        handle(server, conn, accepted)
-        conn.sendall.assert_not_called()
-    accepted.assert_not_called()
-    valid = pairing_socket(payload)
-    handle(server, valid, accepted)
-    valid.sendall.assert_called_once_with(b'{"ok":true}\n')
-    device = accepted.call_args.args[0]
-    assert device.addresses == ("192.168.1.8", "192.168.1.7") and not device.alias
-    replay = pairing_socket(payload)
-    handle(server, replay, accepted)
-    replay.sendall.assert_not_called()
-    assert accepted.call_count == 1
-
-
-def test_pairing_rejects_expired_token(pairing):
-    server, payload, accepted, clock = pairing
-    clock.return_value = 110
-    conn = pairing_socket(payload)
-    handle(server, conn, accepted)
-    accepted.assert_not_called()
-    conn.sendall.assert_not_called()
-
-
-def test_pairing_only_one_simultaneous_request_wins(pairing, monkeypatch):
-    server, payload, accepted, _ = pairing
-    read = server._read
-    ready = threading.Barrier(2)
-
-    def read_at_same_time(conn, peer):
-        device = read(conn, peer)
-        ready.wait(timeout=5)
-        return device
-
-    monkeypatch.setattr(server, "_read", read_at_same_time)
-    sockets = [pairing_socket(payload), pairing_socket(payload)]
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        for job in [pool.submit(handle, server, conn, accepted) for conn in sockets]:
-            job.result(timeout=6)
-    assert accepted.call_count == 1
-    assert sum(conn.sendall.call_count for conn in sockets) == 1
-    assert server._active == 0
+def test_v1_registration_is_kept_as_repair_without_sending_the_pin(legacy_iphone):
+    config = sanitize_settings({**DEFAULT_SETTINGS, "known_devices": [legacy_iphone]})
+    device = wireless.read_device(config["known_devices"][0])
+    assert device.needs_repair and device.registered and not device.paired
+    assert config["known_devices"][0]["repair"] is True

@@ -32,6 +32,12 @@ jobs:
           swiftc PhoneCam/PairRequest.swift PhoneCam/Packet.swift Tests/PairRequestChecks.swift -o "$RUNNER_TEMP/phonecam-pair-checks"
           "$RUNNER_TEMP/phonecam-pair-checks"
 
+      - name: Test handshake v2 (shared test vectors)
+        working-directory: ios
+        run: |
+          swiftc PhoneCam/Secure.swift Tests/HandshakeChecks.swift -o "$RUNNER_TEMP/phonecam-handshake-checks"
+          "$RUNNER_TEMP/phonecam-handshake-checks" ../docs/test-vectors/handshake-v2.json
+
       - name: Test recording session rules
         working-directory: ios
         run: |

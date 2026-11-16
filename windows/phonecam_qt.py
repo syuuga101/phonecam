@@ -15,6 +15,19 @@ def _selftest():
     try:
         import av, numpy, zeroconf, qrcode, PIL.Image, PIL.ImageDraw  # noqa: F401
         lines.append("imports ok: av %s numpy %s qrcode PIL %s" % (av.__version__, numpy.__version__, PIL.__version__))
+        # 通信の暗号 (v2): X25519・HKDF・ChaCha20-Poly1305 が同梱されているか、Windows では DPAPI も往復させる
+        from phonecam.core import secure
+        a, b = os.urandom(32), os.urandom(32)
+        if secure.x25519(a, secure.x25519_public(b)) != secure.x25519(b, secure.x25519_public(a)):
+            raise RuntimeError("x25519 mismatch")
+        k = secure.hkdf(b"selftest", b"salt", b"info", 32)
+        ch = secure.Channel(k, b"AAAA", k, b"AAAA")
+        if ch.open(ch.seal(1, b"hello")[5:])[1] != b"hello":
+            raise RuntimeError("aead round trip failed")
+        if sys.platform == "win32":
+            if secure.unprotect_secret(*secure.protect_secret(b"x" * 32)) != b"x" * 32:
+                raise RuntimeError("dpapi round trip failed")
+        lines.append("crypto ok")
         qr = qrcode.QRCode(border=1)
         qr.add_data("http://192.168.0.1:8080")
         qr.make(fit=True)

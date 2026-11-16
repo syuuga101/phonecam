@@ -14,9 +14,10 @@ from PySide6.QtWidgets import (
     QButtonGroup, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QVBoxLayout, QWidget,
 )
 
-from phonecam.core import pairreq
+from phonecam.core.handshake import PairSession
+from phonecam.core.usbmux import wifi_connect
 from phonecam.core.wireless import (
-    PAIR_SECONDS, Pairing, discover, hotspot_on, ipv4, merge_devices, on_tether, read_device, route_of,
+    PAIR_SECONDS, Device, Pairing, discover, hotspot_on, ipv4, merge_devices, on_tether, read_device, route_of,
 )
 from phonecam.core.settings import normalize_pair_code, valid_pair_code
 from phonecam.i18n import t
@@ -38,7 +39,9 @@ def local_addresses():
 
 
 class PairDialog(QDialog):
-    def __init__(self, parent):
+    """QR で iPhone を追加する。identity はこの PC の長期鍵 (QR にはそのフィンガープリントが入る)。"""
+
+    def __init__(self, parent, identity):
         super().__init__(parent)
         self.setWindowTitle(t("wireless.add"))
         self.device = None
@@ -64,7 +67,7 @@ class PairDialog(QDialog):
         self.received.timeout.connect(self._receive)
         try:
             import qrcode
-            self.listener = Pairing(local_addresses(), self.inbox.put)
+            self.listener = Pairing(local_addresses(), self.inbox.put, identity)
             with BytesIO() as buffer:
                 qrcode.make(self.listener.url, box_size=5).save(buffer, format="PNG")
                 pixmap = QPixmap()
@@ -234,17 +237,25 @@ class Disclosure(QWidget):
         self.toggled.emit(value)
 
 
-class CodeDialog(QDialog):
-    """未登録の iPhone に初めてつなぐときだけ出す、6桁コードの入力。
-    address があれば、iPhone へ「ペアリング要求」を送り、iPhone の画面にコードをポップアップで出してもらう。
-    対応していない iPhone や返事がないときは、今までどおり設定画面でコードを確認してもらう。"""
+def default_session(address, identity, on_state):
+    """画面から使うペアリング (コード方式)。Wi-Fi の address の iPhone に、PC のほうから始める。"""
+    return PairSession(lambda: wifi_connect(address), identity, socket.gethostname()[:40], on_state).start()
 
-    def __init__(self, parent, name, address=None, requester=pairreq.PairRequester):
+
+class CodeDialog(QDialog):
+    """まだペアリングしていない iPhone につなぐときの、6桁の照合コードの入力。
+    PC が iPhone に接続を始めると、iPhone の画面にその接続だけの 6 桁が出る。それを入力して合えば、
+    お互いの鍵を保存する (次からは入力不要)。address が無いとき (デモ) は、入力欄だけを出す。
+    コードは使い捨て: 違っていたら作り直す (もう一度「つなぐ」から)。"""
+
+    def __init__(self, parent, name, address=None, identity=None, session=default_session):
         super().__init__(parent)
         self.setWindowTitle(t("wireless.code_title"))
         self.declined = False
-        self.requester = None
+        self.session = None
+        self.peer = None             # ペアリングできたときの相手の情報 (secure.parse_peer の形)
         self.states = SimpleQueue()
+        self._submitted = False
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
         head = PlainLabel(t("wireless.code_for", name=clip_text(name)))
@@ -280,7 +291,7 @@ class CodeDialog(QDialog):
         self.poll = QTimer(self, interval=100)
         self.poll.timeout.connect(self._poll)
         if address:
-            self.requester = requester(address, socket.gethostname(), self.states.put).start()
+            self.session = session(address, identity, self.states.put)
             self.poll.start()
 
     def _poll(self):
@@ -289,35 +300,64 @@ class CodeDialog(QDialog):
                 state = self.states.get_nowait()
             except Empty:
                 return
-            if state == pairreq.SHOWN:
-                self.note.setText(t("wireless.code_note_popup"))
-            elif state == pairreq.BACKGROUND:
-                self.note.setText(t("wireless.code_note_background"))
-            elif state == pairreq.DECLINED:
+            if state == "paired":
+                self.peer = self.session.result
+                self.accept()
+                return
+            if state == "declined":
                 self.declined = True
                 self.reject()
                 return
+            if state == "waiting":
+                self.note.setText(t("wireless.code_note_wait"))
+            elif state == "shown":
+                self.note.setText(t("wireless.code_note_popup"))
+            elif state == "background":
+                self.note.setText(t("wireless.code_note_background"))
+            elif state == "code":
+                self.note.setText(t("wireless.code_note"))
+            elif state == "mismatch":
+                self._finish(t("wireless.code_wrong"))
+            elif state in ("busy", "limited"):
+                self._finish(t("wireless.code_busy"))
+            elif state == "legacy":
+                self._finish(t("wireless.code_legacy"))
             else:
-                self.note.setText(t("wireless.code_note"))   # 今までどおり、iPhone の設定画面で確認してもらう
+                self._finish(t("wireless.code_failed"))
+
+    def _finish(self, text):
+        """このコードではもう進めない (使い捨て)。理由を出して、入力を止める。"""
+        self.note.setText(text)
+        self.edit.setEnabled(False)
+        self.ok.setEnabled(False)
+        self._submitted = True
 
     def done(self, result):
         self.poll.stop()
-        requester, self.requester = self.requester, None
-        if requester is not None:
-            requester.close()   # iPhone のポップアップも閉じてもらう
+        session, self.session = self.session, None
+        if session is not None:
+            session.close()   # iPhone のポップアップも閉じてもらう
         super().done(result)
 
     def _edited(self, text):
         code = normalize_pair_code(text)
         if code != text:
             self.edit.setText(code)
-        self.ok.setEnabled(valid_pair_code(code))
+        self.ok.setEnabled(valid_pair_code(code) and not self._submitted)
 
     def _accept(self):
         code = normalize_pair_code(self.edit.text())
-        if valid_pair_code(code):
-            self.code = code
-            self.accept()
+        if not valid_pair_code(code) or self._submitted:
+            return
+        self.code = code
+        if self.session is None:
+            self.accept()      # iPhone につながない (デモ)
+            return
+        self._submitted = True
+        self.edit.setEnabled(False)
+        self.ok.setEnabled(False)
+        self.note.setText(t("wireless.code_checking"))
+        self.session.submit(code)
 
 
 class Entry:
@@ -332,11 +372,17 @@ class Entry:
 
     @property
     def registered(self):
-        return bool(self.device.code)
+        return self.device.registered
+
+    @property
+    def needs_repair(self):
+        return self.device.needs_repair
 
     def detail(self, state=""):
         parts = [self.device.model, self.address]
-        if state == "connected":
+        if self.needs_repair:
+            parts.append(t("wireless.route.repair"))
+        elif state == "connected":
             # つながっている行に「今は見つかりません」は矛盾するので出さない (検索に出ない USB / 検索前でも)
             parts.append(t("wireless.route.registered") if self.registered else "")
         elif self.found:
@@ -350,7 +396,7 @@ class Entry:
 
     def key(self):
         d = self.device
-        return (d.id, d.title, d.model, d.code, self.address, self.route, self.found)
+        return (d.id, d.title, d.model, d.key, d.repair, self.address, self.route, self.found)
 
 
 class DeviceRow(FitBox):
@@ -387,7 +433,7 @@ class DeviceRow(FitBox):
         if group and len(group.cameras) > 1 and camera is not None:
             lay.addWidget(Hint(t("multi.in_use", camera=group.label(camera)), wrap=False), 0,
                           Qt.AlignmentFlag.AlignVCenter)
-        action = button(t("wireless.disconnect") if state else t("wireless.connect"))
+        action = button(t("wireless.disconnect") if state else t("wireless.repair") if entry.needs_repair else t("wireless.connect"))
         action.setMinimumWidth(84)
         if state:
             action.clicked.connect(lambda: owner.disconnect(entry))
@@ -413,8 +459,6 @@ class WirelessOptions:
         self.expander = None
         self._signature = None
         self._last_status = None
-        self._pending = None
-        self._pending_camera = None
         self.timer = QTimer(page, interval=100)
         self.timer.timeout.connect(self._result)
         self.hint_timer = QTimer(page, interval=12000, singleShot=True)
@@ -515,19 +559,6 @@ class WirelessOptions:
         ip_row = Row("wifi", t("connection.wifi.ip"))
         ip_row.addControl(bound_line(self.ctrl, "ip", width=180))
         self.manual.add(ip_row)
-        code_row = Row("link", t("connection.wifi.code"), t("connection.wifi.code_hint"))
-        self.code_edit = QLineEdit(self.ctrl.get("pair_code", "") or "")
-        self.code_edit.setMaxLength(6)
-        self.code_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.code_edit.setMinimumWidth(120)
-        font = self.code_edit.font()
-        font.setPointSizeF(14.0)
-        font.setWeight(QFont.Weight.DemiBold)
-        self.code_edit.setFont(font)
-        self.code_edit.textEdited.connect(self._code_edited)
-        code_row.addControl(self.code_edit)
-        self.ctrl.settings_changed.connect(self._code_setting)
-        self.manual.add(code_row)
         go_row = Row(None, t("wireless.manual_go"))
         go = go_row.addControl(button(t("wireless.connect")))
         go.clicked.connect(self._manual_connect)
@@ -563,18 +594,16 @@ class WirelessOptions:
         if radio is not None and not radio.isChecked():
             radio.setChecked(True)
 
-    def _code_edited(self, text):
-        code = self.ctrl.set_pair_code(text)   # 数字だけ6桁にそろえる
-        if code != text:
-            self.code_edit.setText(code)
-
-    def _code_setting(self, key, value):
-        if key == "pair_code" and self.code_edit.text() != str(value):
-            self.code_edit.setText(str(value))
-
     def _manual_connect(self):
+        """手で入れた IP につなぐ。その IP の iPhone をまだペアリングしていなければ、先に 6 桁の照合をする。"""
         if self.ctrl.wanted:
             self.ctrl.toggle_connect()
+        address = (self.ctrl.get("ip") or "").strip()
+        known = next((d for d in self._known() if d.paired and address in d.addresses), None)
+        if known is None and address and not self.ctrl.demo:
+            device = self._pair(address, address)
+            if device is None:
+                return
         self.ctrl.changed("target_device", "")
         self.ctrl.changed("usb_serial", "")
         self.ctrl.set_mode("wifi")
@@ -601,7 +630,6 @@ class WirelessOptions:
             self.warning.hide()
         elif not self.hint_timer.isActive() and self.warning.isHidden():
             self.hint_timer.start()
-        self._commit_pending(status)
         self._render()
 
     def _show_hint(self):
@@ -663,7 +691,7 @@ class WirelessOptions:
         out = []
         for device in merge_devices(self._known(), self.discovered):
             live = [ip for ip in device.addresses if ip in found_ips]
-            address = live[0] if live else device.addresses[0]
+            address = live[0] if live else (device.addresses[0] if device.addresses else "")
             out.append(Entry(device, address, route_of(address) if live else "registered", bool(live)))
         return sorted(out, key=lambda e: not e.found)
 
@@ -681,7 +709,7 @@ class WirelessOptions:
                 return ""
         elif status.get("peer") not in entry.device.addresses and camera.get("target_device") != entry.device.id:
             return ""
-        return "connected" if status.get("connected") and status.get("auth_state") != "required" else "connecting"
+        return "connected" if status.get("connected") and status.get("auth_state") != "checking" else "connecting"
 
     def _summary(self, entries):
         # 今選んでいるカメラ (このページの ctrl) 自身の接続の方式。上のカードと同じ status を見る
@@ -756,35 +784,50 @@ class WirelessOptions:
         refit(self.trouble)
 
     # -- 行の操作 -------------------------------------------------------------------
-    def connect_entry(self, entry):
-        if entry.registered:
-            self._start(entry.address, entry.device.code, entry.device)
-            return
-        dialog = CodeDialog(self.page, entry.name, None if self.ctrl.demo else entry.address)
+    def _pair(self, address, name):
+        """コード方式のペアリング (iPhone に 6 桁が出る)。成功したら登録して Device を返す。やめた・失敗したら None。"""
+        dialog = CodeDialog(self.page, name, None if self.ctrl.demo else address, self.ctrl.identity())
         accepted = dialog.exec() == QDialog.DialogCode.Accepted
-        code = dialog.code
+        peer = dialog.peer
         declined = dialog.declined
         dialog.deleteLater()
         if declined:
             self.ctrl.toast.emit(t("wireless.pair_declined"), "error")
-        if not accepted:
-            return
-        device = entry.device
-        self._pending = (replace(device, code=code, addresses=(entry.address,)) if device.id else None)
-        self._start(entry.address, code, replace(device, code=code))
+        if not accepted or peer is None:
+            return None
+        device = Device(peer["id"], peer["name"], ipv4([address, *peer["addresses"]])[:32], "", peer["model"], "",
+                        peer["s"].hex())
+        return self._register(device)
 
-    def _start(self, address, code, device=None):
+    def _register(self, device):
+        group = getattr(self.ctrl, "camera_group", None)
+        root = group.primary if group else self.ctrl
+        device = root.add_known_device(device)
+        self._signature = None
+        self._render()
+        return device
+
+    def connect_entry(self, entry):
+        if entry.device.paired:
+            self._start(entry.address, entry.device)
+            return
+        if not entry.address:
+            self.ctrl.toast.emit(t("wireless.not_found"), "error")
+            return
+        device = self._pair(entry.address, entry.name)
+        if device is not None:
+            self._start(entry.address, device)
+
+    def _start(self, address, device=None):
         group = getattr(self.ctrl, "camera_group", None)
         if group and device:
             camera = group.bind_device(self.ctrl, device, address)
             if camera is None:
                 self.ctrl.toast.emit(t("multi.select_profile"), "error")
             else:
-                if self._pending:
-                    self._pending_camera = camera
                 camera.toggle_connect()
         else:
-            self._apply(address, code)
+            self._apply(address)
             self.ctrl.toggle_connect()
 
     def disconnect(self, entry):
@@ -792,30 +835,12 @@ class WirelessOptions:
         if camera and camera.wanted:
             camera.toggle_connect()
 
-    def _apply(self, address, code):
+    def _apply(self, address):
         if self.ctrl.wanted:
             self.ctrl.toggle_connect()
-        previous_ip = self.ctrl.get("ip")
         self.ctrl.set_ip(address)
-        if code or address != previous_ip:
-            self.ctrl.set_pair_code(code)
         if self.ctrl.get("mode") == "usb":
             self.ctrl.set_mode("auto")   # USB だけにしていた人が Wi-Fi の iPhone を選んだとき。「Wi-Fiだけ」は選び直さない限り変えない
-
-    def _commit_pending(self, status):
-        pending = self._pending
-        if not pending:
-            return
-        camera = self._pending_camera or self.ctrl
-        status = camera.status if camera is not self.ctrl else status
-        if not camera.wanted:
-            self._pending = None
-            self._pending_camera = None
-        elif (status.connected and status.get("peer") == pending.addresses[0]
-              and camera.state.snapshot().get("phone_status")):
-            self._pending = None
-            self._pending_camera = None
-            self._save_known([pending, *(item for item in self._known() if item.id != pending.id)])
 
     def _save_known(self, devices):
         group = getattr(self.ctrl, "camera_group", None)
@@ -857,18 +882,14 @@ class WirelessOptions:
                 camera.toggle_connect()
             camera.changed("target_device", "")
             camera.set_ip("")
-            camera.set_pair_code("")
         self._save_known([item for item in self._known() if item.id != entry.device.id])
 
     def _show_qr(self):
-        dialog = PairDialog(self.page)
+        dialog = PairDialog(self.page, self.ctrl.identity())
         dialog.exec()
         device = dialog.device
         dialog.deleteLater()
         if not device:
             return
-        old = next((item for item in self._known() if item.id == device.id), None)
-        if old and old.alias:
-            device = replace(device, alias=old.alias)
-        self._save_known([device, *(item for item in self._known() if item.id != device.id)])
-        self._start(device.addresses[0], device.code, device)
+        device = self._register(device)
+        self._start(device.addresses[0] if device.addresses else "", device)

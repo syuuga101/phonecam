@@ -3,7 +3,8 @@ import Network
 import CoreMedia
 
 /// TCP サーバ。メイン (5555) と音声専用チャンネル (5556) の両方にこのクラスを使う。
-/// USB (usbmux 経由のループバック) は信頼する。Wi-Fi は SecurityManager の許可とペアリングコードが必要。
+/// プロトコル v2: どの接続も最初にハンドシェイク (Secure.swift) で相手の鍵を確かめる。Wi-Fi は成立したあと全メッセージを
+/// AEAD で包む。USB (usbmux 経由のループバック) は認証だけして平文のまま。v1 の PC との Wi-Fi は受け付けない。
 final class StreamServer {
     enum Role {
         case main
@@ -30,16 +31,33 @@ final class StreamServer {
         self.role = role
         self.security = security
         self.bonjourService = bonjourService
+        if role == .audio {
+            // 映像のセッションが変わったら、古いセッションの音声の接続は閉じる (新しいトークンでつなぎ直させる)
+            security.addBindingObserver { [weak self] in
+                self?.queue.async {
+                    guard let self = self else { return }
+                    for p in self.pendings { self.closeSession(p) }
+                    self.dropClient(generation: nil)
+                }
+            }
+        }
     }
 
     var onControl: (([String: Any]) -> Void)?
     var onClientConnected: ((String) -> Void)?
     var onClientDisconnected: (() -> Void)?
-    /// 認証前の PC からのペアリング要求 (プロトコル v1.6)。respond に "shown" か "background" などを渡すと PC へ返事を送る。
-    /// 返事を渡さなければ何も返さない。respond はどのスレッドからでも呼べる。
-    var onPairRequest: ((_ id: String, _ name: String, _ ip: String, _ respond: @escaping (String) -> Void) -> Void)?
-    /// ポップアップを閉じる (要求した PC が切れた / 時間切れ / 認証成功 / 拒否)
+    /// PC のコード方式ペアリング (プロトコル v2): 6 桁の照合コードを画面に出す合図。
+    /// respond に "shown" か "background" を渡すと PC へ「iPhone に出ている / アプリが前面にない」を知らせる。
+    /// respond はどのスレッドからでも呼べる。
+    var onPairShow: ((_ id: String, _ name: String, _ ip: String, _ code: String, _ respond: @escaping (String) -> Void) -> Void)?
+    /// ポップアップを閉じる (要求した PC が切れた / 時間切れ / コードが合った / 拒否)
     var onPairDismiss: ((_ id: String) -> Void)?
+    /// ペアリングが済んで PC の鍵を覚えた (PC 名)
+    var onPaired: ((_ name: String) -> Void)?
+    /// v1 の PC が USB でつないできた (平文のまま受け付ける。警告を出す)
+    var onLegacyPeer: (() -> Void)?
+    /// ペアリングの自己紹介に使う、この iPhone の ID・名前・機種名・アドレス
+    var deviceInfo: (() -> (id: String, name: String, model: String, addresses: [String]))?
 
     private let queue = DispatchQueue(label: "phonecam.server")
     private var listener: NWListener?
@@ -50,6 +68,7 @@ final class StreamServer {
     // 以下は lock で保護 (どのスレッドからも送信できるようにする)
     private let lock = NSLock()
     private var client: NWConnection?
+    private var clientChannel: SecureChannel?   // Wi-Fi で認証済みのクライアントへ送るものを包む (seal と送信は lock 内で続けて行う)
     private var clientReady = false
     private var generation = 0
     private var pendingVideoFrames = 0
@@ -63,6 +82,13 @@ final class StreamServer {
 
     /// 1 本の接続 (queue 上でのみ触る)
     private final class Session {
+        enum Phase {
+            case first        // 最初のメッセージ待ち
+            case pairing      // コード方式ペアリングの途中
+            case connecting   // 通常接続のハンドシェイクの途中
+            case established  // 認証済み
+        }
+
         let conn: NWConnection
         let ip: String
         let loopback: Bool
@@ -70,10 +96,17 @@ final class StreamServer {
         var ready = false
         var closed = false
         var isClient = false
-        var pairID: String?      // この接続が送ってきたペアリング要求の ID (1 接続に 1 つだけ)
+        var pairID: String?      // コードのポップアップを出している間の ID
         var gen = 0
         var parser = PacketParser()
         var timeout: DispatchWorkItem?
+        var legacyTimer: DispatchWorkItem?
+        var expires = TimeInterval.infinity     // この時刻 (systemUptime) を過ぎた認証前の接続は閉じる
+        var phase = Phase.first
+        var channel: SecureChannel?             // Wi-Fi で認証が済んだあとの暗号化 (USB・v1 は nil)
+        var pair: PairResponder?
+        var pairStage = 0        // 1: m2 を送った / 2: コード表示中 (confirm 待ち) / 3: confirm 済み (自己紹介待ち)
+        var connect: ConnectResponder?
 
         init(conn: NWConnection, ip: String, loopback: Bool, authorized: Bool) {
             self.conn = conn
@@ -85,9 +118,10 @@ final class StreamServer {
 
     // queue 上でのみ触る
     private var activeSession: Session?
-    private var pendings: [Session] = []     // 認証待ちの Wi-Fi 接続 (クライアントにはまだならない)
-    private var activePairSession: Session?  // ペアリングコードのポップアップを出している要求の接続 (常に 1 つだけ)
+    private var pendings: [Session] = []     // 認証前の接続 (クライアントにはまだならない。同じ送信元は 1 本・全部で 4 本まで)
+    private var activePairSession: Session?  // コードのポップアップを出している接続 (常に 1 つだけ)
     private var pairGate = PairRequestGate()
+    private static let maxPendings = 4
 
     // MARK: - 開始 / 停止
 
@@ -151,6 +185,7 @@ final class StreamServer {
     /// queue 上: リスナーが .ready でなければ作り直す
     private func checkListenerHealth() {
         guard running else { return }
+        sweepExpired()
         guard let l = listener else {
             startListener()
             return
@@ -212,24 +247,44 @@ final class StreamServer {
 
     // MARK: - 接続の受け入れ (queue 上)
 
+    private static var uptime: TimeInterval { return ProcessInfo.processInfo.systemUptime }
+
     private func handleNewConnection(_ conn: NWConnection) {
         let info = StreamServer.remoteInfo(conn.endpoint)
+        sweepExpired()
 
         if !info.loopback {
-            // Wi-Fi: 許可が無い / ロックアウト中 / 音声チャンネルで認証済み IP 以外 は即切断。
-            // 既存のクライアントは置き換えない。
+            // Wi-Fi: 許可が無い / ロックアウト中は即切断。既存のクライアントは置き換えない。
             if !security.wifiAllowed || security.isLockedOut(info.ip) {
-                conn.cancel()
-                return
-            }
-            if role == .audio && !security.isAuthorizedIP(info.ip) {
                 conn.cancel()
                 return
             }
         }
 
-        let needsAuth = (role == .main && !info.loopback)
-        let s = Session(conn: conn, ip: info.ip, loopback: info.loopback, authorized: !needsAuth)
+        // 音声チャンネル: 映像のハンドシェイクで結び付けられた相手 (同じ IP) だけ。v1 の PC との USB だけはトークンなしで受ける
+        var legacyAudio = false
+        if role == .audio {
+            guard let binding = security.audioBinding, binding.loopback == info.loopback,
+                  info.loopback || (binding.keys != nil && binding.ip == info.ip) else {
+                conn.cancel()
+                return
+            }
+            legacyAudio = binding.keys == nil
+        }
+
+        let s = Session(conn: conn, ip: info.ip, loopback: info.loopback, authorized: legacyAudio)
+
+        if !s.authorized {
+            // 認証前の接続: 同じ送信元は 1 本だけ (古い方を閉じる)、全部で 4 本まで。ハンドシェイクは 10 秒で期限切れ
+            for p in pendings where p.ip == info.ip { closeSession(p) }
+            if pendings.count >= StreamServer.maxPendings {
+                conn.cancel()
+                return
+            }
+            s.parser.maxPayload = PairRequestRules.maxPreAuthBytes
+            pendings.append(s)
+            scheduleClose(s, after: SecureCrypto.handshakeSeconds)
+        }
 
         conn.stateUpdateHandler = { [weak self, weak s] state in
             guard let self = self, let s = s else { return }
@@ -244,22 +299,18 @@ final class StreamServer {
         }
 
         if s.authorized {
+            s.phase = .established
             activate(s)
-        } else {
-            s.parser.maxPayload = PairRequestRules.maxPreAuthBytes   // 認証前は小さなメッセージだけ受ける
-            pendings.append(s)
-            if pendings.count > 4 {
-                let oldest = pendings.removeFirst()
-                closeSession(oldest)
-            }
-        }
-
-        // 接続確立が終わらないまま止まった接続を捨てる
-        queue.asyncAfter(deadline: .now() + 10.0) { [weak self, weak s] in
-            guard let self = self, let s = s, !s.ready, !s.closed else { return }
-            self.closeSession(s)
         }
         conn.start(queue: queue)
+    }
+
+    /// 認証前で期限切れ (または閉じ済み) の接続を片付ける
+    private func sweepExpired() {
+        let now = StreamServer.uptime
+        for p in pendings where p.closed || now >= p.expires {
+            closeSession(p)
+        }
     }
 
     /// 認可済みの接続を現在のクライアントにする (古いクライアントは置き換える)
@@ -269,6 +320,7 @@ final class StreamServer {
         generation += 1
         s.gen = generation
         client = s.conn
+        clientChannel = s.channel
         clientReady = false
         pendingVideoFrames = 0
         pendingAudioBytes = 0
@@ -288,9 +340,6 @@ final class StreamServer {
         s.isClient = true
         old?.cancel()
 
-        if role == .main {
-            security.setAuthorizedIP(s.loopback ? nil : s.ip)
-        }
         if s.ready {
             markClientReady(s)
         }
@@ -311,41 +360,65 @@ final class StreamServer {
         receiveLoop(s)
         if s.isClient {
             markClientReady(s)
-        } else if !s.authorized {
-            // 認証前: authRequired の status を 1 つだけ送り、5 秒以内の auth を待つ
-            // pairPopup: ペアリング要求 (v1.6) に対応している。古い PC アプリは未知のキーを無視する
-            sendRaw(s, status: ["authRequired": true, "authOk": false, "pairPopup": 1])
+        } else if role == .main && s.loopback && s.phase == .first {
+            // v1 の PC は hs を送らない。USB で 1.5 秒何も来なければ、旧方式 (平文) として受け付ける
             let item = DispatchWorkItem { [weak self, weak s] in
-                guard let self = self, let s = s, !s.authorized, !s.closed else { return }
-                self.authFailed(s)
+                guard let self = self, let s = s, !s.closed, s.phase == .first else { return }
+                self.becomeLegacy(s, first: nil)
             }
-            s.timeout = item
-            queue.asyncAfter(deadline: .now() + 5.0, execute: item)
+            s.legacyTimer = item
+            queue.asyncAfter(deadline: .now() + 1.5, execute: item)
+        }
+    }
+
+    /// 認証の失敗として数える。ロックアウトが始まったら、その IP の接続を (認証前も済みも) 全部切る
+    private func registerFailure(_ s: Session) {
+        if security.noteFailure(s.ip) {
+            cutAll(ip: s.ip, except: s)
         }
     }
 
     private func authFailed(_ s: Session) {
-        security.noteFailure(s.ip)
+        registerFailure(s)
         closeSession(s)
     }
 
-    private func authSucceeded(_ s: Session) {
+    private func cutAll(ip: String, except keep: Session?) {
+        for p in pendings where p.ip == ip && !p.loopback && p !== keep {
+            closeSession(p)
+        }
+        if let a = activeSession, !a.loopback, a.ip == ip, a !== keep {
+            dropClient(generation: nil)
+        }
+    }
+
+    /// 認証が通った: クライアントにする。main なら音声チャンネルの結び付け情報も差し替える。
+    private func authSucceeded(_ s: Session, keys: SessionKeys?) {
         security.noteSuccess(s.ip)
         s.authorized = true
-        s.parser.maxPayload = PacketParser.defaultMaxPayload
+        s.phase = .established
+        s.parser.maxPayload = PacketParser.defaultMaxPayload + SecureChannel.overhead
         s.timeout?.cancel()
         s.timeout = nil
+        s.legacyTimer?.cancel()
+        s.legacyTimer = nil
         pendings.removeAll { $0 === s }
-        // 認証が通ったので、コードのポップアップは閉じる
-        if let p = activePairSession {
-            if p === s {
-                activePairSession = nil
-                if let id = p.pairID { onPairDismiss?(id) }
-            } else {
-                closeSession(p)
-            }
+        // 認証が通ったので、ほかの要求のコードのポップアップは閉じる
+        if let p = activePairSession, p !== s {
+            closeSession(p)
         }
         activate(s)
+        if role == .main {
+            security.setAudioBinding(AudioBinding(ip: s.loopback ? "" : s.ip, loopback: s.loopback, keys: keys))
+        }
+    }
+
+    /// v1 の PC (hs を知らない) との USB: 旧方式のまま受け付ける。Wi-Fi ではここに来ない
+    private func becomeLegacy(_ s: Session, first: (type: UInt8, payload: Data)?) {
+        guard s.loopback, role == .main else { closeSession(s); return }
+        authSucceeded(s, keys: nil)
+        onLegacyPeer?()
+        if let first = first { handleMessage(s, first) }
     }
 
     /// 接続を閉じて後始末する (冪等)
@@ -354,6 +427,8 @@ final class StreamServer {
         s.closed = true
         s.timeout?.cancel()
         s.timeout = nil
+        s.legacyTimer?.cancel()
+        s.legacyTimer = nil
         pendings.removeAll { $0 === s }
         if activePairSession === s {
             activePairSession = nil
@@ -376,6 +451,7 @@ final class StreamServer {
         let conn = client
         let wasConnected = clientReady
         client = nil
+        clientChannel = nil
         clientReady = false
         pendingVideoFrames = 0
         pendingAudioBytes = 0
@@ -392,7 +468,7 @@ final class StreamServer {
             activeSession = nil
         }
         if role == .main {
-            security.setAuthorizedIP(nil)
+            security.setAudioBinding(nil)
         }
         conn?.cancel()
         if wasConnected {
@@ -403,15 +479,16 @@ final class StreamServer {
     private func receiveLoop(_ s: Session) {
         s.conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self = self, !s.closed else { return }
-            if let data = data, !data.isEmpty, !self.ignoreIncoming {
+            // 音声チャンネルは、認証 (トークン) が済んだあとの受信データは読み捨てる (接続の健全性のために読み続ける)
+            if let data = data, !data.isEmpty, !(self.ignoreIncoming && s.authorized) {
                 s.parser.append(data)
                 while let msg = s.parser.next() {
-                    self.handleMessage(s, msg)
+                    self.handleFrame(s, msg)
                     if s.closed { break }
                 }
-                // 認証前に大きすぎるメッセージを送ってきた接続は、失敗として数えて切る
-                if !s.closed && !s.authorized && s.parser.overflowed {
-                    self.authFailed(s)
+                if !s.closed && s.parser.overflowed {
+                    // 認証前の大きすぎるメッセージは失敗として数える。認証後は壊れたストリームなので切る
+                    if s.authorized { self.closeSession(s) } else { self.authFailed(s) }
                     return
                 }
             }
@@ -424,63 +501,231 @@ final class StreamServer {
         }
     }
 
+    /// 外側のメッセージ 1 つ。Wi-Fi で認証が済んだあとは暗号化されたものだけを受け、復号に失敗したら (改ざん・再送・順番違い) 切る。
+    private func handleFrame(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard s.authorized else {
+            handleHandshake(s, msg)
+            return
+        }
+        if let channel = s.channel {
+            guard msg.type == SecureChannel.messageType, let opened = try? channel.open(msg.payload) else {
+                closeSession(s)
+                return
+            }
+            handleMessage(s, (opened.type, opened.payload))
+        } else {
+            guard msg.type != SecureChannel.messageType else {   // 平文の接続に暗号化されたメッセージが来た
+                closeSession(s)
+                return
+            }
+            handleMessage(s, msg)
+        }
+    }
+
+    /// 認証済みの接続のメッセージ
     private func handleMessage(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
         guard msg.type == PacketType.control,
               let obj = try? JSONSerialization.jsonObject(with: msg.payload) as? [String: Any] else { return }
-
-        if !s.authorized {
-            // 認証前は pairRequest / pairCancel と auth 以外を無視する (pong も返さない)
-            if let pair = PairRequestMessage(control: obj) {
-                handlePairMessage(s, pair)
-                return
-            }
-            guard let a = obj["auth"] as? [String: Any] else { return }
-            let code = (a["code"] as? String) ?? ""
-            if security.verify(code) {
-                authSucceeded(s)
-            } else {
-                authFailed(s)
-            }
-            return
-        }
-        // 認可済みクライアントが送る auth は無視する (他のキーは通常どおり処理)
         if let ping = obj["ping"] as? NSNumber {
             sendPong(ping)
         }
         onControl?(obj)
     }
 
-    // MARK: - ペアリング要求 (認証前。プロトコル v1.6)
+    // MARK: - ハンドシェイク (認証前。queue 上)
 
-    /// 要求の処理 (queue 上)。認証前の接続だけがここに来る。
-    /// 受け付けても認証は通らない。コードは画面に出すだけで、ネットワークには送らない。
-    private func handlePairMessage(_ s: Session, _ msg: PairRequestMessage) {
-        switch msg {
-        case .cancel(let id):
-            if s.pairID == id { closeSession(s) }
-        case .request(let id, let name):
-            guard s.pairID == nil else { return }   // 1 接続に 1 回だけ
-            s.pairID = id
-            let decision = pairGate.evaluate(ip: s.ip, activeIP: activePairSession?.ip,
-                                             now: ProcessInfo.processInfo.systemUptime)
+    private func handleHandshake(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        if role == .audio {
+            handleAudioHello(s, msg)
+            return
+        }
+        switch s.phase {
+        case .first:
+            s.legacyTimer?.cancel()
+            s.legacyTimer = nil
+            handleFirst(s, msg)
+        case .pairing:
+            handlePairing(s, msg)
+        case .connecting:
+            handleConnecting(s, msg)
+        case .established:
+            break
+        }
+    }
+
+    private func handleFirst(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard msg.type == PacketType.control, let hs = SecureMessage.parse(msg.payload) else {
+            // hs ではない: v1 の PC。USB だけ旧方式のまま受け、Wi-Fi は「最新版にしてください」と返して切る
+            if s.loopback {
+                becomeLegacy(s, first: msg)
+            } else {
+                sendHS(s, [("err", "version")], thenClose: true)
+            }
+            return
+        }
+        switch hs["mode"] as? String {
+        case "pair": beginPair(s, msg.payload)
+        case "connect": beginConnect(s, msg.payload)
+        default: sendHS(s, [("err", "bad")], thenClose: true)
+        }
+    }
+
+    // 通常接続 -----------------------------------------------------------------
+
+    private func beginConnect(_ s: Session, _ payload: Data) {
+        do {
+            let responder = try ConnectResponder(identity: security.identity)
+            let pinned = security.pinned
+            let c2 = try responder.onC1(payload, lookup: { pinned.lookup($0) })
+            s.connect = responder
+            s.phase = .connecting
+            sendControl(s, c2)
+            scheduleClose(s, after: SecureCrypto.handshakeSeconds)
+        } catch {
+            sendHS(s, [("err", (error as? HSFailure)?.reply ?? "bad")], thenClose: true)
+        }
+    }
+
+    private func handleConnecting(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard msg.type == PacketType.control, let hs = SecureMessage.parse(msg.payload), let responder = s.connect,
+              let keys = responder.keys else {
+            closeSession(s)
+            return
+        }
+        do {
+            try responder.checkConfirm(hs)
+        } catch {
+            sendHS(s, [("err", "auth")], thenClose: true)
+            registerFailure(s)
+            return
+        }
+        // こちらの確認は平文で返す (このあとから Wi-Fi は暗号化)。送信の順序は NWConnection が守る
+        sendControl(s, responder.confirmMessage())
+        s.channel = s.loopback ? nil : SecureChannel.session(keys)
+        authSucceeded(s, keys: keys)
+    }
+
+    // コード方式ペアリング -----------------------------------------------------------
+
+    private func beginPair(_ s: Session, _ payload: Data) {
+        if !s.loopback {
+            let decision = pairGate.evaluate(ip: s.ip, activeIP: activePairSession?.ip, now: StreamServer.uptime)
             guard decision == .accept else {
-                replyPair(s, id: id, state: decision == .busy ? "busy" : "limited", thenClose: true)
+                sendHS(s, [("err", decision == .busy ? "busy" : "limited")], thenClose: true)
                 return
             }
-            if let old = activePairSession, old !== s { closeSession(old) }   // 同じ PC の古い要求を置き換える
-            activePairSession = s
-            // 要求だけの接続は、認証の失敗としては数えない。ポップアップの時間が過ぎたら閉じる
-            scheduleClose(s, after: PairRequestRules.popupSeconds)
-            guard let handler = onPairRequest else {
-                replyPair(s, id: id, state: "unavailable", thenClose: true)
+        }
+        do {
+            let responder = try PairResponder()
+            let m2 = try responder.onM1(payload)
+            s.pair = responder
+            s.phase = .pairing
+            s.pairStage = 1
+            sendControl(s, m2)
+            scheduleClose(s, after: SecureCrypto.handshakeSeconds)
+        } catch {
+            sendHS(s, [("err", "bad")], thenClose: true)
+        }
+    }
+
+    private func handlePairing(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard let responder = s.pair else {
+            closeSession(s)
+            return
+        }
+        switch s.pairStage {
+        case 1:
+            // m3: PC の鍵と約束 (commit) を確かめて、コードを作る
+            guard msg.type == PacketType.control else { closeSession(s); return }
+            do {
+                try responder.onM3(msg.payload)
+            } catch {
+                sendHS(s, [("err", (error as? HSFailure)?.reply ?? "bad")], thenClose: true)
+                registerFailure(s)
                 return
             }
-            handler(id, name, s.ip) { [weak self, weak s] state in
-                self?.queue.async {
-                    guard let self = self, let s = s, !s.closed, s.pairID == id else { return }
-                    self.replyPair(s, id: id, state: state, thenClose: state != "shown")
+            s.pairStage = 2
+            if s.loopback {
+                // USB: 接続そのものが「このコンピュータを信頼」で守られているので、コードの入力は無い
+                scheduleClose(s, after: SecureCrypto.handshakeSeconds)
+                return
+            }
+            showPairCode(s, responder)
+        case 2:
+            guard msg.type == PacketType.control, let hs = SecureMessage.parse(msg.payload) else {
+                closeSession(s)
+                return
+            }
+            if let abort = hs["abort"] as? String {
+                // PC で入力したコードが違った: 失敗として数える。やめた (cancel) は数えない
+                if abort == "mismatch" { registerFailure(s) }
+                closeSession(s)
+                return
+            }
+            do {
+                try responder.checkConfirm(hs)
+            } catch {
+                sendHS(s, [("err", "auth")], thenClose: true)
+                registerFailure(s)
+                return
+            }
+            s.pairStage = 3
+            if activePairSession === s {
+                activePairSession = nil
+                if let id = s.pairID { onPairDismiss?(id) }   // コードが合ったのでポップアップは閉じる
+            }
+            scheduleClose(s, after: SecureCrypto.handshakeSeconds)
+        case 3:
+            guard msg.type == SecureChannel.messageType else { closeSession(s); return }
+            finishPair(s, responder, body: msg.payload)
+        default:
+            closeSession(s)
+        }
+    }
+
+    private func showPairCode(_ s: Session, _ responder: PairResponder) {
+        let id = UUID().uuidString.lowercased()
+        s.pairID = id
+        if let old = activePairSession, old !== s { closeSession(old) }   // 同じ PC の古い要求を置き換える
+        activePairSession = s
+        // ポップアップの時間が過ぎたら閉じる (失敗としては数えない)
+        scheduleClose(s, after: PairRequestRules.popupSeconds)
+        guard let handler = onPairShow else {
+            sendHS(s, [("err", "unavailable")], thenClose: true)
+            return
+        }
+        handler(id, PairRequestRules.sanitizeName(responder.pcName), s.ip, responder.code) { [weak self, weak s] state in
+            self?.queue.async {
+                guard let self = self, let s = s, !s.closed, s.pairID == id else { return }
+                if state == "shown" || state == "background" {
+                    self.sendHS(s, [("ui", state)], thenClose: false)
+                } else {
+                    self.sendHS(s, [("err", "unavailable")], thenClose: true)
                 }
             }
+        }
+    }
+
+    /// PC の自己紹介 (AEAD) を開いて鍵を覚え、こちらの自己紹介を返す
+    private func finishPair(_ s: Session, _ responder: PairResponder, body: Data) {
+        guard let info = deviceInfo?() else { closeSession(s); return }
+        do {
+            let peer = try responder.openPeer(body)
+            let reply = try responder.replyFrame(identity: security.identity, id: info.id, name: info.name,
+                                                 model: info.model, addresses: info.addresses)
+            let name = PairRequestRules.sanitizeName(peer.name)
+            security.pinned.add(pub: peer.pub, name: name, id: peer.id)
+            security.noteSuccess(s.ip)
+            scheduleClose(s, after: PairRequestRules.rejectLinger)
+            s.conn.send(content: reply, completion: .contentProcessed({ [weak self, weak s] _ in
+                self?.queue.async {
+                    if let s = s { self?.closeSession(s) }
+                }
+            }))
+            onPaired?(name)
+        } catch {
+            sendHS(s, [("err", "auth")], thenClose: true)
+            registerFailure(s)
         }
     }
 
@@ -488,30 +733,55 @@ final class StreamServer {
     func declinePair(id: String) {
         queue.async { [weak self] in
             guard let self = self, let s = self.activePairSession, s.pairID == id, !s.closed else { return }
-            self.replyPair(s, id: id, state: "declined", thenClose: true)
+            self.sendHS(s, [("err", "declined")], thenClose: true)
         }
     }
 
-    private func replyPair(_ s: Session, id: String, state: String, thenClose: Bool) {
-        let status: [String: Any] = ["pairReply": ["id": id, "state": state]]
-        guard JSONSerialization.isValidJSONObject(status),
-              let json = try? JSONSerialization.data(withJSONObject: status) else {
-            if thenClose { closeSession(s) }
+    // 音声チャンネル -----------------------------------------------------------------
+
+    /// 音声チャンネルの最初のメッセージ: 映像のセッションのトークン (Wi-Fi は音声用の鍵で包まれている)
+    private func handleAudioHello(_ s: Session, _ msg: (type: UInt8, payload: Data)) {
+        guard let binding = security.audioBinding, let keys = binding.keys, binding.loopback == s.loopback,
+              s.loopback || binding.ip == s.ip else {
+            closeSession(s)
             return
         }
-        if thenClose { scheduleClose(s, after: PairRequestRules.rejectLinger) }   // 送れなくても必ず閉じる
-        s.conn.send(content: Packet.encode(type: PacketType.status, payload: json),
-                    completion: .contentProcessed({ [weak self, weak s] _ in
-            guard thenClose else { return }
-            self?.queue.async {
-                if let s = s { self?.closeSession(s) }
+        var type = msg.type
+        var payload = msg.payload
+        var channel: SecureChannel?
+        if !s.loopback {
+            let audioChannel = SecureChannel.session(keys, audio: true)
+            guard type == SecureChannel.messageType, let opened = try? audioChannel.open(payload) else {
+                closeSession(s)
+                return
             }
-        }))
+            type = opened.type
+            payload = opened.payload
+            channel = audioChannel
+        }
+        guard type == PacketType.control, let hs = SecureMessage.parse(payload),
+              let text = hs["audio_tok"] as? String, let token = SecureHex.decode(text, bytes: 16),
+              SecureCrypto.constantTimeEqual(token, keys.audioTok) else {
+            if !s.loopback { registerFailure(s) }
+            closeSession(s)
+            return
+        }
+        s.channel = channel
+        s.authorized = true
+        s.phase = .established
+        s.parser.maxPayload = PacketParser.defaultMaxPayload + SecureChannel.overhead
+        s.timeout?.cancel()
+        s.timeout = nil
+        pendings.removeAll { $0 === s }
+        activate(s)
     }
+
+    // 送信 (認証前) -------------------------------------------------------------------
 
     /// seconds 秒後に、認証の失敗としては数えずに接続を閉じる (前の予約は取り消す)
     private func scheduleClose(_ s: Session, after seconds: TimeInterval) {
         s.timeout?.cancel()
+        s.expires = StreamServer.uptime + seconds
         let item = DispatchWorkItem { [weak self, weak s] in
             guard let self = self, let s = s else { return }
             self.closeSession(s)
@@ -520,15 +790,25 @@ final class StreamServer {
         queue.asyncAfter(deadline: .now() + seconds, execute: item)
     }
 
-    /// 認証前の接続へ status を直接送る
-    private func sendRaw(_ s: Session, status: [String: Any]) {
-        guard JSONSerialization.isValidJSONObject(status),
-              let json = try? JSONSerialization.data(withJSONObject: status) else { return }
-        s.conn.send(content: Packet.encode(type: PacketType.status, payload: json),
+    /// 認証前の接続へ、ハンドシェイクのメッセージ ({"hs": {...}}) を平文で送る。thenClose なら送ってから閉じる (送れなくても必ず閉じる)
+    private func sendHS(_ s: Session, _ fields: [(String, Any)], thenClose: Bool) {
+        if thenClose { scheduleClose(s, after: PairRequestRules.rejectLinger) }
+        s.conn.send(content: Packet.encode(type: PacketType.control, payload: SecureMessage.encode(fields)),
+                    completion: .contentProcessed({ [weak self, weak s] _ in
+            guard thenClose else { return }
+            self?.queue.async {
+                if let s = s { self?.closeSession(s) }
+            }
+        }))
+    }
+
+    /// 認証前の接続へ、作り済みの本体 (ハンドシェイクの JSON) を control として送る
+    private func sendControl(_ s: Session, _ payload: Data) {
+        s.conn.send(content: Packet.encode(type: PacketType.control, payload: payload),
                     completion: .contentProcessed({ _ in }))
     }
 
-    /// Wi-Fi 側の接続 (認証待ちも含む) をすべて切る。Wi-Fi 許可をオフにしたときやコード変更時。
+    /// Wi-Fi 側の接続 (認証待ちも含む) をすべて切る。Wi-Fi 許可をオフにしたときやペアリングの解除のとき。
     func disconnectNonLoopback() {
         queue.async { [weak self] in
             guard let self = self else { return }
@@ -576,6 +856,15 @@ final class StreamServer {
 
     // MARK: - 送信 (どのスレッドからでも可)
 
+    /// lock を持って呼ぶ。Wi-Fi の認証済みクライアントには暗号化 (種別も本文も包む)、USB は平文のまま。
+    /// 暗号化のカウンタは送る順序と一致させる必要があるので、呼んだら続けて同じ lock の中で send する。
+    private func framed(_ type: UInt8, _ payload: Data) -> Data? {
+        if let channel = clientChannel {
+            return try? channel.seal(type: type, payload: payload)
+        }
+        return Packet.encode(type: type, payload: payload)
+    }
+
     /// 映像フレームを送信する。破棄した場合は false。
     /// キーフレーム以外は、前のフレームが未送信 (送信完了前) だと破棄する。キーフレームは破棄しない。
     /// captureTime (ホスト時計の秒) を渡すと、送信する場合に限り直前に type 5 のタイミングパケットを送る。
@@ -609,10 +898,15 @@ final class StreamServer {
             payload.reserveCapacity(16)
             StreamServer.appendDouble(&payload, ct)
             StreamServer.appendDouble(&payload, StreamServer.hostSeconds())
-            conn.send(content: Packet.encode(type: PacketType.timing, payload: payload),
-                      completion: .contentProcessed({ _ in }))
+            if let timing = framed(PacketType.timing, payload) {
+                conn.send(content: timing, completion: .contentProcessed({ _ in }))
+            }
         }
-        let packet = Packet.encode(type: hevc ? PacketType.videoHevc : PacketType.video, payload: data)
+        guard let packet = framed(hevc ? PacketType.videoHevc : PacketType.video, data) else {
+            lock.unlock()
+            conn.cancel()    // 暗号化できない (起こらない想定): 切って作り直させる
+            return false
+        }
         conn.send(content: packet, completion: .contentProcessed({ [weak self] error in
             guard let self = self else { return }
             self.lock.lock()
@@ -661,13 +955,9 @@ final class StreamServer {
         guard JSONSerialization.isValidJSONObject(obj),
               let json = try? JSONSerialization.data(withJSONObject: obj) else { return }
         lock.lock()
-        guard let conn = client, clientReady else {
-            lock.unlock()
-            return
-        }
-        lock.unlock()
-        conn.send(content: Packet.encode(type: PacketType.pong, payload: json),
-                  completion: .contentProcessed({ _ in }))
+        defer { lock.unlock() }
+        guard let conn = client, clientReady, let packet = framed(PacketType.pong, json) else { return }
+        conn.send(content: packet, completion: .contentProcessed({ _ in }))
     }
 
     /// クライアントが接続済みか
@@ -699,7 +989,6 @@ final class StreamServer {
         }
         pendingAudioBytes += pcm.count
         let gen = generation
-        lock.unlock()
 
         var payload = Data()
         payload.reserveCapacity(13 + pcm.count)
@@ -712,8 +1001,12 @@ final class StreamServer {
         payload.append(1)
         payload.append(pcm)
         let size = pcm.count
-        conn.send(content: Packet.encode(type: PacketType.audio, payload: payload),
-                  completion: .contentProcessed({ [weak self] _ in
+        guard let packet = framed(PacketType.audio, payload) else {
+            pendingAudioBytes = max(0, pendingAudioBytes - size)
+            lock.unlock()
+            return
+        }
+        conn.send(content: packet, completion: .contentProcessed({ [weak self] _ in
             guard let self = self else { return }
             self.lock.lock()
             if self.generation == gen {
@@ -721,6 +1014,7 @@ final class StreamServer {
             }
             self.lock.unlock()
         }))
+        lock.unlock()
     }
 
     static func hostSeconds() -> Double {
@@ -738,14 +1032,13 @@ final class StreamServer {
     func sendStatus(_ status: [String: Any]) {
         // 送り先が無いときは JSON を作らない (大きい辞書の直列化を省く)
         lock.lock()
-        guard let conn = client, clientReady else {
-            lock.unlock()
-            return
-        }
+        let ready = client != nil && clientReady
         lock.unlock()
-        guard JSONSerialization.isValidJSONObject(status),
+        guard ready, JSONSerialization.isValidJSONObject(status),
               let json = try? JSONSerialization.data(withJSONObject: status) else { return }
-        let packet = Packet.encode(type: PacketType.status, payload: json)
+        lock.lock()
+        defer { lock.unlock() }
+        guard let conn = client, clientReady, let packet = framed(PacketType.status, json) else { return }
         conn.send(content: packet, completion: .contentProcessed({ _ in }))
     }
 }

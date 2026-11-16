@@ -111,9 +111,7 @@ def _row_value(row):
         if isinstance(control, (Switch, QCheckBox)):
             return t("status.iphone.on" if control.isChecked() else "status.iphone.off")
         if isinstance(control, QLineEdit):
-            # Do not display the pairing code in a collapsed card.
-            if label != t("connection.wifi.code"):
-                return control.text()
+            return control.text()
         if isinstance(control, QKeySequenceEdit):
             return control.keySequence().toString()
         if isinstance(control, (QLabel, StatusValue)) and control.text() not in ("", "-", NO_VALUE):

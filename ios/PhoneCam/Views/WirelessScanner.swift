@@ -52,9 +52,11 @@ struct WirelessScanner: View {
         message = "wireless.scan.sending"
         let request = WirelessPairClient()
         client = request
-        request.send(invite, identity: model.wirelessIdentity, code: model.pairingCode) { success in
+        request.send(invite, identity: model.wirelessIdentity, secure: model.secureIdentity,
+                     pinned: model.pinnedPCs) { success in
             client = nil
             if success {
+                model.pairedPCsChanged()
                 model.showToast(String(localized: "wireless.scan.success"), haptic: .success)
                 dismiss()
             } else {

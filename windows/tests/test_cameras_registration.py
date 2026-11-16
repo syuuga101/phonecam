@@ -25,12 +25,12 @@ def test_assign_and_unassign_enforce_one_camera_per_device(known_iphone):
     device = cameras.read_device(known_iphone)
     assert group.assign(primary, device, usb_serial="serial")
     assert primary.get("ip") == "192.168.1.7"
-    assert primary.get("pair_code") == "012345"
+    assert primary.get("target_device") == device.id    # ペアリング済みの端末だけ、割り当てると固定される
     assert group.users()[device.id] is primary
     assert not group.assign(second, device)
     assert not group.assign(second, usb_serial="serial")
     assert group.assign(primary)
-    assert [primary.get(key) for key in ("target_device", "usb_serial", "ip", "pair_code")] == [""] * 4
+    assert [primary.get(key) for key in ("target_device", "usb_serial", "ip")] == [""] * 3
     assert group.assign(second, device, usb_serial="serial")
     assert group.users()[device.id] is second
 

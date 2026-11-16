@@ -9,6 +9,8 @@ enum PacketType {
     static let timing: UInt8 = 5
     static let audio: UInt8 = 6
     static let control: UInt8 = 10
+    /// v2: Wi-Fi の認証後はすべてこの種別で包む (種別 + 本文を AEAD で暗号化)
+    static let secure: UInt8 = 20
 }
 
 /// フレーミング: 1バイトの種別 + 4バイト(ビッグエンディアン)のペイロード長 + ペイロード

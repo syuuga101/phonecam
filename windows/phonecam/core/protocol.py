@@ -56,6 +56,12 @@ MSG_AUDIO = 6        # iPhone → PC: マイク音声 (int16 PCM)
 MSG_CONTROL = 10
 
 
+MSG_SECURE = 20      # 双方向 (v2): AEAD で包んだメッセージ。中身は [種別 1 バイト][本文]。Wi-Fi の認証後はこれだけを使う
+
+
+SECURE_OVERHEAD = 1 + 16   # 中の種別 1 バイト + 認証タグ 16 バイト
+
+
 # ---------------------------------------------------------------------------
 # 受信の上限と期限 (監査 #7・#8)
 # ---------------------------------------------------------------------------
@@ -103,6 +109,8 @@ def payload_limit(msg_type, authed=True):
     """種別と認証段階ごとの、1 メッセージの長さの上限。"""
     if not authed:
         return MAX_PREAUTH_PAYLOAD
+    if msg_type == MSG_SECURE:
+        return MAX_VIDEO_PAYLOAD + SECURE_OVERHEAD
     if msg_type in (MSG_VIDEO, MSG_VIDEO_HEVC):
         return MAX_VIDEO_PAYLOAD
     if msg_type == MSG_AUDIO:

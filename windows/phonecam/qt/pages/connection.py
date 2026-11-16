@@ -83,6 +83,10 @@ def frame_to_image(img, fmt, max_w, max_h):
     return qi
 
 
+# 認証 (ペアリング) で止まっている状態。接続中のエラー表示を隠さない
+AUTH_FAILURES = ("failed", "refused", "unpaired", "mismatch", "legacy")
+
+
 class PreviewView(QWidget):
     """ライブプレビュー。内容列の幅 x ratio (既定 2/3) の 16:9 を左上に描き、右下のつまみで拡縮する。
     ratio は設定 preview_width_ratio に保存 (つまみを離したとき)。"""
@@ -381,7 +385,7 @@ class ConnectionPage(Page):
             return t("connection.card.off"), t("connection.card.off_hint"), False
         if s.get("usb_note"):
             return t("connection.card.none"), s.usb_note, False
-        if s.error_text and s.get("auth_state") not in ("failed", "refused"):
+        if s.error_text and s.get("auth_state") not in AUTH_FAILURES:
             return t("connection.card.none"), t("connection.card.none_hint"), False
         return t("connection.card.searching"), "", False
 
@@ -576,7 +580,7 @@ class ConnectionPage(Page):
         self.sub_label.setText(sub)
         self.sub_label.setVisible(bool(sub))
         # 自動のときの「見つかりません」は上の見出しが言うので、赤字は認証の失敗などだけ出す
-        hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in ("failed", "refused")
+        hide_error = self.ctrl.get("mode") == "auto" and not s.connected and s.get("auth_state") not in AUTH_FAILURES
         self.error_label.setText("" if hide_error else s.error_text)
         self.start_btn.setText(t("connection.button.pause") if s.start_is_pause else t("connection.button.start"))
         # 主ボタン (accent) は「つなぐ」「開始」。切断・一時停止は通常色

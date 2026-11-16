@@ -18,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import replace
 from queue import Empty, SimpleQueue
 
 from phonecam.core.audio_engine import AudioEngine, find_vbcable_control_panel
@@ -27,6 +28,8 @@ from phonecam.core.elevate import run_elevated
 from phonecam.core.softcam_reg import EXIT_REGISTER_PARTIAL, camera_namespace, registration_status, x86_registration_status
 from phonecam.core.version import APP_REPO, APP_VERSION
 from phonecam.core.link import Link
+from phonecam.core.secure import load_identity
+from phonecam.core.wireless import read_device
 from phonecam.core.settings import (
     AUDIO_AVAILABLE,
     DEFAULT_SETTINGS,
@@ -34,11 +37,9 @@ from phonecam.core.settings import (
     load_settings,
     migrate_legacy_settings,
     mirror_key,
-    normalize_pair_code,
     sanitize_settings,
     save_settings,
     settings_has_key,
-    valid_pair_code,
 )
 from phonecam.core.softcam_shmem import (
     ConsumerWatcher,
@@ -105,6 +106,8 @@ class Controller:
         slot = settings.get("camera_slot", 1)
         self.link = Link(self.settings, self.state, self._get_mode_ip, audio=self.audio, stream=self.stream, slot=slot)
         self.link.audio_enabled = audio_enabled
+        self.link.on_paired = lambda device: self._results.put((self._apply_paired, device))   # USB の初回ペアリング (Link のスレッドから)
+        self.link.identity = lambda: load_identity(self.settings)
         self.watcher = ConsumerWatcher(SoftcamMemoryReader(name=camera_namespace(slot) + "/SharedMemory"))
         # カメラを作り直す直前に共有メモリの監視を手放す (掴んだままだと同じ名前で作り直せない)
         self.link.vcam.release_hooks.append(lambda: self.watcher.reader.close(hold=CAM_RELEASE_HOLD_SEC))
@@ -182,6 +185,8 @@ class Controller:
         self.watch_state_text = NO_VALUE
         if not self.demo:
             self.apply_audio()
+            if not secondary and self.persist:
+                self.identity()      # 長期鍵を作って保存しておく (ペアリング済みの端末との関係は、この鍵が決める)
         self.poll()
 
     # ------------------------------------------------------------------
@@ -291,8 +296,6 @@ class Controller:
             err = None
             if s["mode"] == "wifi" and not s["ip"].strip():
                 err = t("connection.error.ip")
-            elif s["mode"] == "wifi" and not valid_pair_code(s.get("pair_code", "")):
-                err = t("connection.error.code")
             elif av is None or np is None or (s.get("backend") != "phonecam" and pyvirtualcam is None):
                 err = t("connection.error.libs")
             if err:
@@ -322,14 +325,31 @@ class Controller:
         self.changed("mode", mode, None)
         self.link.retry_auth()   # 認証失敗で止まっていたら、つなぎ方を変えたのでもう一度試す
 
-    def set_pair_code(self, raw):
-        """ペアリングコード入力。数字6桁にそろえた値を返す (UI の欄をその値に直す)。"""
-        code = normalize_pair_code(raw)
-        if code != self.settings.get("pair_code", ""):
-            self.changed("pair_code", code, None)
-            if valid_pair_code(code):
-                self.link.retry_auth()
-        return code
+    def identity(self):
+        """この PC の長期鍵 (無ければ作って保存する)。Qt の QR ダイアログ・コード入力ダイアログが使う。"""
+        before = dict(self.settings.get("identity") or {})
+        ident = load_identity(self.settings)
+        if self.settings.get("identity") != before:
+            self.changed("identity", self.settings["identity"], None)
+            self.save_now()
+        return ident
+
+    def add_known_device(self, device):
+        """ペアリングできた端末を登録に入れて保存する (alias は引き継ぐ)。v1 の古い PIN はここで消す。GUI スレッドから。"""
+        known = [d for entry in self.settings.get("known_devices", []) if (d := read_device(entry))]
+        old = next((d for d in known if d.id == device.id), None)
+        if old is not None and old.alias:
+            device = replace(device, alias=old.alias)
+        merged = [device, *(d for d in known if d.id != device.id)]
+        merged = [replace(d, code="") if not d.paired else d for d in merged]   # v2 でペアリングした時点で旧 PIN は消す
+        self.changed("known_devices", [d.stored() for d in merged[:64]], None)
+        if self.settings.get("pair_code"):
+            self.changed("pair_code", "", None)
+        self.save_now()
+        return device
+
+    def _apply_paired(self, device):
+        self.add_known_device(device)
 
     def set_ip(self, ip):
         if ip != self.settings.get("ip"):

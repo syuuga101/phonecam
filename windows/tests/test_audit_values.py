@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from phonecam.core import protocol, softcam_reg
-from phonecam.core.wireless import token_matches
+from phonecam.core.secure import Identity, QrResponder
 from phonecam.i18n import t
 from phonecam.labels import clip_text, mic_state_key, mic_state_text
 
@@ -45,11 +45,12 @@ def test_clip_text_limits_and_flattens():
 
 
 def test_token_with_surrogate_is_rejected_not_raised():
-    assert token_matches("abc", "abc") is True
-    assert token_matches("abd", "abc") is False
-    assert token_matches("\ud800", "abc") is False
-    assert token_matches(123, "abc") is False
-    assert token_matches(None, "abc") is False
+    token = QrResponder(Identity(b"\x01" * 32, "11111111-2222-4333-8444-555555555555"), "abc")
+    assert token.check_token("abc") is True
+    assert token.check_token("abd") is False
+    assert token.check_token("\ud800") is False
+    assert token.check_token(123) is False
+    assert token.check_token(None) is False
 
 
 def test_non_finite_and_bad_channels_are_dropped():

@@ -43,19 +43,6 @@ struct PairRequestChecks {
         precondition(!PairRequestRules.isValidID("abcd1234\u{0}"))
         precondition(!PairRequestRules.isValidID("あいうえおかきくけこ"))
 
-        // --- 認証前のメッセージの読み取り ---
-        let good: [String: Any] = ["pairRequest": ["v": 1, "id": "abcd1234abcd1234", "name": "Desk\u{202E}PC"]]
-        precondition(PairRequestMessage(control: good) == .request(id: "abcd1234abcd1234", name: "DeskPC"))
-        let cancel: [String: Any] = ["pairCancel": ["id": "abcd1234abcd1234"]]
-        precondition(PairRequestMessage(control: cancel) == .cancel(id: "abcd1234abcd1234"))
-        let noName: [String: Any] = ["pairRequest": ["id": "abcd1234abcd1234"]]
-        precondition(PairRequestMessage(control: noName) == .request(id: "abcd1234abcd1234", name: "PC"))
-        precondition(PairRequestMessage(control: ["pairRequest": ["id": "x"]]) == nil, "Bad id is ignored")
-        precondition(PairRequestMessage(control: ["pairRequest": "nope"]) == nil)
-        precondition(PairRequestMessage(control: ["pairRequest": ["id": 12345678]]) == nil)
-        precondition(PairRequestMessage(control: ["auth": ["code": "123456"]]) == nil, "Auth is not a pair message")
-        precondition(PairRequestMessage(control: ["somethingNew": 1]) == nil, "Unknown messages are ignored")
-
         // --- 表示用のコード ---
         precondition(PairRequestRules.displayCode("123456") == "123 456")
         precondition(PairRequestRules.displayCode("12345") == "12345")
@@ -67,7 +54,7 @@ struct PairRequestChecks {
         let small = Packet.encode(type: PacketType.control, payload: Data(repeating: 0x20, count: 100))
         pre.append(small)
         precondition(pre.next() != nil && !pre.overflowed)
-        pre.append(Packet.encode(type: PacketType.control, payload: Data(repeating: 0x20, count: 2000)))
+        pre.append(Packet.encode(type: PacketType.control, payload: Data(repeating: 0x20, count: 70_000)))
         precondition(pre.next() == nil && pre.overflowed, "Oversized pre-auth message is flagged")
         var after = PacketParser()
         after.maxPayload = PairRequestRules.maxPreAuthBytes
